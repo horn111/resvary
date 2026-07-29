@@ -1,8 +1,7 @@
 /**
- * @arc-nano-kit/sdk
+ * @settlary/sdk
  *
- * Open-source kit for usage-based billing and paid APIs on Arc.
- * Powered by Circle Nanopayments, Gateway batched settlement, and the x402 protocol.
+ * Open-source payment operations for stablecoin apps, built on Arc.
  *
  * @packageDocumentation
  */
@@ -31,7 +30,7 @@ export {
 export { GatewayClient, type GatewayClientConfig } from './gateway/client.js';
 
 export {
-  ArcReceiptWatcher,
+  ReceiptWatcher,
   InMemoryReceiptStore,
   PersistentReceiptLedger,
   PersistentWebhookInbox,
@@ -49,10 +48,10 @@ export {
   signWebhookEvent,
   verifyMemoPaymentProof,
   verifyWebhookSignature,
-  type ArcInvoice,
-  type ArcReceipt,
-  type ArcReceiptOnchainProof,
-  type ArcReceiptWatcherConfig,
+  type PaymentInvoice,
+  type PaymentReceipt,
+  type ReceiptOnchainProof,
+  type ReceiptWatcherConfig,
   type CreateInvoiceInput,
   type FindMemoPaymentProofInput,
   type FindMemoPaymentProofResult,

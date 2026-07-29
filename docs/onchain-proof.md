@@ -1,6 +1,6 @@
 # Arc Testnet Onchain Proof
 
-Arc Testnet Proof Mode adds a read-only verification step to Arc Receipts.
+Arc Testnet Proof Mode adds a read-only verification step to Settlary Receipts.
 
 It lets a builder watch Arc Testnet Memo logs or paste an Arc Testnet transaction hash and prove that a receipt is tied to a real Memo-wrapped USDC payment:
 
@@ -51,7 +51,7 @@ import {
   createMemoPaymentRequest,
   findMemoPaymentProof,
   verifyMemoPaymentProof,
-} from '@arc-nano-kit/sdk/receipts';
+} from '@settlary/sdk/receipts';
 
 const invoice = createInvoice({
   id: 'inv_arc_demo',

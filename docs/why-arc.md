@@ -1,6 +1,6 @@
 # Why Arc?
 
-arc-nano-kit is built specifically for [Arc](https://arc.network), Circle's Layer 1 blockchain. Here's why Arc is the ideal foundation for usage-based billing and paid APIs.
+Settlary is built on [Arc](https://arc.network), Circle's Layer 1 blockchain. Here's why Arc is the foundation for its usage-based billing and paid API workflows.
 
 ## USDC-Native Gas
 

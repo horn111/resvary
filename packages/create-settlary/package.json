@@ -1,9 +1,9 @@
 {
-  "name": "create-arc-nano-kit",
+  "name": "create-settlary",
   "version": "0.1.0",
-  "description": "CLI to scaffold arc-nano-kit applications",
+  "description": "CLI to scaffold Settlary applications",
   "bin": {
-    "create-arc-nano-kit": "./dist/index.js"
+    "create-settlary": "./dist/index.js"
   },
   "scripts": {
     "build": "tsc",

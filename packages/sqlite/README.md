@@ -1,13 +1,13 @@
-# @arc-nano-kit/sqlite
+# @settlary/sqlite
 
-Optional SQLite receipt store for `arc-nano-kit`.
+Optional SQLite receipt store for `settlary`.
 
 ```ts
-import { PersistentReceiptLedger } from '@arc-nano-kit/sdk/receipts';
-import { createSqliteReceiptStore } from '@arc-nano-kit/sqlite';
+import { PersistentReceiptLedger } from '@settlary/sdk/receipts';
+import { createSqliteReceiptStore } from '@settlary/sqlite';
 
 const store = createSqliteReceiptStore({
-  path: '.arc-nano-kit/receipts.sqlite',
+  path: '.settlary/receipts.sqlite',
 });
 
 const ledger = new PersistentReceiptLedger({ store });

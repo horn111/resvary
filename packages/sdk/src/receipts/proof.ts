@@ -12,7 +12,7 @@ import {
 } from 'viem';
 import { ARC_TESTNET } from '../constants.js';
 import { ARC_MEMO_ABI, ERC20_TRANSFER_ABI } from './memo-payment.js';
-import type { ArcReceiptOnchainProof, MemoPaymentRequest } from './types.js';
+import type { ReceiptOnchainProof, MemoPaymentRequest } from './types.js';
 
 export type ProofTransactionReceipt = {
   status: string;
@@ -77,7 +77,7 @@ export interface VerifyMemoPaymentProofInput {
 }
 
 export interface VerifyMemoPaymentProofResult {
-  proof: ArcReceiptOnchainProof;
+  proof: ReceiptOnchainProof;
 }
 
 export interface FindMemoPaymentProofInput {
@@ -94,7 +94,7 @@ export interface FindMemoPaymentProofInput {
 export type FindMemoPaymentProofResult =
   | {
       status: 'found';
-      proof: ArcReceiptOnchainProof;
+      proof: ReceiptOnchainProof;
       txHash: `0x${string}`;
       fromBlock: bigint;
       toBlock: bigint;
@@ -117,7 +117,7 @@ type ProofSearchRange = {
 type MemoProofCandidateResult =
   | {
       status: 'found';
-      proof: ArcReceiptOnchainProof;
+      proof: ReceiptOnchainProof;
       txHash: `0x${string}`;
     }
   | {
@@ -127,7 +127,7 @@ type MemoProofCandidateResult =
 
 export async function verifyMemoPaymentProof(
   input: VerifyMemoPaymentProofInput,
-): Promise<ArcReceiptOnchainProof> {
+): Promise<ReceiptOnchainProof> {
   const client = input.publicClient ?? createPublicClient({
     transport: http(input.rpcUrl ?? ARC_TESTNET.rpcUrl),
   });
@@ -290,7 +290,7 @@ export function createMemoPaymentProofFromReceipt(params: {
   paymentRequest: MemoPaymentRequest;
   txReceipt: ProofTransactionReceipt;
   verifiedAt?: number;
-}): ArcReceiptOnchainProof {
+}): ReceiptOnchainProof {
   const { paymentRequest, txHash, txReceipt } = params;
 
   if (txReceipt.status !== 'success') {

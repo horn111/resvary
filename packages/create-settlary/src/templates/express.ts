@@ -4,7 +4,7 @@ export function expressTemplate(config: ProjectConfig): string {
   const price = config.pricing === 'request' ? '0.001' : config.pricing === 'second' ? '0.01' : '0.50';
 
   return `import express from 'express';
-import { expressPaywall } from '@arc-nano-kit/sdk/middleware';
+import { expressPaywall } from '@settlary/sdk/middleware';
 
 const app = express();
 const port = process.env.PORT || 3000;

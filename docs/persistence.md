@@ -1,6 +1,6 @@
-# Arc Receipts Persistence
+# Settlary Receipts Persistence
 
-Arc Receipts can now run with a persistent receipt store instead of only an in-memory ledger.
+Settlary Receipts can now run with a persistent receipt store instead of only an in-memory ledger.
 
 The persistence layer is intentionally local-first. It is built for development, reviewer demos, restart-safe watcher flows, and production apps that want to bring their own database adapter later.
 
@@ -21,7 +21,7 @@ import {
   InMemoryReceiptStore,
   PersistentReceiptLedger,
   PersistentWebhookInbox,
-} from '@arc-nano-kit/sdk/receipts';
+} from '@settlary/sdk/receipts';
 
 const store = new InMemoryReceiptStore();
 const ledger = new PersistentReceiptLedger({ store });
@@ -32,14 +32,14 @@ The store interface is async so SQLite works today and Postgres can be added lat
 
 ## SQLite Usage
 
-SQLite lives in the optional `@arc-nano-kit/sqlite` workspace package so the core SDK does not require SQLite.
+SQLite lives in the optional `@settlary/sqlite` workspace package so the core SDK does not require SQLite.
 
 ```ts
-import { PersistentReceiptLedger } from '@arc-nano-kit/sdk/receipts';
-import { createSqliteReceiptStore } from '@arc-nano-kit/sqlite';
+import { PersistentReceiptLedger } from '@settlary/sdk/receipts';
+import { createSqliteReceiptStore } from '@settlary/sqlite';
 
 const store = createSqliteReceiptStore({
-  path: '.arc-nano-kit/receipts.sqlite',
+  path: '.settlary/receipts.sqlite',
 });
 
 const ledger = new PersistentReceiptLedger({ store });
@@ -49,10 +49,10 @@ The SQLite package uses Node's built-in `node:sqlite` module and currently requi
 
 ## Watcher Cursors
 
-`ArcReceiptWatcher` accepts an optional `cursorStore`. When provided, it persists the next block to scan per invoice/memo/network.
+`ReceiptWatcher` accepts an optional `cursorStore`. When provided, it persists the next block to scan per invoice/memo/network.
 
 ```ts
-const watcher = new ArcReceiptWatcher({
+const watcher = new ReceiptWatcher({
   ledger,
   cursorStore: store,
   publicClient,

@@ -27,9 +27,9 @@ export {
   type MemoPaymentRequestOptions,
 } from './memo-payment.js';
 export {
-  ArcReceiptWatcher,
-  type ArcReceiptWatcherConfig,
-  type ArcReceiptWatcherLifecycleEvent,
+  ReceiptWatcher,
+  type ReceiptWatcherConfig,
+  type ReceiptWatcherLifecycleEvent,
   type ReceiptWatcherClient,
 } from './watcher.js';
 export {
@@ -89,9 +89,9 @@ export {
   type WebhookRouteResult,
 } from './webhook-route.js';
 export type {
-  ArcInvoice,
-  ArcReceipt,
-  ArcReceiptOnchainProof,
+  PaymentInvoice,
+  PaymentReceipt,
+  ReceiptOnchainProof,
   CreateInvoiceInput,
   InvoiceStatus,
   MemoPaymentRequest,

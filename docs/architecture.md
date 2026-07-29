@@ -1,6 +1,6 @@
 # Architecture
 
-`arc-nano-kit` is a local-first payment operations toolkit for Arc builders. It sits between an application and payment infrastructure, giving developers reusable SDK pieces for paid APIs, billing, receipts, watchers, and signed webhook delivery.
+Settlary is a local-first payment operations toolkit for stablecoin apps, built on Arc. It sits between an application and payment infrastructure, giving developers reusable SDK pieces for paid APIs, billing, receipts, watchers, and signed webhook delivery.
 
 ## Current System Shape
 
@@ -9,19 +9,19 @@ Developer app
   |
   |-- Express / Next.js API routes
   |     |
-  |     |-- @arc-nano-kit/sdk/middleware
+  |     |-- @settlary/sdk/middleware
   |     |     - 402 Payment Required responses
   |     |     - payment header parsing
   |     |     - default structural verification
   |     |     - optional app-provided verifier
   |     |
-  |     |-- @arc-nano-kit/sdk/billing
+  |     |-- @settlary/sdk/billing
   |     |     - per-request pricing
   |     |     - per-second pricing
   |     |     - per-job pricing
   |     |     - in-memory usage records
   |     |
-  |     |-- @arc-nano-kit/sdk/receipts
+  |     |-- @settlary/sdk/receipts
   |           - invoices
   |           - transaction memos
   |           - receipt matching
@@ -32,7 +32,7 @@ Developer app
   |           - local webhook inbox
   |           - replayable delivery attempts
   |
-  |-- @arc-nano-kit/sdk/client
+  |-- @settlary/sdk/client
         - buyer-side 402 -> sign -> retry flow
 ```
 
@@ -42,7 +42,7 @@ Developer app
 sequenceDiagram
     participant Buyer as Buyer / Agent
     participant API as Seller API
-    participant SDK as arc-nano-kit SDK
+    participant SDK as Settlary SDK
     participant Arc as Arc Testnet
     participant Inbox as Webhook Inbox
 
@@ -120,11 +120,11 @@ Receipts are the strongest current module. They cover:
 
 ### Watcher
 
-`ArcReceiptWatcher` is local-first and polling-based. It watches Arc Testnet memo-wrapped USDC payment shape, matches observed payments to invoices, attaches onchain proof data, and records receipts in the local ledger. `findMemoPaymentProof()` exposes the same read-only Memo-log lookup for a single payment request when a demo or app wants proof to fill in automatically.
+`ReceiptWatcher` is local-first and polling-based. It watches Arc Testnet memo-wrapped USDC payment shape, matches observed payments to invoices, attaches onchain proof data, and records receipts in the local ledger. `findMemoPaymentProof()` exposes the same read-only Memo-log lookup for a single payment request when a demo or app wants proof to fill in automatically.
 
 Current limits:
 
-- SQLite local persistence is available through the optional `@arc-nano-kit/sqlite` package;
+- SQLite local persistence is available through the optional `@settlary/sqlite` package;
 - no hosted indexer;
 - no hosted database-backed receipt store;
 - no transaction broadcasting in proof mode;

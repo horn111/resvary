@@ -8,7 +8,7 @@ import {
   createWatcherCursorKey,
   createWebhookEvent,
   signWebhookEvent,
-} from '@arc-nano-kit/sdk/receipts';
+} from '@settlary/sdk/receipts';
 import { createSqliteReceiptStore } from './index.js';
 
 const seller = '0x1111111111111111111111111111111111111111' as const;
@@ -85,5 +85,5 @@ describe('SqliteReceiptStore', () => {
 });
 
 function tempDatabasePath(): string {
-  return join(mkdtempSync(join(tmpdir(), 'arc-nano-kit-sqlite-')), 'receipts.sqlite');
+  return join(mkdtempSync(join(tmpdir(), 'settlary-sqlite-')), 'receipts.sqlite');
 }

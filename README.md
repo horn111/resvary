@@ -1,15 +1,17 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/Arc-Public_Testnet-7c3aed?style=for-the-badge" alt="Arc Public Testnet" />
+  <img src="assets/brand/settlary-x-avatar.png" alt="Settlary logo" width="128" />
+  <br />
+  <img src="https://img.shields.io/badge/Built_on-Arc_Testnet-7c3aed?style=for-the-badge" alt="Built on Arc Testnet" />
   <img src="https://img.shields.io/badge/USDC-Powered-2775ca?style=for-the-badge&logo=circle&logoColor=white" alt="USDC Powered" />
   <img src="https://img.shields.io/badge/x402-Compatible-000000?style=for-the-badge" alt="x402 Compatible" />
   <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache_2.0-blue?style=for-the-badge" alt="License" /></a>
   <img src="https://img.shields.io/badge/TypeScript-5.6+-3178c6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
 </p>
 
-<h1 align="center">arc-nano-kit</h1>
+<h1 align="center">Settlary</h1>
 
 <p align="center">
-  <strong>Open-source payment operations toolkit for Arc builders.</strong>
+  <strong>Open-source payment operations for stablecoin apps, built on Arc.</strong>
   <br />
   Paid APIs, invoices, transaction memos, persistent receipts, watcher proof polling, signed webhooks, and local delivery replay.
 </p>
@@ -17,7 +19,7 @@
 <p align="center">
   <a href="#why-this-exists">Why</a> ·
   <a href="#what-works-today">What Works</a> ·
-  <a href="#arc-receipts">Arc Receipts</a> ·
+  <a href="#settlary-receipts">Settlary Receipts</a> ·
   <a href="#quickstart">Quickstart</a> ·
   <a href="docs/grant.md">Grant Snapshot</a> ·
   <a href="docs/demo-script.md">Demo Script</a> ·
@@ -42,15 +44,15 @@ That creates a strong base layer, but application developers still need the oper
 - replayable delivery attempts
 - local reconciliation during development
 
-`arc-nano-kit` is focused on that application layer. The current product direction is intentionally narrow: make Arc payments feel operable for developers building APIs, agents, and stablecoin-native apps.
+Settlary is focused on that application layer. The name reflects the settlement layer it provides between onchain payments and application operations. The current product direction is intentionally narrow: make payments built on Arc operable for developers building APIs, agents, and stablecoin-native apps.
 
 ## Grant Snapshot
 
-`arc-nano-kit` is a TypeScript monorepo with:
+Settlary is a TypeScript monorepo with:
 
-- `@arc-nano-kit/sdk` for middleware, buyer flows, billing, receipts, watcher logic, and webhook delivery helpers.
-- `create-arc-nano-kit` for scaffolding a paid API project from this repo.
-- `apps/demo` for a local Next.js demo of paywalled endpoints and Arc Receipts payment ops.
+- `@settlary/sdk` for middleware, buyer flows, billing, receipts, watcher logic, and webhook delivery helpers.
+- `create-settlary` for scaffolding a paid API project from this repo.
+- `apps/demo` for a local Next.js demo of paywalled endpoints and Settlary Receipts payment ops.
 - Documentation for the grant snapshot, local demo script, getting started, architecture, Arc rationale, and the receipts module.
 
 The newest shipped path is:
@@ -78,20 +80,20 @@ This is not a hosted dashboard or production queue yet. It is a developer-facing
 | Buyer SDK | Ready | Handles `402 -> sign -> retry` for EIP-3009-style payments. |
 | Billing engine | Ready | Per-request, per-second, and per-job pricing helpers. |
 | Usage metering | Ready | In-memory usage records and summaries. |
-| CLI scaffolder | Ready in repo | `packages/create-arc-nano-kit` generates Express or Next.js paid API starters. |
-| Arc Receipts | Ready | Invoices, memos, receipts, signed webhook events, in-memory ledger, and persistent ledger APIs. |
+| CLI scaffolder | Ready in repo | `packages/create-settlary` generates Express or Next.js paid API starters. |
+| Settlary Receipts | Ready | Invoices, memos, receipts, signed webhook events, in-memory ledger, and persistent ledger APIs. |
 | Arc Testnet watcher | Ready | Watches memo-wrapped USDC payments and records matching receipts locally. |
 | Arc Testnet proof mode | Ready | Polls Memo logs or verifies a pasted tx hash against a memo payment request and returns block/log proof. |
 | Webhook Inbox + Replay | Ready | Verifies signed webhook delivery attempts and replays events locally. |
-| SQLite receipt store | Ready | Optional `@arc-nano-kit/sqlite` package for local invoices, receipts, webhook deliveries, and watcher cursors. |
+| SQLite receipt store | Ready | Optional `@settlary/sqlite` package for local invoices, receipts, webhook deliveries, and watcher cursors. |
 | Demo app | Ready locally | Next.js demo with paid endpoints, watcher flow, onchain proof, inbox verification, and replay. |
 | Postgres receipt store | Planned | Postgres adapter is deferred until after SQLite/local persistence. |
 | Hosted dashboard | Planned | Analytics UI and managed ops surface are not part of the current MVP. |
 | Fastify/Hono/Python/Go adapters | Planned | Current framework adapters are Express and Next.js. |
 
-## Arc Receipts
+## Settlary Receipts
 
-Arc Receipts is the main module in the current roadmap. It turns raw stablecoin payments into app-level payment operations.
+Settlary Receipts is the main module in the current roadmap. It turns raw stablecoin payments into app-level payment operations.
 
 ### The Problem
 
@@ -110,7 +112,7 @@ A transfer is not enough for most apps. Builders need to know:
 ```mermaid
 sequenceDiagram
     participant App as Developer App
-    participant SDK as arc-nano-kit SDK
+    participant SDK as Settlary SDK
     participant Arc as Arc Testnet
     participant Inbox as Webhook Inbox
 
@@ -135,7 +137,7 @@ The demo does not stop at "webhook ready". It shows verified delivery:
 - `receipt.generated`
 - optional `onchainProof` with tx hash, block, memo/log index, and Arcscan link
 - raw webhook payload
-- `x-arc-signature`
+- `x-settlary-signature`
 - SDK verification
 - delivery attempt `#1`
 - replayed delivery attempt `#2`
@@ -146,14 +148,14 @@ The demo does not stop at "webhook ready". It shows verified delivery:
 ### Install
 
 ```bash
-npm install @arc-nano-kit/sdk
+npm install @settlary/sdk
 ```
 
 ### Express Paid Endpoint
 
 ```typescript
 import express from 'express';
-import { expressPaywall } from '@arc-nano-kit/sdk/middleware';
+import { expressPaywall } from '@settlary/sdk/middleware';
 
 const app = express();
 
@@ -175,7 +177,7 @@ app.listen(3000);
 ### Next.js Route Handler
 
 ```typescript
-import { nextPaywall } from '@arc-nano-kit/sdk/middleware';
+import { nextPaywall } from '@settlary/sdk/middleware';
 
 export const GET = nextPaywall(
   {
@@ -192,7 +194,7 @@ export const GET = nextPaywall(
 ### Buyer Client
 
 ```typescript
-import { BuyerClient } from '@arc-nano-kit/sdk/client';
+import { BuyerClient } from '@settlary/sdk/client';
 
 const buyer = new BuyerClient({
   privateKey: process.env.BUYER_PRIVATE_KEY as `0x${string}`,
@@ -211,7 +213,7 @@ console.log(response.payment);
 import {
   ReceiptLedger,
   signWebhookEvent,
-} from '@arc-nano-kit/sdk/receipts';
+} from '@settlary/sdk/receipts';
 
 const ledger = new ReceiptLedger();
 
@@ -234,7 +236,7 @@ const receipt = ledger.recordPayment(invoice.id, {
 const paidEvent = ledger.listWebhookEvents().at(-1)!;
 const signature = signWebhookEvent(paidEvent, process.env.ARC_WEBHOOK_SECRET!);
 
-console.log(invoice.memo);      // arc-nano-kit:invoice:v1:inv_pro_plan_123
+console.log(invoice.memo);      // settlary:invoice:v1:inv_pro_plan_123
 console.log(receipt.status);    // paid
 console.log(signature.header);  // t=...,v1=...
 ```
@@ -246,7 +248,7 @@ import {
   WebhookInbox,
   serializeWebhookPayload,
   signWebhookEvent,
-} from '@arc-nano-kit/sdk/receipts';
+} from '@settlary/sdk/receipts';
 
 const inbox = new WebhookInbox();
 const event = ledger.listWebhookEvents().at(-1)!;
@@ -272,11 +274,11 @@ console.log(replay.attempt);  // 2
 ### Persistent Receipts With SQLite
 
 ```typescript
-import { PersistentReceiptLedger } from '@arc-nano-kit/sdk/receipts';
-import { createSqliteReceiptStore } from '@arc-nano-kit/sqlite';
+import { PersistentReceiptLedger } from '@settlary/sdk/receipts';
+import { createSqliteReceiptStore } from '@settlary/sqlite';
 
 const store = createSqliteReceiptStore({
-  path: '.arc-nano-kit/receipts.sqlite',
+  path: '.settlary/receipts.sqlite',
 });
 
 const ledger = new PersistentReceiptLedger({ store });
@@ -293,8 +295,8 @@ console.log(invoice.id);
 ## Running The Demo
 
 ```bash
-git clone https://github.com/horn111/arc-nano-kit.git
-cd arc-nano-kit
+git clone https://github.com/horn111/settlary.git
+cd settlary
 npm install
 npm run dev
 ```
@@ -316,8 +318,8 @@ The demo includes:
 The repo includes a scaffolder package:
 
 ```bash
-npm run build --workspace=packages/create-arc-nano-kit
-node packages/create-arc-nano-kit/dist/index.js my-paid-api
+npm run build --workspace=packages/create-settlary
+node packages/create-settlary/dist/index.js my-paid-api
 ```
 
 It can generate Express or Next.js starters with a paid API route and environment template.
@@ -331,7 +333,7 @@ import {
   createPaywallMiddleware,
   expressPaywall,
   nextPaywall,
-} from '@arc-nano-kit/sdk/middleware';
+} from '@settlary/sdk/middleware';
 ```
 
 The default verifier checks payment payload structure, amount, recipient, and expiry. Production integrations can provide a custom `verifyPayment` function to delegate verification to the appropriate payment infrastructure.
@@ -339,7 +341,7 @@ The default verifier checks payment payload structure, amount, recipient, and ex
 ### Client
 
 ```typescript
-import { BuyerClient } from '@arc-nano-kit/sdk/client';
+import { BuyerClient } from '@settlary/sdk/client';
 ```
 
 The buyer client signs an authorization and retries the original request with an `x-payment` header after receiving a `402 Payment Required` response.
@@ -347,7 +349,7 @@ The buyer client signs an authorization and retries the original request with an
 ### Billing
 
 ```typescript
-import { UsageMeter, createBillingPlan } from '@arc-nano-kit/sdk/billing';
+import { UsageMeter, createBillingPlan } from '@settlary/sdk/billing';
 ```
 
 Billing helpers support:
@@ -360,7 +362,7 @@ Billing helpers support:
 ### Gateway / Balance Helpers
 
 ```typescript
-import { GatewayClient } from '@arc-nano-kit/sdk/gateway';
+import { GatewayClient } from '@settlary/sdk/gateway';
 ```
 
 The current Gateway client is intentionally small: it checks Arc Testnet native USDC balance, formats explorer links, and provides sufficient-balance checks. Deposit tracking, pending settlement state, and alerts are planned.
@@ -369,7 +371,7 @@ The current Gateway client is intentionally small: it checks Arc Testnet native 
 
 ```typescript
 import {
-  ArcReceiptWatcher,
+  ReceiptWatcher,
   InMemoryReceiptStore,
   PersistentReceiptLedger,
   PersistentWebhookInbox,
@@ -381,15 +383,15 @@ import {
   signWebhookEvent,
   verifyMemoPaymentProof,
   verifyWebhookSignature,
-} from '@arc-nano-kit/sdk/receipts';
+} from '@settlary/sdk/receipts';
 ```
 
-Receipts are the strongest current module and the center of near-term development. The core SDK now exposes store interfaces and persistent ledger/inbox helpers; local SQLite persistence lives in the optional `@arc-nano-kit/sqlite` package.
+Receipts are the strongest current module and the center of near-term development. The core SDK now exposes store interfaces and persistent ledger/inbox helpers; local SQLite persistence lives in the optional `@settlary/sqlite` package.
 
 ## Project Structure
 
 ```text
-arc-nano-kit/
+settlary/
 |-- apps/
 |   `-- demo/
 |       |-- src/app/page.tsx
@@ -408,7 +410,7 @@ arc-nano-kit/
 |   |       `-- receipts/
 |   |-- sqlite/
 |   |   `-- src/
-|   `-- create-arc-nano-kit/
+|   `-- create-settlary/
 |       `-- src/
 |-- docs/
 |   |-- architecture.md
@@ -435,7 +437,7 @@ That makes Arc a natural environment for:
 - application-level reconciliation
 - payment operations that need fast settlement and predictable costs
 
-`arc-nano-kit` focuses on the developer tooling around those workflows.
+Settlary focuses on the developer tooling around those workflows.
 
 ## Current Limits
 
@@ -507,12 +509,12 @@ Apache-2.0. See [LICENSE](LICENSE).
 ---
 
 <p align="center">
-  <strong>Built for <a href="https://www.arc.io">Arc</a> · Powered by <a href="https://developers.circle.com">Circle</a> primitives · Compatible with <a href="https://x402.org">x402</a> payment flows</strong>
+  <strong>Settlary · Payment operations for stablecoin apps · Built on <a href="https://www.arc.io">Arc</a></strong>
 </p>
 
 <p align="center">
   <sub>
-    arc-nano-kit is an independent open-source project and is not officially affiliated with Circle Internet Financial.
+    Settlary is an independent open-source project and is not affiliated with or endorsed by Circle Internet Financial.
     <br />
     Circle, USDC, and Arc are trademarks of Circle Internet Financial, LLC.
   </sub>

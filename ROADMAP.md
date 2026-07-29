@@ -2,7 +2,7 @@
 
 > Last updated: June 2026
 
-`arc-nano-kit` is an early open-source payment operations toolkit for Arc builders. The current focus is narrow on purpose: make Arc payment flows easier to run, inspect, and operate locally before moving toward persistent production infrastructure.
+Settlary is an early open-source payment operations toolkit for stablecoin apps, built on Arc. The current focus is narrow on purpose: make Arc payment flows easier to run, inspect, and operate locally before moving toward persistent production infrastructure.
 
 ## Shipped
 
@@ -23,7 +23,7 @@
 - [x] Per-job pricing model
 - [x] In-memory usage metering
 
-### Arc Receipts
+### Settlary Receipts
 
 - [x] Invoice helpers
 - [x] Transaction memo helpers
@@ -41,7 +41,7 @@
 - [x] Interactive watcher flow in the demo
 - [x] Webhook Inbox + Replay demo flow
 - [x] Optional Onchain Proof demo panel with Memo-log polling
-- [x] Repo-local `create-arc-nano-kit` scaffolder
+- [x] Repo-local `create-settlary` scaffolder
 - [x] Grant snapshot and demo script docs
 
 ## Next Grant Milestones
@@ -63,7 +63,7 @@
 ### Next.js Webhook Route Helpers
 
 - [x] Raw body reader for signed webhook payloads
-- [x] `x-arc-signature` verification helper
+- [x] `x-settlary-signature` verification helper
 - [x] Delivery attempt recording helper
 - [x] Typed success/failure responses for route handlers
 
@@ -121,7 +121,7 @@
 
 ## Grant Framing
 
-The highest-impact next step is to turn the current local Arc Receipts proof into a more durable builder workflow:
+The highest-impact next step is to turn the current local Settlary Receipts proof into a more durable builder workflow:
 
 ```text
 local payment ops proof

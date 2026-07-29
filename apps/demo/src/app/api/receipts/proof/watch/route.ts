@@ -3,23 +3,23 @@ import {
   createReceipt,
   findMemoPaymentProof,
   stablecoinUnitsToString,
-  type ArcInvoice,
+  type PaymentInvoice,
   type FindMemoPaymentProofResult,
   type MemoPaymentRequest,
-} from '@arc-nano-kit/sdk/receipts';
+} from '@settlary/sdk/receipts';
 import { jsonSafeResponse, proofErrorResponse } from '../responses';
 import { getDemoReceiptStore } from '../../../webhook-inbox/store';
 
 export const dynamic = 'force-dynamic';
 
 interface WatchProofRequest {
-  invoice?: ArcInvoice;
+  invoice?: PaymentInvoice;
   paymentRequest?: MemoPaymentRequest;
   fromBlock?: string;
 }
 
 interface ValidWatchProofRequest {
-  invoice: ArcInvoice;
+  invoice: PaymentInvoice;
   paymentRequest: MemoPaymentRequest;
   fromBlock?: string;
 }
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
 }
 
 async function saveProofWatchCursor(
-  invoice: ArcInvoice,
+  invoice: PaymentInvoice,
   paymentRequest: MemoPaymentRequest,
   nextFromBlock: bigint,
 ): Promise<void> {
@@ -91,7 +91,7 @@ function validateWatchProofRequest(body: WatchProofRequest): ValidWatchProofRequ
   };
 }
 
-function createProofReceipt(invoice: ArcInvoice, result: Extract<FindMemoPaymentProofResult, { status: 'found' }>) {
+function createProofReceipt(invoice: PaymentInvoice, result: Extract<FindMemoPaymentProofResult, { status: 'found' }>) {
   return createReceipt(invoice, {
     txHash: result.proof.txHash,
     from: result.proof.payer,

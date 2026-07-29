@@ -26,13 +26,13 @@ export type WebhookRouteResult =
 export function createWebhookRouteHandler(config: WebhookRouteHandlerConfig) {
   return async function handleWebhook(request: Request): Promise<Response> {
     const payload = await request.text();
-    const header = request.headers.get('x-arc-signature');
+    const header = request.headers.get('x-settlary-signature');
 
     if (!header) {
       return Response.json(
         {
           ok: false,
-          error: 'Missing x-arc-signature header',
+          error: 'Missing x-settlary-signature header',
           reason: 'missing_signature',
         } satisfies WebhookRouteResult,
         { status: 400 },

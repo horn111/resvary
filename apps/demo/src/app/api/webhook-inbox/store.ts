@@ -4,15 +4,15 @@ import {
   PersistentReceiptLedger,
   PersistentWebhookInbox,
   type ReceiptStore,
-} from '@arc-nano-kit/sdk/receipts';
+} from '@settlary/sdk/receipts';
 
-export const DEMO_WEBHOOK_SECRET = 'arc_receipts_demo_secret';
+export const DEMO_WEBHOOK_SECRET = 'settlary_receipts_demo_secret';
 export const DEMO_WEBHOOK_TARGET = 'https://seller.app/webhooks/arc';
 
 const globalWebhookInbox = globalThis as typeof globalThis & {
-  __arcNanoKitReceiptStore?: ReceiptStore;
-  __arcNanoKitReceiptStoreMode?: DemoReceiptStoreMode;
-  __arcNanoKitWebhookInbox?: PersistentWebhookInbox;
+  __settlaryReceiptStore?: ReceiptStore;
+  __settlaryReceiptStoreMode?: DemoReceiptStoreMode;
+  __settlaryWebhookInbox?: PersistentWebhookInbox;
 };
 
 export type DemoReceiptStoreMode = 'memory' | 'sqlite';
@@ -31,25 +31,25 @@ type SqliteReceiptStoreModule = {
 };
 
 export async function getDemoReceiptStore(): Promise<ReceiptStore> {
-  if (globalWebhookInbox.__arcNanoKitReceiptStore) {
-    return globalWebhookInbox.__arcNanoKitReceiptStore;
+  if (globalWebhookInbox.__settlaryReceiptStore) {
+    return globalWebhookInbox.__settlaryReceiptStore;
   }
 
   const mode = getDemoReceiptStoreMode();
-  globalWebhookInbox.__arcNanoKitReceiptStoreMode = mode;
+  globalWebhookInbox.__settlaryReceiptStoreMode = mode;
 
   if (mode === 'sqlite') {
     const { createSqliteReceiptStore } = await importOptionalSqliteStore();
     const store = createSqliteReceiptStore({
-      path: process.env.ARC_RECEIPTS_SQLITE_PATH
-        ?? join(process.cwd(), '.arc-nano-kit', 'receipts.sqlite'),
+      path: process.env.SETTLARY_RECEIPTS_SQLITE_PATH
+        ?? join(process.cwd(), '.settlary', 'receipts.sqlite'),
     });
-    globalWebhookInbox.__arcNanoKitReceiptStore = store;
+    globalWebhookInbox.__settlaryReceiptStore = store;
     return store;
   }
 
   const store = new InMemoryReceiptStore();
-  globalWebhookInbox.__arcNanoKitReceiptStore = store;
+  globalWebhookInbox.__settlaryReceiptStore = store;
   return store;
 }
 
@@ -58,19 +58,19 @@ export async function getDemoReceiptLedger(): Promise<PersistentReceiptLedger> {
 }
 
 export async function getDemoWebhookInbox(): Promise<PersistentWebhookInbox> {
-  if (globalWebhookInbox.__arcNanoKitWebhookInbox) {
-    return globalWebhookInbox.__arcNanoKitWebhookInbox;
+  if (globalWebhookInbox.__settlaryWebhookInbox) {
+    return globalWebhookInbox.__settlaryWebhookInbox;
   }
 
-  globalWebhookInbox.__arcNanoKitWebhookInbox = new PersistentWebhookInbox({
+  globalWebhookInbox.__settlaryWebhookInbox = new PersistentWebhookInbox({
     store: await getDemoReceiptStore(),
   });
-  return globalWebhookInbox.__arcNanoKitWebhookInbox;
+  return globalWebhookInbox.__settlaryWebhookInbox;
 }
 
 export async function getDemoReceiptStoreSummary(): Promise<DemoReceiptStoreSummary> {
   const store = await getDemoReceiptStore();
-  const mode = globalWebhookInbox.__arcNanoKitReceiptStoreMode ?? getDemoReceiptStoreMode();
+  const mode = globalWebhookInbox.__settlaryReceiptStoreMode ?? getDemoReceiptStoreMode();
 
   return {
     mode,
@@ -83,7 +83,7 @@ export async function getDemoReceiptStoreSummary(): Promise<DemoReceiptStoreSumm
 }
 
 function getDemoReceiptStoreMode(): DemoReceiptStoreMode {
-  return process.env.ARC_RECEIPTS_STORE === 'sqlite' ? 'sqlite' : 'memory';
+  return process.env.SETTLARY_RECEIPTS_STORE === 'sqlite' ? 'sqlite' : 'memory';
 }
 
 async function importOptionalSqliteStore(): Promise<SqliteReceiptStoreModule> {
@@ -91,10 +91,10 @@ async function importOptionalSqliteStore(): Promise<SqliteReceiptStoreModule> {
     const runtimeImport = new Function('specifier', 'return import(specifier)') as (
       specifier: string,
     ) => Promise<SqliteReceiptStoreModule>;
-    return await runtimeImport('@arc-nano-kit/sqlite');
+    return await runtimeImport('@settlary/sqlite');
   } catch (error) {
     throw new Error(
-      'ARC_RECEIPTS_STORE=sqlite requires the optional @arc-nano-kit/sqlite package to be installed and built.',
+      'SETTLARY_RECEIPTS_STORE=sqlite requires the optional @settlary/sqlite package to be installed and built.',
       { cause: error },
     );
   }

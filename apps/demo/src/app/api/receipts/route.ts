@@ -1,7 +1,7 @@
 import {
   createMemoPaymentRequest,
   signWebhookEvent,
-} from '@arc-nano-kit/sdk/receipts';
+} from '@settlary/sdk/receipts';
 import {
   DEMO_WEBHOOK_SECRET,
   DEMO_WEBHOOK_TARGET,
@@ -19,9 +19,9 @@ export async function GET() {
   const now = Date.now();
   const ledger = await getDemoReceiptLedger();
 
-  const invoice = await ledger.getInvoice('inv_arc_receipts_demo')
+  const invoice = await ledger.getInvoice('inv_settlary_receipts_demo')
     ?? await ledger.createInvoice({
-      id: 'inv_arc_receipts_demo',
+      id: 'inv_settlary_receipts_demo',
       amount: '19.00',
       currency: 'USDC',
       network: 'arc-testnet',
@@ -31,7 +31,7 @@ export async function GET() {
       createdAt: now,
       expiresAt: now + 30 * 60 * 1000,
       metadata: {
-        product: 'Arc Receipts',
+        product: 'Settlary Receipts',
         source: 'demo',
       },
     });

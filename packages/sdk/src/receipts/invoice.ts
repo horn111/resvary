@@ -7,8 +7,8 @@ import { DEFAULTS } from '../constants.js';
 import { isAmountAtLeast, toStablecoinUnits } from './amount.js';
 import { createInvoiceMemo, createInvoiceMemoData, createInvoiceMemoId } from './memo.js';
 import type {
-  ArcInvoice,
-  ArcReceipt,
+  PaymentInvoice,
+  PaymentReceipt,
   CreateInvoiceInput,
   ObservedPayment,
   PaymentMatchResult,
@@ -16,7 +16,7 @@ import type {
 
 const DEFAULT_PAYMENT_URI_SCHEME = 'arc';
 
-export function createInvoice(input: CreateInvoiceInput): ArcInvoice {
+export function createInvoice(input: CreateInvoiceInput): PaymentInvoice {
   const id = input.id ?? createInvoiceId();
   const currency = input.currency ?? 'USDC';
   const network = input.network ?? DEFAULTS.network;
@@ -71,12 +71,12 @@ export function createPaymentUri(params: {
   return `${params.scheme ?? DEFAULT_PAYMENT_URI_SCHEME}://pay?${search.toString()}`;
 }
 
-export function isInvoiceExpired(invoice: ArcInvoice, now = Date.now()): boolean {
+export function isInvoiceExpired(invoice: PaymentInvoice, now = Date.now()): boolean {
   return invoice.expiresAt !== undefined && now > invoice.expiresAt;
 }
 
 export function matchPaymentToInvoice(
-  invoice: ArcInvoice,
+  invoice: PaymentInvoice,
   payment: ObservedPayment,
   now = Date.now(),
 ): PaymentMatchResult {
@@ -116,10 +116,10 @@ export function matchPaymentToInvoice(
 }
 
 export function createReceipt(
-  invoice: ArcInvoice,
+  invoice: PaymentInvoice,
   payment: ObservedPayment,
   createdAt = payment.observedAt ?? Date.now(),
-): ArcReceipt {
+): PaymentReceipt {
   const match = matchPaymentToInvoice(invoice, payment, createdAt);
   if (!match.success) {
     throw new Error(`Payment does not match invoice: ${match.reason}`);

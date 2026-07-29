@@ -3,7 +3,7 @@
  *
  * @example
  * ```typescript
- * import { createBillingPlan } from '@arc-nano-kit/sdk/billing';
+ * import { createBillingPlan } from '@settlary/sdk/billing';
  *
  * const apiPlan = createBillingPlan({
  *   name: 'API Standard',

@@ -1,6 +1,6 @@
 ---
 name: Feature Request
-about: Suggest a new feature for arc-nano-kit
+about: Suggest a new feature for Settlary
 title: '[FEATURE] '
 labels: enhancement
 assignees: ''

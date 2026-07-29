@@ -4,11 +4,11 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   const payload = await request.text();
-  const header = request.headers.get('x-arc-signature');
+  const header = request.headers.get('x-settlary-signature');
 
   if (!header) {
     return Response.json(
-      { error: 'Missing x-arc-signature header' },
+      { error: 'Missing x-settlary-signature header' },
       { status: 400 },
     );
   }
