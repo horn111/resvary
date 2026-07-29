@@ -1,6 +1,5 @@
 # Grant Application Brand Update
 
-## Ready-to-paste comment
 
 **Project name update: arc-nano-kit is now Settlary**
 
