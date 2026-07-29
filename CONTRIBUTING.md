@@ -1,6 +1,6 @@
-# Contributing to arc-nano-kit
+# Contributing to Settlary
 
-Thank you for your interest in contributing to arc-nano-kit! This document provides guidelines and information about contributing to this project.
+Thank you for your interest in contributing to Settlary! This document provides guidelines and information about contributing to this project.
 
 ## Table of Contents
 
@@ -21,12 +21,12 @@ This project adheres to the [Contributor Covenant Code of Conduct](CODE_OF_CONDU
 1. **Fork the repository** on GitHub
 2. **Clone your fork** locally:
    ```bash
-   git clone https://github.com/YOUR_USERNAME/arc-nano-kit.git
-   cd arc-nano-kit
+   git clone https://github.com/YOUR_USERNAME/settlary.git
+   cd settlary
    ```
 3. **Add the upstream remote**:
    ```bash
-   git remote add upstream https://github.com/horn111/arc-nano-kit.git
+   git remote add upstream https://github.com/horn111/settlary.git
    ```
 4. **Create a branch** for your changes:
    ```bash
@@ -124,4 +124,4 @@ npm run test:watch --workspace=packages/sdk
 
 ## Questions?
 
-Feel free to open a [Discussion](https://github.com/horn111/arc-nano-kit/discussions) or reach out in the [Circle Discord](https://circle.com/discord).
+Feel free to open a [Discussion](https://github.com/horn111/settlary/discussions) or reach out in the [Circle Discord](https://circle.com/discord).

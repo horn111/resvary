@@ -1,4 +1,4 @@
-const BIGINT_MARKER = '__arcNanoKitBigInt';
+const BIGINT_MARKER = '__settlaryBigInt';
 
 type SerializedBigInt = {
   [BIGINT_MARKER]: string;

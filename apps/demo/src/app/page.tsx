@@ -73,7 +73,7 @@ type ReceiptDemo = {
     txHash?: string;
     memo: string;
     createdAt: number;
-    onchainProof?: ArcReceiptOnchainProof;
+    onchainProof?: ReceiptOnchainProof;
     metadata?: Record<string, unknown>;
   };
   webhook: {
@@ -86,7 +86,7 @@ type ReceiptDemo = {
   timeline: TimelineItem[];
 };
 
-type ArcReceiptOnchainProof = {
+type ReceiptOnchainProof = {
   chainId: number;
   network: string;
   txHash: string;
@@ -106,13 +106,13 @@ type ArcReceiptOnchainProof = {
 };
 
 type OnchainProofResult = {
-  proof: ArcReceiptOnchainProof;
+  proof: ReceiptOnchainProof;
   receipt: ReceiptDemo['receipt'];
 };
 
 type ProofWatchResult = {
   status: 'pending' | 'found';
-  proof?: ArcReceiptOnchainProof;
+  proof?: ReceiptOnchainProof;
   receipt?: ReceiptDemo['receipt'];
   fromBlock: string;
   toBlock: string;
@@ -239,7 +239,7 @@ export default function HomePage() {
     },
     {
       label: 'Webhook signature verified',
-      detail: 'local inbox accepted x-arc-signature',
+      detail: 'local inbox accepted x-settlary-signature',
       done: Boolean(webhookDeliveries[0]?.verified),
     },
     {
@@ -311,7 +311,7 @@ export default function HomePage() {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        'x-arc-signature': data.webhook.signatureHeader,
+        'x-settlary-signature': data.webhook.signatureHeader,
       },
       body: JSON.stringify(data.webhook.event),
     });
@@ -423,7 +423,7 @@ export default function HomePage() {
         }),
       });
       const result = (await response.json()) as {
-        proof?: ArcReceiptOnchainProof;
+        proof?: ReceiptOnchainProof;
         receipt?: ReceiptDemo['receipt'];
         error?: string;
         reason?: string;
@@ -519,20 +519,20 @@ export default function HomePage() {
           <div className="header-left">
             <p className="header-kicker">Grant-ready local proof</p>
             <h1>
-              Arc Receipts <span className="header-tag">Ops Demo</span>
+              Settlary Receipts <span className="header-tag">Ops Demo</span>
             </h1>
             <p className="header-copy">
               invoice -&gt; memo -&gt; watcher -&gt; receipt -&gt; verified webhook -&gt; replay
             </p>
           </div>
           <div className="resource-links" aria-label="Project resources">
-            <a className="resource-link" href="https://github.com/horn111/arc-nano-kit/blob/main/docs/grant.md">
+            <a className="resource-link" href="https://github.com/horn111/settlary/blob/main/docs/grant.md">
               Grant Snapshot
             </a>
-            <a className="resource-link" href="https://github.com/horn111/arc-nano-kit/blob/main/docs/demo-script.md">
+            <a className="resource-link" href="https://github.com/horn111/settlary/blob/main/docs/demo-script.md">
               Demo Script
             </a>
-            <a className="repo-link" href="https://github.com/horn111/arc-nano-kit">
+            <a className="repo-link" href="https://github.com/horn111/settlary">
               <svg aria-hidden="true" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
                 <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z" />
               </svg>
@@ -573,7 +573,7 @@ export default function HomePage() {
             </div>
             <div className="proof-summary">
               <span>Grant proof</span>
-              <strong>local, replayable payment ops for Arc receipts</strong>
+              <strong>local, replayable payment ops built on Arc</strong>
               <p>Run the flow once, then replay the signed webhook to prove delivery state without a dashboard.</p>
             </div>
             {receiptDemo ? (
@@ -614,7 +614,7 @@ export default function HomePage() {
             <div className="pipeline-container">
               <div className="terminal-header">
                 <div className="terminal-cmd">
-                  <span>$</span> arc receipts watch --network arc-testnet --memo
+                  <span>$</span> settlary receipts watch --network arc-testnet --memo
                 </div>
                 <div className={`terminal-status ${receiptLoading ? 'status-active' : ''}`}>
                   {terminalState}

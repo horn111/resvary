@@ -8,7 +8,7 @@ import { ARC_TESTNET_CONTRACTS } from '../constants.js';
 import { ReceiptLedger } from './ledger.js';
 import { ARC_MEMO_ABI, createMemoPaymentRequest } from './memo-payment.js';
 import { InMemoryReceiptStore, createWatcherCursorKey } from './store.js';
-import { ArcReceiptWatcher } from './watcher.js';
+import { ReceiptWatcher } from './watcher.js';
 
 const seller = '0x1111111111111111111111111111111111111111' as const;
 const buyer = '0x2222222222222222222222222222222222222222' as const;
@@ -17,7 +17,7 @@ const blockHash = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 const transferEvent = parseAbiItem('event Transfer(address indexed from,address indexed to,uint256 value)');
 const memoEvent = ARC_MEMO_ABI.find((item) => item.type === 'event' && item.name === 'Memo');
 
-describe('ArcReceiptWatcher', () => {
+describe('ReceiptWatcher', () => {
   it('creates a receipt when it sees matching Memo and ERC-20 Transfer logs', async () => {
     const ledger = new ReceiptLedger();
     const invoice = ledger.createInvoice({ id: 'inv_watch', amount: '19.00', payTo: seller });
@@ -27,7 +27,7 @@ describe('ArcReceiptWatcher', () => {
       memoLogs: [memoLog(request)],
       receiptLogs: [transferLog({ value: 19_000_000n })],
     });
-    const watcher = new ArcReceiptWatcher({ ledger, publicClient, onReceipt });
+    const watcher = new ReceiptWatcher({ ledger, publicClient, onReceipt });
 
     watcher.watchInvoice(invoice, { fromBlock: 10n });
     const receipts = await watcher.pollOnce();
@@ -63,7 +63,7 @@ describe('ArcReceiptWatcher', () => {
         value: 19_000_000_000_000_000_000n,
       })],
     });
-    const watcher = new ArcReceiptWatcher({ ledger, publicClient });
+    const watcher = new ReceiptWatcher({ ledger, publicClient });
 
     watcher.watchInvoice(invoice, { fromBlock: 10n });
     const receipts = await watcher.pollOnce();
@@ -83,7 +83,7 @@ describe('ArcReceiptWatcher', () => {
       })],
       receiptLogs: [transferLog({ value: 19_000_000n })],
     });
-    const watcher = new ArcReceiptWatcher({ ledger, publicClient });
+    const watcher = new ReceiptWatcher({ ledger, publicClient });
 
     watcher.watchInvoice(invoice, { fromBlock: 10n });
     const receipts = await watcher.pollOnce();
@@ -105,7 +105,7 @@ describe('ArcReceiptWatcher', () => {
       memoLogs: [],
       receiptLogs: [],
     });
-    const firstWatcher = new ArcReceiptWatcher({
+    const firstWatcher = new ReceiptWatcher({
       ledger: firstLedger,
       publicClient: firstClient,
       cursorStore: store,
@@ -123,7 +123,7 @@ describe('ArcReceiptWatcher', () => {
       memoLogs: [],
       receiptLogs: [],
     });
-    const secondWatcher = new ArcReceiptWatcher({
+    const secondWatcher = new ReceiptWatcher({
       ledger: secondLedger,
       publicClient: secondClient,
       cursorStore: store,

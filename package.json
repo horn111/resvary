@@ -1,11 +1,11 @@
 {
-  "name": "arc-nano-kit",
+  "name": "settlary",
   "version": "0.1.0",
   "private": true,
-  "description": "Open-source kit for usage-based billing and paid APIs on Arc",
+  "description": "Open-source payment operations toolkit for stablecoin apps, built on Arc",
   "repository": {
     "type": "git",
-    "url": "https://github.com/horn111/arc-nano-kit.git"
+    "url": "https://github.com/horn111/settlary.git"
   },
   "author": "horn111",
   "license": "Apache-2.0",

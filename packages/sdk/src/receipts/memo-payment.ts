@@ -9,7 +9,7 @@ import {
 } from 'viem';
 import { ARC_TESTNET_CONTRACTS } from '../constants.js';
 import { createInvoiceMemoData, createInvoiceMemoId } from './memo.js';
-import type { ArcInvoice, MemoPaymentRequest } from './types.js';
+import type { PaymentInvoice, MemoPaymentRequest } from './types.js';
 
 export const ERC20_TRANSFER_ABI = [
   {
@@ -74,7 +74,7 @@ export interface MemoPaymentRequestOptions {
 }
 
 export function createMemoPaymentRequest(
-  invoice: ArcInvoice,
+  invoice: PaymentInvoice,
   options: MemoPaymentRequestOptions = {},
 ): MemoPaymentRequest {
   const target = options.usdcAddress ?? ARC_TESTNET_CONTRACTS.usdc;

@@ -4,8 +4,8 @@
 
 import { createInvoice, createReceipt, isInvoiceExpired } from './invoice.js';
 import type {
-  ArcInvoice,
-  ArcReceipt,
+  PaymentInvoice,
+  PaymentReceipt,
   CreateInvoiceInput,
   InvoiceStatus,
   ObservedPayment,
@@ -19,18 +19,18 @@ export interface LedgerFilter {
 }
 
 export class ReceiptLedger {
-  private readonly invoices = new Map<string, ArcInvoice>();
-  private readonly receipts = new Map<string, ArcReceipt>();
+  private readonly invoices = new Map<string, PaymentInvoice>();
+  private readonly receipts = new Map<string, PaymentReceipt>();
   private readonly events: WebhookEvent[] = [];
 
-  createInvoice(input: CreateInvoiceInput): ArcInvoice {
+  createInvoice(input: CreateInvoiceInput): PaymentInvoice {
     const invoice = createInvoice(input);
     this.addInvoice(invoice);
     this.events.push(createWebhookEvent('invoice.created', { invoice }));
     return invoice;
   }
 
-  addInvoice(invoice: ArcInvoice): void {
+  addInvoice(invoice: PaymentInvoice): void {
     if (this.invoices.has(invoice.id)) {
       throw new Error(`Invoice already exists: ${invoice.id}`);
     }
@@ -38,11 +38,11 @@ export class ReceiptLedger {
     this.invoices.set(invoice.id, invoice);
   }
 
-  getInvoice(id: string): ArcInvoice | undefined {
+  getInvoice(id: string): PaymentInvoice | undefined {
     return this.invoices.get(id);
   }
 
-  listInvoices(filter?: LedgerFilter): ArcInvoice[] {
+  listInvoices(filter?: LedgerFilter): PaymentInvoice[] {
     return [...this.invoices.values()].filter((invoice) => {
       if (filter?.status && invoice.status !== filter.status) {
         return false;
@@ -56,7 +56,7 @@ export class ReceiptLedger {
     });
   }
 
-  recordPayment(invoiceId: string, payment: ObservedPayment): ArcReceipt {
+  recordPayment(invoiceId: string, payment: ObservedPayment): PaymentReceipt {
     const existingReceipt = payment.txHash
       ? this.getReceiptByTxHash(payment.txHash, invoiceId)
       : undefined;
@@ -75,7 +75,7 @@ export class ReceiptLedger {
     return receipt;
   }
 
-  markExpired(invoiceId: string, now = Date.now()): ArcInvoice {
+  markExpired(invoiceId: string, now = Date.now()): PaymentInvoice {
     const invoice = this.requireInvoice(invoiceId);
 
     if (!isInvoiceExpired(invoice, now)) {
@@ -87,7 +87,7 @@ export class ReceiptLedger {
     return expiredInvoice;
   }
 
-  markRefunded(invoiceId: string, refund: { txHash?: `0x${string}`; refundedAt?: number } = {}): ArcReceipt {
+  markRefunded(invoiceId: string, refund: { txHash?: `0x${string}`; refundedAt?: number } = {}): PaymentReceipt {
     const invoice = this.requireInvoice(invoiceId);
     const receipt = [...this.receipts.values()].find((item) => item.invoiceId === invoiceId);
 
@@ -95,7 +95,7 @@ export class ReceiptLedger {
       throw new Error(`Cannot refund invoice without a paid receipt: ${invoiceId}`);
     }
 
-    const refundedReceipt: ArcReceipt = {
+    const refundedReceipt: PaymentReceipt = {
       ...receipt,
       id: `rfnd_${receipt.id}`,
       status: 'refunded',
@@ -112,18 +112,18 @@ export class ReceiptLedger {
     return refundedReceipt;
   }
 
-  getReceipt(id: string): ArcReceipt | undefined {
+  getReceipt(id: string): PaymentReceipt | undefined {
     return this.receipts.get(id);
   }
 
-  getReceiptByTxHash(txHash: `0x${string}`, invoiceId?: string): ArcReceipt | undefined {
+  getReceiptByTxHash(txHash: `0x${string}`, invoiceId?: string): PaymentReceipt | undefined {
     return [...this.receipts.values()].find((receipt) => (
       receipt.txHash?.toLowerCase() === txHash.toLowerCase()
       && (invoiceId === undefined || receipt.invoiceId === invoiceId)
     ));
   }
 
-  listReceipts(): ArcReceipt[] {
+  listReceipts(): PaymentReceipt[] {
     return [...this.receipts.values()];
   }
 
@@ -131,7 +131,7 @@ export class ReceiptLedger {
     return [...this.events];
   }
 
-  private requireInvoice(id: string): ArcInvoice {
+  private requireInvoice(id: string): PaymentInvoice {
     const invoice = this.invoices.get(id);
     if (!invoice) {
       throw new Error(`Invoice not found: ${id}`);
@@ -140,7 +140,7 @@ export class ReceiptLedger {
     return invoice;
   }
 
-  private updateInvoice(id: string, patch: Partial<ArcInvoice>): ArcInvoice {
+  private updateInvoice(id: string, patch: Partial<PaymentInvoice>): PaymentInvoice {
     const invoice = this.requireInvoice(id);
     const next = { ...invoice, ...patch };
     this.invoices.set(id, next);

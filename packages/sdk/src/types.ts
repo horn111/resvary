@@ -1,5 +1,5 @@
 /**
- * Core type definitions for arc-nano-kit.
+ * Core type definitions for Settlary.
  */
 
 /** Supported x402 protocol versions */

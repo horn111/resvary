@@ -1,13 +1,13 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'arc-nano-kit Demo - Arc Receipts',
+  title: 'Settlary Demo - Settlary Receipts',
   description:
-    'Interactive demo of Arc Receipts, memo payment requests, signed webhooks, and paid API endpoints.',
+    'Interactive demo of Settlary Receipts, memo payment requests, signed webhooks, and paid API endpoints.',
   openGraph: {
-    title: 'arc-nano-kit Demo - Arc Receipts',
-    description: 'Arc Receipts and paid API operations on Arc',
-    url: 'https://arc-nano-kit.vercel.app',
+    title: 'Settlary Demo - Settlary Receipts',
+    description: 'Settlary Receipts and paid API operations on Arc',
+    url: 'https://settlary.vercel.app',
   },
 };
 

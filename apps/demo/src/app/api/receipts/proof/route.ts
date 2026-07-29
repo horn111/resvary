@@ -2,22 +2,22 @@ import {
   createReceipt,
   stablecoinUnitsToString,
   verifyMemoPaymentProof,
-  type ArcInvoice,
+  type PaymentInvoice,
   type MemoPaymentRequest,
-} from '@arc-nano-kit/sdk/receipts';
+} from '@settlary/sdk/receipts';
 import { jsonSafeResponse, proofErrorResponse } from './responses';
 
 export const dynamic = 'force-dynamic';
 
 interface ProofRequest {
   txHash?: string;
-  invoice?: ArcInvoice;
+  invoice?: PaymentInvoice;
   paymentRequest?: MemoPaymentRequest;
 }
 
 interface ValidProofRequest {
   txHash: `0x${string}`;
-  invoice: ArcInvoice;
+  invoice: PaymentInvoice;
   paymentRequest: MemoPaymentRequest;
 }
 
@@ -92,7 +92,7 @@ function parseTxHash(value?: string): `0x${string}` | null {
 
 function hasPaymentRequest(
   body: ProofRequest,
-): body is ProofRequest & { invoice: ArcInvoice; paymentRequest: MemoPaymentRequest } {
+): body is ProofRequest & { invoice: PaymentInvoice; paymentRequest: MemoPaymentRequest } {
   return Boolean(body.invoice && body.paymentRequest);
 }
 

@@ -1,5 +1,5 @@
 /**
- * Types for Arc invoice, receipt, and webhook workflows.
+ * Types for Settlary invoice, receipt, and webhook workflows.
  */
 
 export type StablecoinSymbol = 'USDC' | 'EURC';
@@ -37,7 +37,7 @@ export interface CreateInvoiceInput {
   metadata?: Record<string, unknown>;
 }
 
-export interface ArcInvoice {
+export interface PaymentInvoice {
   id: string;
   status: InvoiceStatus;
   amount: string;
@@ -68,7 +68,7 @@ export interface ObservedPayment {
   callDataHash?: `0x${string}`;
   observedAt?: number;
   blockNumber?: bigint;
-  onchainProof?: ArcReceiptOnchainProof;
+  onchainProof?: ReceiptOnchainProof;
   metadata?: Record<string, unknown>;
 }
 
@@ -90,7 +90,7 @@ export interface PaymentMatchResult {
   reason?: string;
 }
 
-export interface ArcReceipt {
+export interface PaymentReceipt {
   id: string;
   invoiceId: string;
   status: ReceiptStatus;
@@ -104,11 +104,11 @@ export interface ArcReceipt {
   txHash?: `0x${string}`;
   createdAt: number;
   blockNumber?: bigint;
-  onchainProof?: ArcReceiptOnchainProof;
+  onchainProof?: ReceiptOnchainProof;
   metadata?: Record<string, unknown>;
 }
 
-export interface ArcReceiptOnchainProof {
+export interface ReceiptOnchainProof {
   chainId: number;
   network: string;
   txHash: `0x${string}`;

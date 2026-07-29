@@ -16,7 +16,7 @@ import { ARC_TESTNET, USDC_DECIMALS } from '../constants.js';
 import { createMemoPaymentRequest, ERC20_TRANSFER_ABI } from './memo-payment.js';
 import { createMemoPaymentProofFromReceipt } from './proof.js';
 import { createWatcherCursorKey, type ReceiptStore } from './store.js';
-import type { ArcInvoice, ArcReceipt, MemoPaymentRequest, ObservedPayment } from './types.js';
+import type { PaymentInvoice, PaymentReceipt, MemoPaymentRequest, ObservedPayment } from './types.js';
 
 const MEMO_EVENT = parseAbiItem(
   'event Memo(address indexed sender,address indexed target,bytes32 callDataHash,bytes32 indexed memoId,bytes memo,uint256 memoIndex)',
@@ -54,22 +54,22 @@ type MatchedMemoLog = {
   args: CompleteMemoArgs;
 };
 
-export type ArcReceiptWatcherLifecycleEvent =
+export type ReceiptWatcherLifecycleEvent =
   | { type: 'watcher.started'; invoiceCount: number }
   | { type: 'watcher.stopped' }
   | { type: 'watcher.poll'; fromBlock: bigint; toBlock: bigint; invoiceCount: number }
   | { type: 'watcher.memo_seen'; invoiceId: string; txHash: `0x${string}`; blockNumber?: bigint }
-  | { type: 'watcher.receipt_created'; invoiceId: string; receipt: ArcReceipt }
+  | { type: 'watcher.receipt_created'; invoiceId: string; receipt: PaymentReceipt }
   | { type: 'watcher.cursor_saved'; invoiceId: string; cursorKey: string; nextFromBlock: bigint };
 
 type MaybePromise<T> = T | Promise<T>;
 
 export interface ReceiptLedgerWriter {
-  recordPayment(invoiceId: string, payment: ObservedPayment): MaybePromise<ArcReceipt>;
-  getReceiptByTxHash(txHash: `0x${string}`, invoiceId?: string): MaybePromise<ArcReceipt | undefined>;
+  recordPayment(invoiceId: string, payment: ObservedPayment): MaybePromise<PaymentReceipt>;
+  getReceiptByTxHash(txHash: `0x${string}`, invoiceId?: string): MaybePromise<PaymentReceipt | undefined>;
 }
 
-export interface ArcReceiptWatcherConfig {
+export interface ReceiptWatcherConfig {
   ledger: ReceiptLedgerWriter;
   cursorStore?: ReceiptStore;
   rpcUrl?: string;
@@ -77,26 +77,26 @@ export interface ArcReceiptWatcherConfig {
   fromBlock?: bigint;
   confirmations?: number;
   pollIntervalMs?: number;
-  onReceipt?: (receipt: ArcReceipt, invoice: ArcInvoice) => void | Promise<void>;
-  onEvent?: (event: ArcReceiptWatcherLifecycleEvent) => void | Promise<void>;
+  onReceipt?: (receipt: PaymentReceipt, invoice: PaymentInvoice) => void | Promise<void>;
+  onEvent?: (event: ReceiptWatcherLifecycleEvent) => void | Promise<void>;
   onError?: (error: unknown) => void;
 }
 
-export class ArcReceiptWatcher {
+export class ReceiptWatcher {
   private readonly ledger: ReceiptLedgerWriter;
   private readonly cursorStore?: ReceiptStore;
   private readonly client: ReceiptWatcherClient;
   private readonly confirmations: bigint;
   private readonly pollIntervalMs: number;
   private readonly fromBlock?: bigint;
-  private readonly onReceipt?: ArcReceiptWatcherConfig['onReceipt'];
-  private readonly onEvent?: ArcReceiptWatcherConfig['onEvent'];
-  private readonly onError?: ArcReceiptWatcherConfig['onError'];
-  private readonly invoices = new Map<string, ArcInvoice>();
+  private readonly onReceipt?: ReceiptWatcherConfig['onReceipt'];
+  private readonly onEvent?: ReceiptWatcherConfig['onEvent'];
+  private readonly onError?: ReceiptWatcherConfig['onError'];
+  private readonly invoices = new Map<string, PaymentInvoice>();
   private readonly cursors = new Map<string, bigint>();
   private timer?: ReturnType<typeof setInterval>;
 
-  constructor(config: ArcReceiptWatcherConfig) {
+  constructor(config: ReceiptWatcherConfig) {
     this.ledger = config.ledger;
     this.cursorStore = config.cursorStore;
     this.client = config.publicClient ?? createPublicClient({
@@ -110,7 +110,7 @@ export class ArcReceiptWatcher {
     this.onError = config.onError;
   }
 
-  watchInvoice(invoice: ArcInvoice, options: { fromBlock?: bigint } = {}): void {
+  watchInvoice(invoice: PaymentInvoice, options: { fromBlock?: bigint } = {}): void {
     this.invoices.set(invoice.id, invoice);
     if (options.fromBlock !== undefined) {
       this.cursors.set(invoice.id, options.fromBlock);
@@ -122,7 +122,7 @@ export class ArcReceiptWatcher {
     this.cursors.delete(invoiceId);
   }
 
-  async pollOnce(): Promise<ArcReceipt[]> {
+  async pollOnce(): Promise<PaymentReceipt[]> {
     if (this.invoices.size === 0) {
       return [];
     }
@@ -131,7 +131,7 @@ export class ArcReceiptWatcher {
     const toBlock = latestBlock > this.confirmations
       ? latestBlock - this.confirmations
       : 0n;
-    const receipts: ArcReceipt[] = [];
+    const receipts: PaymentReceipt[] = [];
 
     for (const invoice of this.invoices.values()) {
       const request = createMemoPaymentRequest(invoice);
@@ -178,11 +178,11 @@ export class ArcReceiptWatcher {
   }
 
   private async pollInvoice(
-    invoice: ArcInvoice,
+    invoice: PaymentInvoice,
     request: MemoPaymentRequest,
     fromBlock: bigint,
     toBlock: bigint,
-  ): Promise<ArcReceipt[]> {
+  ): Promise<PaymentReceipt[]> {
     const memoLogs = await this.client.getLogs({
       address: request.memoContract,
       event: MEMO_EVENT,
@@ -191,7 +191,7 @@ export class ArcReceiptWatcher {
       toBlock,
     }) as MemoLog[];
 
-    const receipts: ArcReceipt[] = [];
+    const receipts: PaymentReceipt[] = [];
 
     for (const memoLog of memoLogs) {
       const receipt = await this.processMemoLog(invoice, request, memoLog);
@@ -204,10 +204,10 @@ export class ArcReceiptWatcher {
   }
 
   private async processMemoLog(
-    invoice: ArcInvoice,
+    invoice: PaymentInvoice,
     request: MemoPaymentRequest,
     memoLog: MemoLog,
-  ): Promise<ArcReceipt | null> {
+  ): Promise<PaymentReceipt | null> {
     const match = await this.getUnrecordedMatchingMemoLog(invoice.id, request, memoLog);
     if (!match) {
       return null;
@@ -280,7 +280,7 @@ export class ArcReceiptWatcher {
   }
 
   private async resolveFromBlock(
-    invoice: ArcInvoice,
+    invoice: PaymentInvoice,
     request: MemoPaymentRequest,
     defaultFromBlock: bigint,
   ): Promise<bigint> {
@@ -300,7 +300,7 @@ export class ArcReceiptWatcher {
   }
 
   private async saveCursor(
-    invoice: ArcInvoice,
+    invoice: PaymentInvoice,
     request: MemoPaymentRequest,
     nextFromBlock: bigint,
   ): Promise<void> {
@@ -327,7 +327,7 @@ export class ArcReceiptWatcher {
     });
   }
 
-  private getCursorKey(invoice: ArcInvoice, request: MemoPaymentRequest): string {
+  private getCursorKey(invoice: PaymentInvoice, request: MemoPaymentRequest): string {
     return createWatcherCursorKey({
       network: invoice.network,
       invoiceId: invoice.id,
@@ -335,7 +335,7 @@ export class ArcReceiptWatcher {
     });
   }
 
-  private async emit(event: ArcReceiptWatcherLifecycleEvent): Promise<void> {
+  private async emit(event: ReceiptWatcherLifecycleEvent): Promise<void> {
     await this.onEvent?.(event);
   }
 

@@ -1,7 +1,7 @@
 {
-  "name": "@arc-nano-kit/sdk",
+  "name": "@settlary/sdk",
   "version": "0.1.0-alpha",
-  "description": "Usage-based billing and paid API middleware for Arc — powered by Circle Nanopayments & x402",
+  "description": "Payment operations SDK for stablecoin apps, built on Arc",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -62,12 +62,12 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/horn111/arc-nano-kit.git",
+    "url": "https://github.com/horn111/settlary.git",
     "directory": "packages/sdk"
   },
-  "homepage": "https://github.com/horn111/arc-nano-kit#readme",
+  "homepage": "https://github.com/horn111/settlary#readme",
   "bugs": {
-    "url": "https://github.com/horn111/arc-nano-kit/issues"
+    "url": "https://github.com/horn111/settlary/issues"
   },
   "dependencies": {
     "viem": "^2.21.0"

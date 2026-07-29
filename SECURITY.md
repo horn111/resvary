@@ -8,13 +8,13 @@
 
 ## Reporting a Vulnerability
 
-We take the security of arc-nano-kit seriously. If you believe you have found a security vulnerability, please report it to us as described below.
+We take the security of Settlary seriously. If you believe you have found a security vulnerability, please report it to us as described below.
 
 **Please do NOT report security vulnerabilities through public GitHub issues.**
 
 ### How to Report
 
-Send an email to **security@arc-nano-kit.dev** with the following information:
+Send a private message or direct email to the project maintainers with the following information:
 
 - Type of issue (e.g., buffer overflow, SQL injection, cross-site scripting, etc.)
 - Full paths of source file(s) related to the issue
@@ -48,7 +48,7 @@ The following are in scope for security reports:
 
 ## Security Best Practices
 
-When using arc-nano-kit in production:
+When using Settlary in production:
 
 1. **Never commit `.env` files** — Use environment variables or secrets managers
 2. **Rotate wallet keys regularly** — Especially for seller-side payment collection

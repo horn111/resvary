@@ -1,6 +1,6 @@
 import type {
-  ArcInvoice,
-  ArcReceipt,
+  PaymentInvoice,
+  PaymentReceipt,
   InvoiceStatus,
   WebhookDeliveryAttempt,
   WebhookDeliveryStatus,
@@ -38,14 +38,14 @@ export interface WatcherCursorKeyInput {
 }
 
 export interface ReceiptStore {
-  saveInvoice(invoice: ArcInvoice): Promise<void>;
-  getInvoice(id: string): Promise<ArcInvoice | undefined>;
-  listInvoices(filter?: ReceiptStoreInvoiceFilter): Promise<ArcInvoice[]>;
+  saveInvoice(invoice: PaymentInvoice): Promise<void>;
+  getInvoice(id: string): Promise<PaymentInvoice | undefined>;
+  listInvoices(filter?: ReceiptStoreInvoiceFilter): Promise<PaymentInvoice[]>;
 
-  saveReceipt(receipt: ArcReceipt): Promise<void>;
-  getReceipt(id: string): Promise<ArcReceipt | undefined>;
-  getReceiptByTxHash(txHash: `0x${string}`, invoiceId?: string): Promise<ArcReceipt | undefined>;
-  listReceipts(): Promise<ArcReceipt[]>;
+  saveReceipt(receipt: PaymentReceipt): Promise<void>;
+  getReceipt(id: string): Promise<PaymentReceipt | undefined>;
+  getReceiptByTxHash(txHash: `0x${string}`, invoiceId?: string): Promise<PaymentReceipt | undefined>;
+  listReceipts(): Promise<PaymentReceipt[]>;
 
   saveWebhookEvent(event: WebhookEvent): Promise<void>;
   listWebhookEvents(filter?: ReceiptStoreEventFilter): Promise<WebhookEvent[]>;
@@ -61,21 +61,21 @@ export interface ReceiptStore {
 }
 
 export class InMemoryReceiptStore implements ReceiptStore {
-  private readonly invoices = new Map<string, ArcInvoice>();
-  private readonly receipts = new Map<string, ArcReceipt>();
+  private readonly invoices = new Map<string, PaymentInvoice>();
+  private readonly receipts = new Map<string, PaymentReceipt>();
   private readonly events = new Map<string, WebhookEvent>();
   private readonly deliveries = new Map<string, WebhookDeliveryAttempt>();
   private readonly cursors = new Map<string, WatcherCursor>();
 
-  async saveInvoice(invoice: ArcInvoice): Promise<void> {
+  async saveInvoice(invoice: PaymentInvoice): Promise<void> {
     this.invoices.set(invoice.id, invoice);
   }
 
-  async getInvoice(id: string): Promise<ArcInvoice | undefined> {
+  async getInvoice(id: string): Promise<PaymentInvoice | undefined> {
     return this.invoices.get(id);
   }
 
-  async listInvoices(filter: ReceiptStoreInvoiceFilter = {}): Promise<ArcInvoice[]> {
+  async listInvoices(filter: ReceiptStoreInvoiceFilter = {}): Promise<PaymentInvoice[]> {
     return [...this.invoices.values()].filter((invoice) => {
       if (filter.status && invoice.status !== filter.status) {
         return false;
@@ -89,25 +89,25 @@ export class InMemoryReceiptStore implements ReceiptStore {
     });
   }
 
-  async saveReceipt(receipt: ArcReceipt): Promise<void> {
+  async saveReceipt(receipt: PaymentReceipt): Promise<void> {
     this.receipts.set(receipt.id, receipt);
   }
 
-  async getReceipt(id: string): Promise<ArcReceipt | undefined> {
+  async getReceipt(id: string): Promise<PaymentReceipt | undefined> {
     return this.receipts.get(id);
   }
 
   async getReceiptByTxHash(
     txHash: `0x${string}`,
     invoiceId?: string,
-  ): Promise<ArcReceipt | undefined> {
+  ): Promise<PaymentReceipt | undefined> {
     return [...this.receipts.values()].find((receipt) => (
       receipt.txHash?.toLowerCase() === txHash.toLowerCase()
       && (invoiceId === undefined || receipt.invoiceId === invoiceId)
     ));
   }
 
-  async listReceipts(): Promise<ArcReceipt[]> {
+  async listReceipts(): Promise<PaymentReceipt[]> {
     return [...this.receipts.values()];
   }
 

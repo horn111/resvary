@@ -3,7 +3,7 @@
  *
  * @example
  * ```typescript
- * import { GatewayClient } from '@arc-nano-kit/sdk/gateway';
+ * import { GatewayClient } from '@settlary/sdk/gateway';
  *
  * const gateway = new GatewayClient({
  *   walletAddress: '0x...',

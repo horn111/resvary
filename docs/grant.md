@@ -2,7 +2,7 @@
 
 ## Project
 
-`arc-nano-kit` is an open-source TypeScript payment operations toolkit for Arc builders.
+Settlary is an open-source TypeScript payment operations toolkit for stablecoin apps, built on Arc.
 
 It helps developers move beyond "a payment happened" and into application-level payment operations: invoices, transaction memos, receipts, signed webhooks, verified delivery attempts, and local replay.
 
@@ -30,19 +30,19 @@ Without this layer, builders can accept payments but still have to hand-roll the
 
 The current repo includes:
 
-- `@arc-nano-kit/sdk` for middleware, buyer flows, billing, receipts, watcher logic, and webhook delivery helpers.
+- `@settlary/sdk` for middleware, buyer flows, billing, receipts, watcher logic, and webhook delivery helpers.
 - Express and Next.js paywall adapters for x402-style `402 Payment Required` flows.
 - `BuyerClient` for the `402 -> sign -> retry` client flow.
 - Billing helpers for per-request, per-second, and per-job pricing.
 - `ReceiptLedger` for backwards-compatible in-memory invoices, receipts, and webhook events.
 - `ReceiptStore`, `InMemoryReceiptStore`, and `PersistentReceiptLedger` for restart-safe receipt workflows.
-- Optional `@arc-nano-kit/sqlite` local/dev store for invoices, receipts, webhook deliveries, webhook events, and watcher cursors.
-- `ArcReceiptWatcher` for memo-wrapped Arc Testnet USDC payments.
+- Optional `@settlary/sqlite` local/dev store for invoices, receipts, webhook deliveries, webhook events, and watcher cursors.
+- `ReceiptWatcher` for memo-wrapped Arc Testnet USDC payments.
 - Store-backed watcher cursors so local scans can resume from saved block state.
 - `findMemoPaymentProof` and `verifyMemoPaymentProof` for read-only Arc Testnet Memo-log polling or tx/log proof against a memo payment request.
 - `WebhookInbox` and `PersistentWebhookInbox` for signed webhook verification, delivery recording, and replay.
-- A framework-light webhook route helper for raw body handling, `x-arc-signature` verification, and typed success/failure responses.
-- `create-arc-nano-kit` scaffolder for Express or Next.js paid API starters.
+- A framework-light webhook route helper for raw body handling, `x-settlary-signature` verification, and typed success/failure responses.
+- `create-settlary` scaffolder for Express or Next.js paid API starters.
 - A hosted/local Next.js demo that shows the payment ops flow end to end.
 
 ## Proven Proof Flow
@@ -66,7 +66,7 @@ The demo proves the chain does not stop at "webhook ready". It shows verified de
 - `receipt.generated`
 - optional `onchainProof` with tx hash, block, memo index, log index, and Arcscan link
 - raw webhook payload
-- `x-arc-signature`
+- `x-settlary-signature`
 - `Signature OK`
 - `Delivery attempt #1`
 - `Replay Webhook`
@@ -77,7 +77,7 @@ The demo proves the chain does not stop at "webhook ready". It shows verified de
 
 Arc is a natural environment for paid APIs, autonomous agents, usage-based billing, and stablecoin-native apps. Those apps need more than raw payment primitives: they need payment operations that developers can run, test, inspect, and eventually persist.
 
-`arc-nano-kit` focuses on the developer infrastructure around Arc payments:
+Settlary focuses on the developer infrastructure around payments built on Arc:
 
 - making Arc payment flows easier to integrate into API products;
 - turning transaction memos into app-level reconciliation;
@@ -87,9 +87,9 @@ Arc is a natural environment for paid APIs, autonomous agents, usage-based billi
 
 ## Why Funding Is Needed
 
-The project has already proven the local Arc Receipts workflow: invoices, memo payment requests, receipt generation, signed webhooks, replay, and local persistence.
+The project has already proven the local Settlary Receipts workflow: invoices, memo payment requests, receipt generation, signed webhooks, replay, and local persistence.
 
-Grant funding would move the project from a working local SDK into reusable infrastructure for Arc builders. The funded work focuses on production persistence, durable watcher behavior, refund lifecycle state, framework integrations, and reviewer-friendly hosted demos.
+Grant funding would move the project from a working local SDK into reusable infrastructure for developers building on Arc. The funded work focuses on production persistence, durable watcher behavior, refund lifecycle state, framework integrations, and reviewer-friendly hosted demos.
 
 Without funding, the project can continue as a small experimental SDK. With funding, it can become a maintained open-source payment operations layer that other Arc apps can adopt instead of rebuilding receipt, webhook, replay, and reconciliation logic themselves.
 
@@ -120,7 +120,7 @@ The most useful funded milestones move the project from a proven local workflow 
    - Harden watcher resume behavior with persisted cursor state, idempotent receipt creation, retry-safe scans, structured logs, and examples for long-running server processes.
 
 3. Framework webhook integrations
-   - Ship production-friendly Next.js route helpers plus Express examples for raw body handling, `x-arc-signature` verification, delivery recording, replay, and typed success/failure responses.
+   - Ship production-friendly Next.js route helpers plus Express examples for raw body handling, `x-settlary-signature` verification, delivery recording, replay, and typed success/failure responses.
 
 4. Refund and partial refund lifecycle
    - Add full and partial refund states, counter-payment matching, refund webhook events, and receipt transitions for app-level reconciliation.

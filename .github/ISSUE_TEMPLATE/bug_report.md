@@ -1,6 +1,6 @@
 ---
 name: Bug Report
-about: Report a bug to help us improve arc-nano-kit
+about: Report a bug to help us improve Settlary
 title: '[BUG] '
 labels: bug
 assignees: ''

@@ -3,7 +3,7 @@
  *
  * @example
  * ```typescript
- * import { UsageMeter } from '@arc-nano-kit/sdk/billing';
+ * import { UsageMeter } from '@settlary/sdk/billing';
  *
  * const meter = new UsageMeter({ endpoint: '/api/data' });
  *

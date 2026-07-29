@@ -1,6 +1,6 @@
 # Getting Started
 
-This guide shows the current `arc-nano-kit` developer workflow: paid API middleware, buyer-side access, and the local Arc Receipts demo.
+This guide shows the current `settlary` developer workflow: paid API middleware, buyer-side access, and the local Settlary Receipts demo.
 
 ## Prerequisites
 
@@ -9,12 +9,12 @@ This guide shows the current `arc-nano-kit` developer workflow: paid API middlew
 - A wallet private key if you want to test buyer-side signing against your own endpoints
 
 The local demo does not require a hosted dashboard, database, or production webhook queue.
-For restart-safe local receipt storage, set `ARC_RECEIPTS_STORE=sqlite` before starting the demo.
+For restart-safe local receipt storage, set `SETTLARY_RECEIPTS_STORE=sqlite` before starting the demo.
 
 ## Install The SDK
 
 ```bash
-npm install @arc-nano-kit/sdk
+npm install @settlary/sdk
 ```
 
 ## Seller: Protect An Endpoint
@@ -23,7 +23,7 @@ npm install @arc-nano-kit/sdk
 
 ```typescript
 import express from 'express';
-import { expressPaywall } from '@arc-nano-kit/sdk/middleware';
+import { expressPaywall } from '@settlary/sdk/middleware';
 
 const app = express();
 
@@ -46,7 +46,7 @@ app.listen(3000);
 ### Next.js App Router
 
 ```typescript
-import { nextPaywall } from '@arc-nano-kit/sdk/middleware';
+import { nextPaywall } from '@settlary/sdk/middleware';
 
 export const GET = nextPaywall(
   {
@@ -66,7 +66,7 @@ The default verifier checks payment payload structure, amount, recipient, and ex
 ## Buyer: Access A Paywalled API
 
 ```typescript
-import { BuyerClient } from '@arc-nano-kit/sdk/client';
+import { BuyerClient } from '@settlary/sdk/client';
 
 const buyer = new BuyerClient({
   privateKey: process.env.BUYER_PRIVATE_KEY as `0x${string}`,
@@ -82,8 +82,8 @@ console.log(response.payment);
 ## Run The Local Demo
 
 ```bash
-git clone https://github.com/horn111/arc-nano-kit.git
-cd arc-nano-kit
+git clone https://github.com/horn111/settlary.git
+cd settlary
 npm install
 npm run dev
 ```
@@ -101,7 +101,7 @@ The demo currently shows:
 - local Webhook Inbox verification;
 - replayed webhook delivery attempt.
 
-## Verify The Arc Receipts Flow
+## Verify The Settlary Receipts Flow
 
 In the browser:
 
@@ -119,8 +119,8 @@ For a detailed reviewer script, see [demo-script.md](demo-script.md).
 From this repo:
 
 ```bash
-npm run build --workspace=packages/create-arc-nano-kit
-node packages/create-arc-nano-kit/dist/index.js my-paid-api
+npm run build --workspace=packages/create-settlary
+node packages/create-settlary/dist/index.js my-paid-api
 ```
 
 The scaffolder creates an Express or Next.js starter with a paid API route and environment template.
@@ -131,5 +131,5 @@ The scaffolder creates an Express or Next.js starter with a paid API route and e
 - [Demo Script](demo-script.md)
 - [Architecture](architecture.md)
 - [Onchain Proof](onchain-proof.md)
-- [Arc Receipts](receipts.md)
+- [Settlary Receipts](receipts.md)
 - [Why Arc?](why-arc.md)

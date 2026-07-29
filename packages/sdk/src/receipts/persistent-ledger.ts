@@ -1,7 +1,7 @@
 import { createInvoice, createReceipt, isInvoiceExpired } from './invoice.js';
 import type {
-  ArcInvoice,
-  ArcReceipt,
+  PaymentInvoice,
+  PaymentReceipt,
   CreateInvoiceInput,
   ObservedPayment,
   WebhookEvent,
@@ -20,14 +20,14 @@ export class PersistentReceiptLedger {
     this.store = config.store;
   }
 
-  async createInvoice(input: CreateInvoiceInput): Promise<ArcInvoice> {
+  async createInvoice(input: CreateInvoiceInput): Promise<PaymentInvoice> {
     const invoice = createInvoice(input);
     await this.addInvoice(invoice);
     await this.saveWebhookEvent(createWebhookEvent('invoice.created', { invoice }));
     return invoice;
   }
 
-  async addInvoice(invoice: ArcInvoice): Promise<void> {
+  async addInvoice(invoice: PaymentInvoice): Promise<void> {
     const existing = await this.store.getInvoice(invoice.id);
     if (existing) {
       throw new Error(`Invoice already exists: ${invoice.id}`);
@@ -36,15 +36,15 @@ export class PersistentReceiptLedger {
     await this.store.saveInvoice(invoice);
   }
 
-  async getInvoice(id: string): Promise<ArcInvoice | undefined> {
+  async getInvoice(id: string): Promise<PaymentInvoice | undefined> {
     return this.store.getInvoice(id);
   }
 
-  async listInvoices(filter?: ReceiptStoreInvoiceFilter): Promise<ArcInvoice[]> {
+  async listInvoices(filter?: ReceiptStoreInvoiceFilter): Promise<PaymentInvoice[]> {
     return this.store.listInvoices(filter);
   }
 
-  async recordPayment(invoiceId: string, payment: ObservedPayment): Promise<ArcReceipt> {
+  async recordPayment(invoiceId: string, payment: ObservedPayment): Promise<PaymentReceipt> {
     const existingReceipt = payment.txHash
       ? await this.getReceiptByTxHash(payment.txHash, invoiceId)
       : undefined;
@@ -66,7 +66,7 @@ export class PersistentReceiptLedger {
     return receipt;
   }
 
-  async markExpired(invoiceId: string, now = Date.now()): Promise<ArcInvoice> {
+  async markExpired(invoiceId: string, now = Date.now()): Promise<PaymentInvoice> {
     const invoice = await this.requireInvoice(invoiceId);
 
     if (!isInvoiceExpired(invoice, now)) {
@@ -81,7 +81,7 @@ export class PersistentReceiptLedger {
   async markRefunded(
     invoiceId: string,
     refund: { txHash?: `0x${string}`; refundedAt?: number } = {},
-  ): Promise<ArcReceipt> {
+  ): Promise<PaymentReceipt> {
     const invoice = await this.requireInvoice(invoiceId);
     const receipt = (await this.store.listReceipts())
       .find((item) => item.invoiceId === invoiceId);
@@ -90,7 +90,7 @@ export class PersistentReceiptLedger {
       throw new Error(`Cannot refund invoice without a paid receipt: ${invoiceId}`);
     }
 
-    const refundedReceipt: ArcReceipt = {
+    const refundedReceipt: PaymentReceipt = {
       ...receipt,
       id: `rfnd_${receipt.id}`,
       status: 'refunded',
@@ -107,18 +107,18 @@ export class PersistentReceiptLedger {
     return refundedReceipt;
   }
 
-  async getReceipt(id: string): Promise<ArcReceipt | undefined> {
+  async getReceipt(id: string): Promise<PaymentReceipt | undefined> {
     return this.store.getReceipt(id);
   }
 
   async getReceiptByTxHash(
     txHash: `0x${string}`,
     invoiceId?: string,
-  ): Promise<ArcReceipt | undefined> {
+  ): Promise<PaymentReceipt | undefined> {
     return this.store.getReceiptByTxHash(txHash, invoiceId);
   }
 
-  async listReceipts(): Promise<ArcReceipt[]> {
+  async listReceipts(): Promise<PaymentReceipt[]> {
     return this.store.listReceipts();
   }
 
@@ -130,7 +130,7 @@ export class PersistentReceiptLedger {
     await this.store.saveWebhookEvent(event);
   }
 
-  private async requireInvoice(id: string): Promise<ArcInvoice> {
+  private async requireInvoice(id: string): Promise<PaymentInvoice> {
     const invoice = await this.store.getInvoice(id);
     if (!invoice) {
       throw new Error(`Invoice not found: ${id}`);
@@ -139,7 +139,7 @@ export class PersistentReceiptLedger {
     return invoice;
   }
 
-  private async updateInvoice(id: string, patch: Partial<ArcInvoice>): Promise<ArcInvoice> {
+  private async updateInvoice(id: string, patch: Partial<PaymentInvoice>): Promise<PaymentInvoice> {
     const invoice = await this.requireInvoice(id);
     const next = { ...invoice, ...patch };
     await this.store.saveInvoice(next);

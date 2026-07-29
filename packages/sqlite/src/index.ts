@@ -5,8 +5,8 @@ import type { DatabaseSync as DatabaseSyncType } from 'node:sqlite';
 import {
   parseReceiptStoreValue,
   serializeReceiptStoreValue,
-  type ArcInvoice,
-  type ArcReceipt,
+  type PaymentInvoice,
+  type PaymentReceipt,
   type ReceiptStore,
   type ReceiptStoreDeliveryFilter,
   type ReceiptStoreEventFilter,
@@ -14,7 +14,7 @@ import {
   type WatcherCursor,
   type WebhookDeliveryAttempt,
   type WebhookEvent,
-} from '@arc-nano-kit/sdk/receipts';
+} from '@settlary/sdk/receipts';
 
 const require = createRequire(import.meta.url);
 const { DatabaseSync } = require('node:sqlite') as typeof import('node:sqlite');
@@ -40,9 +40,9 @@ export class SqliteReceiptStore implements ReceiptStore {
     this.migrate();
   }
 
-  async saveInvoice(invoice: ArcInvoice): Promise<void> {
+  async saveInvoice(invoice: PaymentInvoice): Promise<void> {
     this.db.prepare(`
-      INSERT INTO arc_invoices (id, status, customer_id, created_at, payload)
+      INSERT INTO settlary_invoices (id, status, customer_id, created_at, payload)
       VALUES (?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         status = excluded.status,
@@ -58,14 +58,14 @@ export class SqliteReceiptStore implements ReceiptStore {
     );
   }
 
-  async getInvoice(id: string): Promise<ArcInvoice | undefined> {
-    return parsePayloadRow<ArcInvoice>(this.db.prepare(
-      'SELECT payload FROM arc_invoices WHERE id = ?',
+  async getInvoice(id: string): Promise<PaymentInvoice | undefined> {
+    return parsePayloadRow<PaymentInvoice>(this.db.prepare(
+      'SELECT payload FROM settlary_invoices WHERE id = ?',
     ).get(id));
   }
 
-  async listInvoices(filter: ReceiptStoreInvoiceFilter = {}): Promise<ArcInvoice[]> {
-    return this.allPayloads<ArcInvoice>('SELECT payload FROM arc_invoices ORDER BY created_at ASC')
+  async listInvoices(filter: ReceiptStoreInvoiceFilter = {}): Promise<PaymentInvoice[]> {
+    return this.allPayloads<PaymentInvoice>('SELECT payload FROM settlary_invoices ORDER BY created_at ASC')
       .filter((invoice) => {
         if (filter.status && invoice.status !== filter.status) {
           return false;
@@ -79,9 +79,9 @@ export class SqliteReceiptStore implements ReceiptStore {
       });
   }
 
-  async saveReceipt(receipt: ArcReceipt): Promise<void> {
+  async saveReceipt(receipt: PaymentReceipt): Promise<void> {
     this.db.prepare(`
-      INSERT INTO arc_receipts (id, invoice_id, tx_hash_norm, status, created_at, payload)
+      INSERT INTO settlary_receipts (id, invoice_id, tx_hash_norm, status, created_at, payload)
       VALUES (?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         invoice_id = excluded.invoice_id,
@@ -99,29 +99,29 @@ export class SqliteReceiptStore implements ReceiptStore {
     );
   }
 
-  async getReceipt(id: string): Promise<ArcReceipt | undefined> {
-    return parsePayloadRow<ArcReceipt>(this.db.prepare(
-      'SELECT payload FROM arc_receipts WHERE id = ?',
+  async getReceipt(id: string): Promise<PaymentReceipt | undefined> {
+    return parsePayloadRow<PaymentReceipt>(this.db.prepare(
+      'SELECT payload FROM settlary_receipts WHERE id = ?',
     ).get(id));
   }
 
   async getReceiptByTxHash(
     txHash: `0x${string}`,
     invoiceId?: string,
-  ): Promise<ArcReceipt | undefined> {
+  ): Promise<PaymentReceipt | undefined> {
     const row = invoiceId
       ? this.db.prepare(
-        'SELECT payload FROM arc_receipts WHERE tx_hash_norm = ? AND invoice_id = ? LIMIT 1',
+        'SELECT payload FROM settlary_receipts WHERE tx_hash_norm = ? AND invoice_id = ? LIMIT 1',
       ).get(txHash.toLowerCase(), invoiceId)
       : this.db.prepare(
-        'SELECT payload FROM arc_receipts WHERE tx_hash_norm = ? LIMIT 1',
+        'SELECT payload FROM settlary_receipts WHERE tx_hash_norm = ? LIMIT 1',
       ).get(txHash.toLowerCase());
 
-    return parsePayloadRow<ArcReceipt>(row);
+    return parsePayloadRow<PaymentReceipt>(row);
   }
 
-  async listReceipts(): Promise<ArcReceipt[]> {
-    return this.allPayloads<ArcReceipt>('SELECT payload FROM arc_receipts ORDER BY created_at ASC');
+  async listReceipts(): Promise<PaymentReceipt[]> {
+    return this.allPayloads<PaymentReceipt>('SELECT payload FROM settlary_receipts ORDER BY created_at ASC');
   }
 
   async saveWebhookEvent(event: WebhookEvent): Promise<void> {
@@ -253,7 +253,7 @@ export class SqliteReceiptStore implements ReceiptStore {
     this.db.exec(`
       PRAGMA journal_mode = WAL;
 
-      CREATE TABLE IF NOT EXISTS arc_invoices (
+      CREATE TABLE IF NOT EXISTS settlary_invoices (
         id TEXT PRIMARY KEY,
         status TEXT NOT NULL,
         customer_id TEXT,
@@ -261,13 +261,13 @@ export class SqliteReceiptStore implements ReceiptStore {
         payload TEXT NOT NULL
       );
 
-      CREATE INDEX IF NOT EXISTS arc_invoices_status
-        ON arc_invoices(status);
+      CREATE INDEX IF NOT EXISTS settlary_invoices_status
+        ON settlary_invoices(status);
 
-      CREATE INDEX IF NOT EXISTS arc_invoices_customer_id
-        ON arc_invoices(customer_id);
+      CREATE INDEX IF NOT EXISTS settlary_invoices_customer_id
+        ON settlary_invoices(customer_id);
 
-      CREATE TABLE IF NOT EXISTS arc_receipts (
+      CREATE TABLE IF NOT EXISTS settlary_receipts (
         id TEXT PRIMARY KEY,
         invoice_id TEXT NOT NULL,
         tx_hash_norm TEXT,
@@ -276,8 +276,8 @@ export class SqliteReceiptStore implements ReceiptStore {
         payload TEXT NOT NULL
       );
 
-      CREATE UNIQUE INDEX IF NOT EXISTS arc_receipts_invoice_tx_hash
-        ON arc_receipts(invoice_id, tx_hash_norm)
+      CREATE UNIQUE INDEX IF NOT EXISTS settlary_receipts_invoice_tx_hash
+        ON settlary_receipts(invoice_id, tx_hash_norm)
         WHERE tx_hash_norm IS NOT NULL;
 
       CREATE TABLE IF NOT EXISTS arc_webhook_events (

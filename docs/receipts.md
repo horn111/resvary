@@ -1,6 +1,6 @@
-# Arc Receipts
+# Settlary Receipts
 
-Arc Receipts is the payment operations layer for arc-nano-kit. It gives Arc builders a small, typed workflow for invoices, transaction memos, watcher-based payment observation, receipts, signed webhooks, local delivery verification, and replay.
+Settlary Receipts is the payment operations module in Settlary. It gives developers building on Arc a small, typed workflow for invoices, transaction memos, watcher-based payment observation, receipts, signed webhooks, local delivery verification, and replay.
 
 The goal is not to replace x402 or Circle App Kits. The goal is to make the application layer around Arc payments easier to ship. Refund and partial refund state are planned next steps, not shipped behavior in the current module.
 
@@ -23,7 +23,7 @@ Arc transaction memos and Unified Balance state patterns make this a natural fit
 import {
   ReceiptLedger,
   signWebhookEvent,
-} from '@arc-nano-kit/sdk/receipts';
+} from '@settlary/sdk/receipts';
 
 const ledger = new ReceiptLedger();
 
@@ -37,7 +37,7 @@ const invoice = ledger.createInvoice({
 });
 
 console.log(invoice.memo);
-// arc-nano-kit:invoice:v1:inv_pro_plan_123
+// settlary:invoice:v1:inv_pro_plan_123
 
 const receipt = ledger.recordPayment(invoice.id, {
   from: '0x2222222222222222222222222222222222222222',
@@ -63,10 +63,10 @@ Use the watcher when you want receipts to come from real Arc Testnet transaction
 
 ```typescript
 import {
-  ArcReceiptWatcher,
+  ReceiptWatcher,
   ReceiptLedger,
   createMemoPaymentRequest,
-} from '@arc-nano-kit/sdk/receipts';
+} from '@settlary/sdk/receipts';
 
 const ledger = new ReceiptLedger();
 
@@ -83,7 +83,7 @@ console.log(paymentRequest.target);       // Arc Testnet USDC ERC-20 interface
 console.log(paymentRequest.memoId);       // Indexed memo id for querying logs
 console.log(paymentRequest.txData);       // Data for Memo.memo(...)
 
-const watcher = new ArcReceiptWatcher({
+const watcher = new ReceiptWatcher({
   ledger,
   onReceipt(receipt) {
     console.log('paid', receipt.txHash);
@@ -107,7 +107,7 @@ import {
   createMemoPaymentRequest,
   findMemoPaymentProof,
   verifyMemoPaymentProof,
-} from '@arc-nano-kit/sdk/receipts';
+} from '@settlary/sdk/receipts';
 
 const paymentRequest = createMemoPaymentRequest(invoice);
 
@@ -133,14 +133,14 @@ The proof path is read-only. It does not send a transaction, store a private key
 
 ## Webhook Inbox and Replay
 
-Use `WebhookInbox` when you want a local app to receive, verify, store, and replay Arc Receipts webhook deliveries.
+Use `WebhookInbox` when you want a local app to receive, verify, store, and replay Settlary Receipts webhook deliveries.
 
 ```typescript
 import {
   WebhookInbox,
   serializeWebhookPayload,
   signWebhookEvent,
-} from '@arc-nano-kit/sdk/receipts';
+} from '@settlary/sdk/receipts';
 
 const inbox = new WebhookInbox();
 const event = ledger.listWebhookEvents().at(-1)!;
@@ -174,21 +174,21 @@ import {
   InMemoryReceiptStore,
   PersistentReceiptLedger,
   PersistentWebhookInbox,
-} from '@arc-nano-kit/sdk/receipts';
+} from '@settlary/sdk/receipts';
 
 const store = new InMemoryReceiptStore();
 const ledger = new PersistentReceiptLedger({ store });
 const inbox = new PersistentWebhookInbox({ store });
 ```
 
-For local SQLite persistence, use the optional `@arc-nano-kit/sqlite` package:
+For local SQLite persistence, use the optional `@settlary/sqlite` package:
 
 ```typescript
-import { PersistentReceiptLedger } from '@arc-nano-kit/sdk/receipts';
-import { createSqliteReceiptStore } from '@arc-nano-kit/sqlite';
+import { PersistentReceiptLedger } from '@settlary/sdk/receipts';
+import { createSqliteReceiptStore } from '@settlary/sqlite';
 
 const store = createSqliteReceiptStore({
-  path: '.arc-nano-kit/receipts.sqlite',
+  path: '.settlary/receipts.sqlite',
 });
 
 const ledger = new PersistentReceiptLedger({ store });
@@ -198,7 +198,7 @@ const ledger = new PersistentReceiptLedger({ store });
 
 - `createInvoice()` for invoice ids, stablecoin minor units, Arc payment URIs, memo ids, and invoice memos.
 - `createMemoPaymentRequest()` for Arc `Memo.memo(...)` call data around an ERC-20 USDC transfer.
-- `ArcReceiptWatcher` for polling Arc Testnet memo events and creating receipts from matching payments.
+- `ReceiptWatcher` for polling Arc Testnet memo events and creating receipts from matching payments.
 - `findMemoPaymentProof()` for read-only Memo-log polling by memo id.
 - `verifyMemoPaymentProof()` for read-only tx/log proof against a memo payment request.
 - `createInvoiceMemo()`, `createInvoiceMemoId()`, `createInvoiceMemoData()`, and `parseInvoiceMemo()` for memo correlation.

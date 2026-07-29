@@ -1,8 +1,8 @@
-# @arc-nano-kit/demo
+# @settlary/demo
 
-Local Next.js demo for `arc-nano-kit` payment operations on Arc.
+Local Next.js demo for `settlary` payment operations on Arc.
 
-The demo shows more than paywalled endpoints. It walks through the current Arc Receipts flow:
+The demo shows more than paywalled endpoints. It walks through the current Settlary Receipts flow:
 
 ```text
 invoice
@@ -57,7 +57,7 @@ See [../../docs/demo-script.md](../../docs/demo-script.md) for the full grant-re
 
 - The default hosted/demo inbox is in-memory.
 - The default hosted/demo receipt ledger is in-memory.
-- Local SQLite persistence is available with `ARC_RECEIPTS_STORE=sqlite`.
+- Local SQLite persistence is available with `SETTLARY_RECEIPTS_STORE=sqlite`.
 - Onchain proof mode is read-only and never asks for a private key.
 - Auto proof polling is local and does not replace a hosted indexer.
 - The watcher flow is a local developer demo.

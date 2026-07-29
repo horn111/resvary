@@ -3,7 +3,7 @@ import type { ProjectConfig } from '../prompts.js';
 export function nextTemplate(config: ProjectConfig): string {
   const price = config.pricing === 'request' ? '0.001' : config.pricing === 'second' ? '0.01' : '0.50';
 
-  return `import { nextPaywall } from '@arc-nano-kit/sdk/middleware';
+  return `import { nextPaywall } from '@settlary/sdk/middleware';
 
 export const GET = nextPaywall(
   { 

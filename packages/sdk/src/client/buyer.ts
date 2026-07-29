@@ -9,7 +9,7 @@
  *
  * @example
  * ```typescript
- * import { BuyerClient } from '@arc-nano-kit/sdk/client';
+ * import { BuyerClient } from '@settlary/sdk/client';
  *
  * const buyer = new BuyerClient({
  *   privateKey: '0x...',

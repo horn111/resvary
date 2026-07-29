@@ -57,7 +57,7 @@ export function createPaywallMiddleware(config: PaywallConfig) {
 
   if (!sellerAddress) {
     throw new Error(
-      'arc-nano-kit: Seller address is required. Set SELLER_ADDRESS env var or pass payTo in config.',
+      'settlary: Seller address is required. Set SELLER_ADDRESS env var or pass payTo in config.',
     );
   }
 

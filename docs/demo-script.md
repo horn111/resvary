@@ -1,14 +1,14 @@
 # Demo Script
 
-This script is for reviewers who want to verify the current `arc-nano-kit` payment ops flow locally.
+This script is for reviewers who want to verify the current `settlary` payment ops flow locally.
 
 The demo is local-first. It does not require a hosted dashboard, database, or production webhook queue.
 
 ## Setup
 
 ```bash
-git clone https://github.com/horn111/arc-nano-kit.git
-cd arc-nano-kit
+git clone https://github.com/horn111/settlary.git
+cd settlary
 npm install
 npm run dev
 ```
@@ -93,7 +93,7 @@ The optional onchain proof path connects the same receipt shape to a concrete Ar
 The demo reports the active receipt store mode. By default it uses an in-memory store. For local SQLite persistence, run:
 
 ```bash
-ARC_RECEIPTS_STORE=sqlite npm run dev
+SETTLARY_RECEIPTS_STORE=sqlite npm run dev
 ```
 
 ## API Fallback Check
@@ -119,7 +119,7 @@ const inboxResponse = await fetch(`${base}/api/webhook-inbox`, {
   method: 'POST',
   headers: {
     'content-type': 'application/json',
-    'x-arc-signature': receiptData.webhook.signatureHeader,
+    'x-settlary-signature': receiptData.webhook.signatureHeader,
   },
   body: rawPayload,
 });
@@ -158,7 +158,7 @@ replayOf: <first delivery id>
 
 ## Notes For Grant Reviewers
 
-- The default hosted/demo inbox is in-memory unless `ARC_RECEIPTS_STORE=sqlite` is set locally.
+- The default hosted/demo inbox is in-memory unless `SETTLARY_RECEIPTS_STORE=sqlite` is set locally.
 - Onchain proof mode is read-only and does not send transactions.
 - Auto proof polling is local and read-only; it is not a hosted indexer.
 - SQLite persistence, watcher cursors, and webhook route helpers are available locally; Postgres and refund states are planned next.

@@ -13,7 +13,7 @@ export function packageTemplate(config: ProjectConfig): string {
       : `"dev": "next dev",\n    "build": "next build",\n    "start": "next start"`}
   },
   "dependencies": {
-    "@arc-nano-kit/sdk": "latest",
+    "@settlary/sdk": "latest",
     ${isExpress 
       ? `"express": "^4.18.2"` 
       : `"next": "latest",\n    "react": "latest",\n    "react-dom": "latest"`}

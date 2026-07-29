@@ -1,8 +1,8 @@
 {
-  "name": "@arc-nano-kit/demo",
+  "name": "@settlary/demo",
   "version": "0.1.0",
   "private": true,
-  "description": "Demo app for arc-nano-kit — paywalled API endpoints on Arc",
+  "description": "Settlary demo — payment operations and paywalled APIs built on Arc",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -10,8 +10,8 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@arc-nano-kit/sdk": "*",
-    "@arc-nano-kit/sqlite": "*",
+    "@settlary/sdk": "*",
+    "@settlary/sqlite": "*",
     "next": "^15.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

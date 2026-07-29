@@ -1,7 +1,7 @@
 {
-  "name": "@arc-nano-kit/sqlite",
+  "name": "@settlary/sqlite",
   "version": "0.1.0-alpha",
-  "description": "SQLite receipt store for arc-nano-kit",
+  "description": "SQLite receipt store for Settlary",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -26,7 +26,7 @@
     "node": ">=24.0.0"
   },
   "dependencies": {
-    "@arc-nano-kit/sdk": "*"
+    "@settlary/sdk": "*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

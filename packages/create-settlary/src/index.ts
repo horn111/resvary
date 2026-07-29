@@ -5,7 +5,7 @@ import { runPrompts } from './prompts.js';
 import { generateProject } from './generator.js';
 
 async function main() {
-  console.log(pc.cyan('\n⚡ create-arc-nano-kit\n'));
+  console.log(pc.cyan('\n⚡ create-settlary\n'));
 
   // Parse optional CLI argument for project name
   const args = process.argv.slice(2);
