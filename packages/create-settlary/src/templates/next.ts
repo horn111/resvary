@@ -1,7 +1,45 @@
 import type { ProjectConfig } from '../prompts.js';
 
 export function nextTemplate(config: ProjectConfig): string {
-  const price = config.pricing === 'request' ? '0.001' : config.pricing === 'second' ? '0.01' : '0.50';
+  if (config.template === 'ai-credits') {
+    return `import { CreditLedger } from '@settlary/sdk/credits';
+import { createSqliteCreditStore } from '@settlary/sqlite';
+
+const ledger = new CreditLedger({
+  projectId: 'my_ai_product',
+  store: createSqliteCreditStore({ path: '.settlary/settlary.sqlite' }),
+});
+
+export async function POST(request: Request) {
+  const { customerId, prompt, idempotencyKey } = await request.json();
+  const meter = await ledger.registerMeter({ key: 'llm_tokens', dimensions: ['input_tokens', 'output_tokens'], idempotencyKey: 'meter-v1' });
+  const price = await ledger.createPriceVersion({
+    meterKey: meter.key,
+    rates: [
+      { dimension: 'input_tokens', unitSize: '1000', amount: '0.002' },
+      { dimension: 'output_tokens', unitSize: '1000', amount: '0.008' },
+    ],
+    idempotencyKey: 'price-v1',
+  });
+  await ledger.grantCredits({
+    customerId,
+    amount: '5',
+    idempotencyKey: \`starter-credit:\${customerId}\`,
+  });
+  const result = await ledger.runMetered({
+    customerId, priceId: price.id,
+    estimatedUsage: { input_tokens: '2000', output_tokens: '1000' }, idempotencyKey,
+  }, async () => ({
+    value: { answer: \`Simulated answer for: \${prompt}\` },
+    actualUsage: { input_tokens: '800', output_tokens: '240' },
+    usageEventId: \`simulated:\${idempotencyKey}\`,
+  }));
+  return Response.json(result);
+}
+`;
+  }
+  const price =
+    config.pricing === 'request' ? '0.001' : config.pricing === 'second' ? '0.01' : '0.50';
 
   return `import { nextPaywall } from '@settlary/sdk/middleware';
 

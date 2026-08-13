@@ -1,21 +1,17 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Settlary Demo - Settlary Receipts',
+  title: 'Settlary - Prepaid AI Credits Demo',
   description:
-    'Interactive demo of Settlary Receipts, memo payment requests, signed webhooks, and paid API endpoints.',
+    'Interactive prepaid credits, usage billing, reservations, and receipts for AI products.',
   openGraph: {
-    title: 'Settlary Demo - Settlary Receipts',
-    description: 'Settlary Receipts and paid API operations on Arc',
+    title: 'Settlary - Prepaid AI Credits Demo',
+    description: 'Reserve maximum AI cost, charge actual usage, and release the remainder.',
     url: 'https://settlary.vercel.app',
   },
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <head>

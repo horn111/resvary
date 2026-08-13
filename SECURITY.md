@@ -6,6 +6,18 @@
 | ------- | ------------------ |
 | 0.1.x   | :white_check_mark: |
 
+## Prepaid credits alpha
+
+The `0.3.0-alpha` credit engine is intended for evaluation and design-partner deployments. SQLite is a local or single-node backend, not a multi-node production datastore.
+
+- Authorize `customerId`, grants, adjustments, price IDs, and project scope on the server.
+- Never expose admin grant or adjustment operations directly to an untrusted client.
+- Keep API keys, sensitive prompts, and personal information out of metadata.
+- Use stable idempotency keys for all retries.
+- Treat closed-loop credits separately from transferable funds, custody, tax invoices, and redemption.
+
+See [docs/credit-security-model.md](docs/credit-security-model.md) for the full model.
+
 ## Reporting a Vulnerability
 
 We take the security of Settlary seriously. If you believe you have found a security vulnerability, please report it to us as described below.

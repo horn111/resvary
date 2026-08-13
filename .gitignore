@@ -40,3 +40,13 @@ npm-debug.log*
 # Misc
 .turbo/
 .vercel/
+.settlary/
+
+# Private grant application working files
+docs/grant.md
+docs/grant-brand-update.md
+docs/grant-pivot-update.md
+docs/grant-application-current.md
+
+# Local product marketing context
+.agents/

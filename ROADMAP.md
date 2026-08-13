@@ -1,135 +1,57 @@
 # Roadmap
 
-> Last updated: June 2026
+> Last updated: August 2026
 
-Settlary is an early open-source payment operations toolkit for stablecoin apps, built on Arc. The current focus is narrow on purpose: make Arc payment flows easier to run, inspect, and operate locally before moving toward persistent production infrastructure.
+Settlary is now focused on open-source prepaid credits and usage billing for AI products. Arc remains an optional funding rail, not the product category.
 
-## Shipped
+## 0.3 alpha: shipped in repository
 
-### Core SDK
+- [x] USD credit accounts with six-decimal integer arithmetic
+- [x] Manual grants and compensating adjustments
+- [x] Multi-dimensional meters and immutable price versions
+- [x] Atomic reserve, commit, release, and expiry lifecycle
+- [x] Per-charge usage receipts and immutable ledger entries
+- [x] Idempotent mutation commands and duplicate usage protection
+- [x] Transactional outbox and signed credit webhook helper
+- [x] In-memory and SQLite stores
+- [x] Restart, rollback, and concurrent reservation coverage
+- [x] Arc Testnet invoice/payment receipt to credit grant adapter
+- [x] Interactive simulated AI demo with optional live provider
+- [x] AI credits starter for Express and Next.js
+- [x] Backward-compatible receipts, x402, and buyer APIs
 
-- [x] TypeScript monorepo
-- [x] Express middleware for x402-style paywalled endpoints
-- [x] Next.js Route Handler adapter
-- [x] Buyer SDK with `402 -> sign -> retry` flow
-- [x] Arc chain configuration and constants
-- [x] Middleware test coverage
-- [x] Billing and receipts test coverage
+## Next: production persistence
 
-### Billing
+- [ ] Postgres `CreditStore` and receipt store
+- [ ] Cross-process concurrency and isolation tests
+- [ ] Durable outbox delivery worker with retries and dead-letter state
+- [ ] Structured logs, health checks, and migration CLI
+- [ ] Import/export for local SQLite data
+- [ ] Design-partner deployment guide
 
-- [x] Per-request pricing model
-- [x] Per-second pricing model
-- [x] Per-job pricing model
-- [x] In-memory usage metering
+## Candidate milestone: funding and distribution
 
-### Settlary Receipts
+The next item is selected from design-partner evidence rather than implemented in parallel:
 
-- [x] Invoice helpers
-- [x] Transaction memo helpers
-- [x] Receipt matching
-- [x] In-memory receipt ledger
-- [x] HMAC-signed webhook events
-- [x] Arc Testnet watcher for memo-wrapped USDC payments
-- [x] Read-only Arc Testnet proof polling and tx proof for memo payment requests
-- [x] Local webhook inbox
-- [x] Webhook replay attempts with fresh signature timestamps
-
-### Developer Experience
-
-- [x] Local Next.js demo app
-- [x] Interactive watcher flow in the demo
-- [x] Webhook Inbox + Replay demo flow
-- [x] Optional Onchain Proof demo panel with Memo-log polling
-- [x] Repo-local `create-settlary` scaffolder
-- [x] Grant snapshot and demo script docs
-
-## Next Grant Milestones
-
-### Persistent Receipt Store
-
-- [x] SQLite receipt store adapter
-- [ ] Postgres receipt store adapter
-- [x] Persistent invoices, receipts, webhook events, and delivery attempts
-- [ ] Import/export path for local demo data
-
-### Persistent Watcher Cursor
-
-- [x] Store last scanned block per watched invoice or memo id
-- [x] Resume watcher safely after process restart
-- [x] Avoid duplicate receipt creation after replayed scans
-- [x] Expose cursor state for local debugging
-
-### Next.js Webhook Route Helpers
-
-- [x] Raw body reader for signed webhook payloads
-- [x] `x-settlary-signature` verification helper
-- [x] Delivery attempt recording helper
-- [x] Typed success/failure responses for route handlers
-
-### Refund And Partial Refund State
-
-- [ ] Refund receipt status model
-- [ ] Partial refund accounting
-- [ ] Counter-payment matching
-- [ ] Webhook events for refund lifecycle changes
-
-### Hosted Demo Flow
-
-- [ ] Reviewer-friendly hosted demo
-- [ ] Demo script embedded in docs
-- [ ] Clear "what is simulated vs onchain" labeling
-- [ ] Short walkthrough assets for grant reviewers
+- Stripe-funded credits if card checkout is the adoption blocker;
+- self-hosted HTTP service if teams need non-TypeScript or multi-service access;
+- hosted control plane if teams ask Settlary to operate persistence and delivery;
+- Arc production funding after Arc mainnet and legal review.
 
 ## Later
 
-### Gateway Readiness
+- allowance and promotional grant policies;
+- tiered and package pricing;
+- dashboard, audit explorer, and usage analytics;
+- Fastify, Hono, Python, and Go clients;
+- reversals and product-level refund policies;
+- postpaid B2B usage and clearing adapters.
 
-- [ ] Deposit readiness helpers
-- [ ] Pending settlement state
-- [ ] Balance monitoring and alerts
-- [ ] Multi-chain balance visibility
+## Explicit non-goals for the alpha
 
-### Dashboard And Analytics
-
-- [ ] Usage analytics API
-- [ ] Revenue tracking
-- [ ] Per-endpoint cost breakdown
-- [ ] Receipt and webhook delivery views
-
-### Multi-Framework Support
-
-- [ ] Fastify adapter
-- [ ] Hono adapter
-- [ ] Python SDK
-- [ ] Go SDK
-
-### Agent Commerce
-
-- [ ] Agent payment policy examples
-- [ ] Agent-to-agent paid API examples
-- [ ] Budget-aware buyer flows
-- [ ] Service discovery experiments
-
-## Current Non-Goals
-
-- Hosted managed payment platform
-- Production webhook queue
-- Default production Gateway verification without an app-provided verifier
-- Persistent receipt database in the current MVP
-- Fastify/Hono/Python/Go adapters in the current MVP
-
-## Grant Framing
-
-The highest-impact next step is to turn the current local Settlary Receipts proof into a more durable builder workflow:
-
-```text
-local payment ops proof
--> persistent receipts
--> resumable watcher
--> webhook route helpers
--> refund states
--> hosted reviewer demo
-```
-
-See [docs/grant.md](docs/grant.md) and [docs/demo-script.md](docs/demo-script.md) for the grant-ready project summary and local demo walkthrough.
+- subscriptions, tax calculation, or tax invoices;
+- transferable or redeemable credits;
+- custody, cash-out, or marketplace wallets;
+- managed production queue or SLA;
+- expiring credit grants;
+- hosted authentication, RBAC, and tenant administration.

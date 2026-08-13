@@ -1,5 +1,7 @@
 # Why Arc?
 
+> Arc is now an optional USDC funding rail for Settlary credits, not the product category. The credit ledger itself is payment-rail agnostic.
+
 Settlary is built on [Arc](https://arc.network), Circle's Layer 1 blockchain. Here's why Arc is the foundation for its usage-based billing and paid API workflows.
 
 ## USDC-Native Gas
@@ -40,24 +42,24 @@ Arc is designed with autonomous AI agents as first-class citizens:
 
 ## Comparison
 
-| Feature | Arc | Ethereum | Base | Solana |
-|---------|-----|----------|------|--------|
-| Gas Token | USDC | ETH | ETH | SOL |
-| Finality | <1s | ~12min | ~2s | ~0.4s |
-| Min Payment | $0.000001 | ~$0.50 | ~$0.001 | ~$0.001 |
-| Gas per Tx | ~$0.001 | ~$1-50 | ~$0.01 | ~$0.0001 |
-| Nanopayments | Native | Via L2 | Via x402 | Via x402 |
-| USDC Native | ✅ | ❌ | ❌ | ❌ |
+| Feature      | Arc       | Ethereum | Base     | Solana   |
+| ------------ | --------- | -------- | -------- | -------- |
+| Gas Token    | USDC      | ETH      | ETH      | SOL      |
+| Finality     | <1s       | ~12min   | ~2s      | ~0.4s    |
+| Min Payment  | $0.000001 | ~$0.50   | ~$0.001  | ~$0.001  |
+| Gas per Tx   | ~$0.001   | ~$1-50   | ~$0.01   | ~$0.0001 |
+| Nanopayments | Native    | Via L2   | Via x402 | Via x402 |
+| USDC Native  | ✅        | ❌       | ❌       | ❌       |
 
 ## Network Details
 
-| Parameter | Value |
-|-----------|-------|
-| Network | Arc Testnet |
-| Chain ID | `5042002` |
-| RPC URL | `https://rpc.testnet.arc.network` |
-| Explorer | [testnet.arcscan.app](https://testnet.arcscan.app) |
-| Faucet | [faucet.circle.com](https://faucet.circle.com) |
-| Currency | USDC (6 decimals) |
-| Consensus | Malachite BFT |
-| Mainnet ETA | Summer 2026 |
+| Parameter   | Value                                              |
+| ----------- | -------------------------------------------------- |
+| Network     | Arc Testnet                                        |
+| Chain ID    | `5042002`                                          |
+| RPC URL     | `https://rpc.testnet.arc.network`                  |
+| Explorer    | [testnet.arcscan.app](https://testnet.arcscan.app) |
+| Faucet      | [faucet.circle.com](https://faucet.circle.com)     |
+| Currency    | USDC (6 decimals)                                  |
+| Consensus   | Malachite BFT                                      |
+| Mainnet ETA | Summer 2026                                        |

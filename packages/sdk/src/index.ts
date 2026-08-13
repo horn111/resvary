@@ -1,7 +1,7 @@
 /**
  * @settlary/sdk
  *
- * Open-source payment operations for stablecoin apps, built on Arc.
+ * Open-source prepaid credits and usage billing for AI products.
  *
  * @packageDocumentation
  */
@@ -26,6 +26,10 @@ export {
   type PerSecondPricing,
   type PerJobPricing,
 } from './billing/plans.js';
+
+export * from './credits/index.js';
+export { createMeterDefinition, createPriceVersion, rateUsage } from './pricing/index.js';
+export { ArcCreditFunding, type ArcCreditFundingConfig, type ArcFundingRequest } from './funding/index.js';
 
 export { GatewayClient, type GatewayClientConfig } from './gateway/client.js';
 

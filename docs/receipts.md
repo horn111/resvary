@@ -1,5 +1,7 @@
 # Settlary Receipts
 
+> Compatibility module. Settlary's primary product is now prepaid credits and usage billing for AI products. Payment receipts remain supported as funding evidence; see [prepaid-credits.md](prepaid-credits.md) and [arc-credit-funding.md](arc-credit-funding.md).
+
 Settlary Receipts is the payment operations module in Settlary. It gives developers building on Arc a small, typed workflow for invoices, transaction memos, watcher-based payment observation, receipts, signed webhooks, local delivery verification, and replay.
 
 The goal is not to replace x402 or Circle App Kits. The goal is to make the application layer around Arc payments easier to ship. Refund and partial refund state are planned next steps, not shipped behavior in the current module.
@@ -20,10 +22,7 @@ Arc transaction memos and Unified Balance state patterns make this a natural fit
 ## Quick Start
 
 ```typescript
-import {
-  ReceiptLedger,
-  signWebhookEvent,
-} from '@settlary/sdk/receipts';
+import { ReceiptLedger, signWebhookEvent } from '@settlary/sdk/receipts';
 
 const ledger = new ReceiptLedger();
 
@@ -62,11 +61,7 @@ console.log(signature.header);
 Use the watcher when you want receipts to come from real Arc Testnet transactions instead of manually calling `recordPayment()`.
 
 ```typescript
-import {
-  ReceiptWatcher,
-  ReceiptLedger,
-  createMemoPaymentRequest,
-} from '@settlary/sdk/receipts';
+import { ReceiptWatcher, ReceiptLedger, createMemoPaymentRequest } from '@settlary/sdk/receipts';
 
 const ledger = new ReceiptLedger();
 
@@ -79,9 +74,9 @@ const invoice = ledger.createInvoice({
 const paymentRequest = createMemoPaymentRequest(invoice);
 
 console.log(paymentRequest.memoContract);
-console.log(paymentRequest.target);       // Arc Testnet USDC ERC-20 interface
-console.log(paymentRequest.memoId);       // Indexed memo id for querying logs
-console.log(paymentRequest.txData);       // Data for Memo.memo(...)
+console.log(paymentRequest.target); // Arc Testnet USDC ERC-20 interface
+console.log(paymentRequest.memoId); // Indexed memo id for querying logs
+console.log(paymentRequest.txData); // Data for Memo.memo(...)
 
 const watcher = new ReceiptWatcher({
   ledger,
@@ -136,11 +131,7 @@ The proof path is read-only. It does not send a transaction, store a private key
 Use `WebhookInbox` when you want a local app to receive, verify, store, and replay Settlary Receipts webhook deliveries.
 
 ```typescript
-import {
-  WebhookInbox,
-  serializeWebhookPayload,
-  signWebhookEvent,
-} from '@settlary/sdk/receipts';
+import { WebhookInbox, serializeWebhookPayload, signWebhookEvent } from '@settlary/sdk/receipts';
 
 const inbox = new WebhookInbox();
 const event = ledger.listWebhookEvents().at(-1)!;
@@ -160,7 +151,7 @@ const replay = inbox.replay({
 });
 
 console.log(delivery.status); // verified
-console.log(replay.attempt);  // 2
+console.log(replay.attempt); // 2
 ```
 
 The inbox is intentionally in-memory for local payment-ops workflows. A production app should persist delivery attempts in its own database.

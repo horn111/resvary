@@ -1,23 +1,15 @@
 # @settlary/sqlite
 
-Optional SQLite receipt store for `settlary`.
+SQLite persistence for Settlary credits, usage receipts, and stablecoin payment receipts.
 
-```ts
-import { PersistentReceiptLedger } from '@settlary/sdk/receipts';
-import { createSqliteReceiptStore } from '@settlary/sqlite';
+```typescript
+import { CreditLedger } from '@settlary/sdk/credits';
+import { createSqliteCreditStore } from '@settlary/sqlite';
 
-const store = createSqliteReceiptStore({
-  path: '.settlary/receipts.sqlite',
-});
-
-const ledger = new PersistentReceiptLedger({ store });
+const store = createSqliteCreditStore({ path: '.settlary/settlary.sqlite' });
+const credits = new CreditLedger({ projectId: 'my_ai_product', store });
 ```
 
-This package stores invoices, receipts, webhook events, webhook delivery attempts, and watcher cursors.
+The existing `createSqliteReceiptStore` remains available for payment invoices, receipts, webhook deliveries, and Arc watcher cursors. Both stores can use the same file.
 
-## Requirements
-
-- Node 24+
-- Local filesystem access
-
-The package uses Node's built-in `node:sqlite` module. It is optional so the core SDK remains free of SQLite runtime requirements.
+Requires Node.js 24+ and local filesystem access. The credit store uses WAL, `BEGIN IMMEDIATE`, rollback-safe writes, and versioned schema metadata.

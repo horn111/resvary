@@ -75,6 +75,7 @@ export interface UsageInput {
  * @param config - Plan configuration
  * @returns A billing plan with cost calculation methods
  */
+/** @deprecated Use createMeterDefinition, createPriceVersion, and rateUsage instead. */
 export function createBillingPlan(config: {
   name: string;
   description?: string;

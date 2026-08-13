@@ -7,13 +7,12 @@ import { generateProject } from './generator.js';
 async function main() {
   console.log(pc.cyan('\n⚡ create-settlary\n'));
 
-  // Parse optional CLI argument for project name
   const args = process.argv.slice(2);
   const initialProjectName = args[0];
 
   try {
     const config = await runPrompts(initialProjectName);
-    
+
     console.log(pc.dim('\nScaffolding project...'));
     const files = await generateProject(config);
 
@@ -26,8 +25,12 @@ async function main() {
     console.log(`  cd ${config.projectName}`);
     console.log('  npm install');
     console.log('  npm run dev');
-    console.log(pc.yellow('\nYour API will be paywalled and ready to accept USDC! 🚀\n'));
 
+    const readyMessage =
+      config.template === 'ai-credits'
+        ? 'Your AI app now has prepaid credits, metered usage, and durable balances.'
+        : 'Your API is paywalled and ready to accept USDC.';
+    console.log(pc.yellow(`\n${readyMessage}\n`));
   } catch (error) {
     if (error instanceof Error && error.message === 'Cancelled') {
       console.log(pc.yellow('\nScaffolding cancelled.\n'));

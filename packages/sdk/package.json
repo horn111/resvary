@@ -1,7 +1,7 @@
 {
   "name": "@settlary/sdk",
-  "version": "0.1.0-alpha",
-  "description": "Payment operations SDK for stablecoin apps, built on Arc",
+  "version": "0.3.0-alpha.0",
+  "description": "Prepaid credits and usage billing SDK for AI products",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -22,6 +22,18 @@
       "types": "./dist/billing/index.d.ts",
       "import": "./dist/billing/index.js"
     },
+    "./credits": {
+      "types": "./dist/credits/index.d.ts",
+      "import": "./dist/credits/index.js"
+    },
+    "./pricing": {
+      "types": "./dist/pricing/index.d.ts",
+      "import": "./dist/pricing/index.js"
+    },
+    "./funding/arc": {
+      "types": "./dist/funding/arc.d.ts",
+      "import": "./dist/funding/arc.js"
+    },
     "./gateway": {
       "types": "./dist/gateway/index.d.ts",
       "import": "./dist/gateway/index.js"
@@ -39,11 +51,15 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "clean": "rm -rf dist",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [
+    "ai-credits",
+    "prepaid-credits",
+    "usage-metering",
+    "ledger",
     "arc",
     "circle",
     "usdc",
@@ -70,7 +86,7 @@
     "url": "https://github.com/horn111/settlary/issues"
   },
   "dependencies": {
-    "viem": "^2.21.0"
+    "viem": "^2.55.8"
   },
   "peerDependencies": {
     "express": ">=4.0.0",
@@ -87,6 +103,6 @@
   "devDependencies": {
     "@types/express": "^5.0.0",
     "typescript": "^5.6.0",
-    "vitest": "^1.6.0"
+    "vitest": "^4.1.10"
   }
 }

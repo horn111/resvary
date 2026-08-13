@@ -1,7 +1,7 @@
 {
   "name": "@settlary/sqlite",
-  "version": "0.1.0-alpha",
-  "description": "SQLite receipt store for Settlary",
+  "version": "0.3.0-alpha.0",
+  "description": "SQLite persistence for Settlary credits, usage receipts, and payment receipts",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -19,7 +19,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "clean": "rm -rf dist",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "test": "vitest run"
   },
   "engines": {
@@ -31,7 +31,7 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "typescript": "^5.6.0",
-    "vitest": "^1.6.0"
+    "vitest": "^4.1.10"
   },
   "license": "Apache-2.0"
 }

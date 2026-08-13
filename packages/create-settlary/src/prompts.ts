@@ -3,6 +3,7 @@ import prompts from 'prompts';
 export interface ProjectConfig {
   projectName: string;
   framework: 'express' | 'next';
+  template: 'ai-credits' | 'paid-api';
   pricing: 'request' | 'second' | 'job';
   payTo: string;
 }
@@ -18,7 +19,16 @@ export async function runPrompts(initialProjectName?: string): Promise<ProjectCo
         type: initialProjectName ? null : 'text',
         name: 'projectName',
         message: 'Project name:',
-        initial: 'my-paid-api',
+        initial: 'my-ai-credits-app',
+      },
+      {
+        type: 'select',
+        name: 'template',
+        message: 'Starter:',
+        choices: [
+          { title: 'AI prepaid credits', value: 'ai-credits' },
+          { title: 'Legacy x402 paid API', value: 'paid-api' },
+        ],
       },
       {
         type: 'select',
@@ -30,7 +40,7 @@ export async function runPrompts(initialProjectName?: string): Promise<ProjectCo
         ],
       },
       {
-        type: 'select',
+        type: (_previous, values) => (values.template === 'paid-api' ? 'select' : null),
         name: 'pricing',
         message: 'Pricing model:',
         choices: [
@@ -40,19 +50,20 @@ export async function runPrompts(initialProjectName?: string): Promise<ProjectCo
         ],
       },
       {
-        type: 'text',
+        type: (_previous, values) => (values.template === 'paid-api' ? 'text' : null),
         name: 'payTo',
         message: 'Your wallet address to receive USDC (payTo):',
         initial: '0x0000000000000000000000000000000000000000',
       },
     ],
-    { onCancel }
+    { onCancel },
   );
 
   return {
     projectName: initialProjectName || response.projectName,
     framework: response.framework,
-    pricing: response.pricing,
-    payTo: response.payTo,
+    template: response.template,
+    pricing: response.pricing ?? 'request',
+    payTo: response.payTo ?? '0x0000000000000000000000000000000000000000',
   };
 }

@@ -1,8 +1,8 @@
 {
   "name": "settlary",
-  "version": "0.1.0",
+  "version": "0.3.0-alpha.0",
   "private": true,
-  "description": "Open-source payment operations toolkit for stablecoin apps, built on Arc",
+  "description": "Open-source prepaid credits and usage billing for AI products",
   "repository": {
     "type": "git",
     "url": "https://github.com/horn111/settlary.git"
@@ -16,7 +16,6 @@
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "dev": "npm run dev --workspace=apps/demo",
-    "lint": "eslint . --ext .ts,.tsx",
     "typecheck": "tsc --noEmit --project packages/sdk/tsconfig.json",
     "test": "npm run test --workspaces --if-present",
     "clean": "npm run clean --workspaces --if-present && rm -rf node_modules",
@@ -25,7 +24,6 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "eslint": "^9.0.0",
     "prettier": "^3.3.0",
     "typescript": "^5.6.0"
   },
