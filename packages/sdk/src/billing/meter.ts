@@ -62,6 +62,7 @@ export interface UsageSummary {
  * For production use, extend with a persistent store
  * (Supabase, Postgres, Redis, etc.)
  */
+/** @deprecated Use CreditLedger with meters, price versions, and usage receipts instead. */
 export class UsageMeter {
   private readonly records: UsageRecord[] = [];
   private readonly endpoint: string;

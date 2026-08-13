@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Pivoted
+
+- Repositioned Settlary as open-source prepaid credits and usage billing for AI products; Arc is now an optional USDC funding rail.
+
+### Added
+
+- USD credit accounts with integer arithmetic, manual grants, adjustments, reservations, expiry, actual-usage commits, and usage receipts.
+- Multi-dimensional meters, immutable price versions, and deterministic integer rating.
+- Persistent idempotency, immutable ledger entries, transactional outbox events, and signed credit webhooks.
+- `CreditStore`, `InMemoryCreditStore`, and transactional `SqliteCreditStore` with versioned schema metadata.
+- Arc Testnet funding intents and exactly-once payment receipt to credit grant confirmation.
+- New prepaid AI credits demo, optional OpenAI-compatible mode, and AI starter templates.
+- Migration, pricing, funding, persistence, security, grant pivot, and prepaid-credit documentation.
+
+### Deprecated
+
+- `UsageMeter` and `createBillingPlan` remain compatible but should not be used as a balance source of truth.
+
 ### Changed
 
 - Renamed the project from `arc-nano-kit` to **Settlary** to align with the Arc Brand Guidelines and establish an independent product identity.

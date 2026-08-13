@@ -36,7 +36,8 @@ export function tsconfigTemplate(config: ProjectConfig): string {
   return `{
   "compilerOptions": {
     "target": "es2022",
-    "module": "commonjs",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "strict": true,

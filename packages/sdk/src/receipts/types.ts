@@ -132,7 +132,16 @@ export type WebhookEventType =
   | 'invoice.observed'
   | 'invoice.paid'
   | 'invoice.expired'
-  | 'invoice.refunded';
+  | 'invoice.refunded'
+  | 'credit.granted'
+  | 'credit.adjusted'
+  | 'credit.reserved'
+  | 'credit.released'
+  | 'credit.expired'
+  | 'usage.charged'
+  | 'funding.intent.created'
+  | 'funding.confirmed'
+  | 'funding.failed';
 
 export interface WebhookEvent<TData = unknown> {
   id: string;

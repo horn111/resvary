@@ -18,17 +18,43 @@ export async function generateProject(config: ProjectConfig): Promise<string[]> 
   await write(targetDir, 'package.json', packageTemplate(config), filesCreated);
   await write(targetDir, 'tsconfig.json', tsconfigTemplate(config), filesCreated);
   await write(targetDir, '.env', envTemplate(config), filesCreated);
-  await write(targetDir, '.gitignore', 'node_modules\n.env\ndist\n.next', filesCreated);
+  await write(
+    targetDir,
+    '.gitignore',
+    'node_modules\n.env\ndist\n.next\n.settlary\n',
+    filesCreated,
+  );
 
   // Generate framework specific files
   if (config.framework === 'express') {
     await fs.mkdir(path.join(targetDir, 'src'), { recursive: true });
     await write(targetDir, 'src/index.ts', expressTemplate(config), filesCreated);
   } else if (config.framework === 'next') {
-    await fs.mkdir(path.join(targetDir, 'app/api/data'), { recursive: true });
-    await write(targetDir, 'app/api/data/route.ts', nextTemplate(config), filesCreated);
-    await write(targetDir, 'app/layout.tsx', 'export default function RootLayout({ children }: { children: React.ReactNode }) { return (<html><body>{children}</body></html>); }', filesCreated);
-    await write(targetDir, 'app/page.tsx', 'export default function Page() { return <h1>My Paid API</h1>; }', filesCreated);
+    const route = config.template === 'ai-credits' ? 'generate' : 'data';
+    await fs.mkdir(path.join(targetDir, `app/api/${route}`), { recursive: true });
+    await write(targetDir, `app/api/${route}/route.ts`, nextTemplate(config), filesCreated);
+    await write(
+      targetDir,
+      'app/layout.tsx',
+      'export default function RootLayout({ children }: { children: React.ReactNode }) { return <html><body>{children}</body></html>; }\n',
+      filesCreated,
+    );
+    await write(
+      targetDir,
+      'app/page.tsx',
+      config.template === 'ai-credits'
+        ? 'export default function Page() { return <main><h1>AI prepaid credits</h1><p>POST customerId, prompt, and idempotencyKey to /api/generate.</p></main>; }\n'
+        : 'export default function Page() { return <main><h1>Paid API</h1><p>Request /api/data to try the x402 paywall.</p></main>; }\n',
+      filesCreated,
+    );
+    if (config.template === 'ai-credits') {
+      await write(
+        targetDir,
+        'next.config.mjs',
+        "export default { serverExternalPackages: ['@settlary/sqlite'] };\n",
+        filesCreated,
+      );
+    }
   }
 
   return filesCreated;

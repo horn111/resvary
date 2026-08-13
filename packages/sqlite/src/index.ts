@@ -1,7 +1,6 @@
 import { mkdirSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { dirname } from 'node:path';
-import type { DatabaseSync as DatabaseSyncType } from 'node:sqlite';
+import { DatabaseSync, type DatabaseSync as DatabaseSyncType } from 'node:sqlite';
 import {
   parseReceiptStoreValue,
   serializeReceiptStoreValue,
@@ -16,8 +15,11 @@ import {
   type WebhookEvent,
 } from '@settlary/sdk/receipts';
 
-const require = createRequire(import.meta.url);
-const { DatabaseSync } = require('node:sqlite') as typeof import('node:sqlite');
+export {
+  SqliteCreditStore,
+  createSqliteCreditStore,
+  type SqliteCreditStoreConfig,
+} from './credit.js';
 
 export interface SqliteReceiptStoreConfig {
   path: string;
