@@ -5,6 +5,7 @@
   "description": "Settlary prepaid AI credits and usage billing demo",
   "scripts": {
     "dev": "next dev",
+    "prebuild": "npm run build --workspace=@settlary/sdk && npm run build --workspace=@settlary/sqlite",
     "build": "next build",
     "start": "next start"
   },
