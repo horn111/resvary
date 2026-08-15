@@ -457,27 +457,49 @@ function wordDots(text: string, width: number, height: number, gap: number, font
         if (alpha > 170) cells.push({ column, row, x, y });
       }
     }
-    const occupied = new Set(cells.map((cell) => `${cell.column}:${cell.row}`));
-    const cleaned = cells.filter((cell) => {
-      for (let y = -1; y <= 1; y += 1) {
-        for (let x = -1; x <= 1; x += 1) {
-          if ((x || y) && occupied.has(`${cell.column + x}:${cell.row + y}`)) return true;
+    const cellsByPosition = new Map<string, (typeof cells)[number]>(
+      cells.map((cell) => [`${cell.column}:${cell.row}`, cell] as const),
+    );
+    const visited = new Set<string>();
+    const components: typeof cells[] = [];
+
+    for (const cell of cells) {
+      const startKey = `${cell.column}:${cell.row}`;
+      if (visited.has(startKey)) continue;
+      const component: typeof cells = [];
+      const pending = [cell];
+      visited.add(startKey);
+
+      while (pending.length) {
+        const current = pending.pop();
+        if (!current) continue;
+        component.push(current);
+        for (let y = -1; y <= 1; y += 1) {
+          for (let x = -1; x <= 1; x += 1) {
+            if (!x && !y) continue;
+            const key = `${current.column + x}:${current.row + y}`;
+            const neighbour = cellsByPosition.get(key);
+            if (!neighbour || visited.has(key)) continue;
+            visited.add(key);
+            pending.push(neighbour);
+          }
         }
       }
-      return false;
-    });
-    const topRow = Math.min(...cleaned.map((cell) => cell.row));
-    const topCells = cleaned.filter((cell) => cell.row === topRow);
-    if (topCells.length) {
-      const leftEdge = Math.min(...topCells.map((cell) => cell.x));
-      const rightEdge = Math.max(...topCells.map((cell) => cell.x));
-      const crownX = offsetX + pen * scale + (leftEdge + rightEdge) / 2;
-      result.push({
-        x: crownX,
-        y: offsetY + topCells[0].y - gap,
-        u: (crownX - offsetX) / drawnWidth,
-      });
+      components.push(component);
     }
+
+    let cleaned = components.reduce(
+      (largest, component) => (component.length > largest.length ? component : largest),
+      [] as typeof cells,
+    );
+    const rowCounts = new Map<number, number>();
+    for (const cell of cleaned) rowCounts.set(cell.row, (rowCounts.get(cell.row) ?? 0) + 1);
+    const stableTopRow = Math.min(
+      ...[...rowCounts.entries()]
+        .filter(([, count]) => count >= 3)
+        .map(([row]) => row),
+    );
+    cleaned = cleaned.filter((cell) => cell.row >= stableTopRow);
     for (const cell of cleaned) {
       const x = offsetX + pen * scale + cell.x;
       result.push({ x, y: offsetY + cell.y, u: (x - offsetX) / drawnWidth });
