@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  serverExternalPackages: ['viem', '@settlary/sqlite'],
+  serverExternalPackages: ['viem', '@resvary/sqlite'],
 };
 
 module.exports = nextConfig;

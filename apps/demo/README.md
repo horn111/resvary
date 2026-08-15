@@ -1,4 +1,4 @@
-# Settlary AI Credits Demo
+# Resvary AI Credits Demo
 
 Interactive Next.js demo for:
 
@@ -12,6 +12,6 @@ It also demonstrates idempotent replay, provider failure, SQLite restart persist
 npm run dev --workspace=apps/demo
 ```
 
-Node.js 24+ is required. The default simulation needs no external key. Set `SETTLARY_AI_API_KEY`, `SETTLARY_AI_MODEL`, and optionally `SETTLARY_AI_BASE_URL` for the live OpenAI-compatible button.
+Node.js 24+ is required. The default simulation needs no external key. Set `RESVARY_AI_API_KEY`, `RESVARY_AI_MODEL`, and optionally `RESVARY_AI_BASE_URL` for the live OpenAI-compatible button.
 
 Legacy Arc payment proof and webhook routes remain available for the optional funding path.

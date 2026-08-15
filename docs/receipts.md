@@ -1,8 +1,8 @@
-# Settlary Receipts
+# Resvary Receipts
 
-> Compatibility module. Settlary's primary product is now prepaid credits and usage billing for AI products. Payment receipts remain supported as funding evidence; see [prepaid-credits.md](prepaid-credits.md) and [arc-credit-funding.md](arc-credit-funding.md).
+> Compatibility module. Resvary's primary product is now prepaid credits and usage billing for AI products. Payment receipts remain supported as funding evidence; see [prepaid-credits.md](prepaid-credits.md) and [arc-credit-funding.md](arc-credit-funding.md).
 
-Settlary Receipts is the payment operations module in Settlary. It gives developers building on Arc a small, typed workflow for invoices, transaction memos, watcher-based payment observation, receipts, signed webhooks, local delivery verification, and replay.
+Resvary Receipts is the payment operations module in Resvary. It gives developers building on Arc a small, typed workflow for invoices, transaction memos, watcher-based payment observation, receipts, signed webhooks, local delivery verification, and replay.
 
 The goal is not to replace x402 or Circle App Kits. The goal is to make the application layer around Arc payments easier to ship. Refund and partial refund state are planned next steps, not shipped behavior in the current module.
 
@@ -22,7 +22,7 @@ Arc transaction memos and Unified Balance state patterns make this a natural fit
 ## Quick Start
 
 ```typescript
-import { ReceiptLedger, signWebhookEvent } from '@settlary/sdk/receipts';
+import { ReceiptLedger, signWebhookEvent } from '@resvary/sdk/receipts';
 
 const ledger = new ReceiptLedger();
 
@@ -36,7 +36,7 @@ const invoice = ledger.createInvoice({
 });
 
 console.log(invoice.memo);
-// settlary:invoice:v1:inv_pro_plan_123
+// resvary:invoice:v1:inv_pro_plan_123
 
 const receipt = ledger.recordPayment(invoice.id, {
   from: '0x2222222222222222222222222222222222222222',
@@ -61,7 +61,7 @@ console.log(signature.header);
 Use the watcher when you want receipts to come from real Arc Testnet transactions instead of manually calling `recordPayment()`.
 
 ```typescript
-import { ReceiptWatcher, ReceiptLedger, createMemoPaymentRequest } from '@settlary/sdk/receipts';
+import { ReceiptWatcher, ReceiptLedger, createMemoPaymentRequest } from '@resvary/sdk/receipts';
 
 const ledger = new ReceiptLedger();
 
@@ -102,7 +102,7 @@ import {
   createMemoPaymentRequest,
   findMemoPaymentProof,
   verifyMemoPaymentProof,
-} from '@settlary/sdk/receipts';
+} from '@resvary/sdk/receipts';
 
 const paymentRequest = createMemoPaymentRequest(invoice);
 
@@ -128,10 +128,10 @@ The proof path is read-only. It does not send a transaction, store a private key
 
 ## Webhook Inbox and Replay
 
-Use `WebhookInbox` when you want a local app to receive, verify, store, and replay Settlary Receipts webhook deliveries.
+Use `WebhookInbox` when you want a local app to receive, verify, store, and replay Resvary Receipts webhook deliveries.
 
 ```typescript
-import { WebhookInbox, serializeWebhookPayload, signWebhookEvent } from '@settlary/sdk/receipts';
+import { WebhookInbox, serializeWebhookPayload, signWebhookEvent } from '@resvary/sdk/receipts';
 
 const inbox = new WebhookInbox();
 const event = ledger.listWebhookEvents().at(-1)!;
@@ -165,21 +165,21 @@ import {
   InMemoryReceiptStore,
   PersistentReceiptLedger,
   PersistentWebhookInbox,
-} from '@settlary/sdk/receipts';
+} from '@resvary/sdk/receipts';
 
 const store = new InMemoryReceiptStore();
 const ledger = new PersistentReceiptLedger({ store });
 const inbox = new PersistentWebhookInbox({ store });
 ```
 
-For local SQLite persistence, use the optional `@settlary/sqlite` package:
+For local SQLite persistence, use the optional `@resvary/sqlite` package:
 
 ```typescript
-import { PersistentReceiptLedger } from '@settlary/sdk/receipts';
-import { createSqliteReceiptStore } from '@settlary/sqlite';
+import { PersistentReceiptLedger } from '@resvary/sdk/receipts';
+import { createSqliteReceiptStore } from '@resvary/sqlite';
 
 const store = createSqliteReceiptStore({
-  path: '.settlary/receipts.sqlite',
+  path: '.resvary/receipts.sqlite',
 });
 
 const ledger = new PersistentReceiptLedger({ store });

@@ -4,11 +4,11 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   const payload = await request.text();
-  const header = request.headers.get('x-settlary-signature');
+  const header = request.headers.get('x-resvary-signature');
 
   if (!header) {
     return Response.json(
-      { error: 'Missing x-settlary-signature header' },
+      { error: 'Missing x-resvary-signature header' },
       { status: 400 },
     );
   }

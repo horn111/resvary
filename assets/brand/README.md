@@ -1,20 +1,31 @@
-# Settlary Social Brand Assets
+# Resvary Social Brand Assets
 
 ## X profile
 
-- Display name: `Settlary`
-- Bio: `Open-source payment operations for stablecoin apps. Invoices, receipts, proofs, signed webhooks & replay. Built on Arc.`
-- Website: `https://github.com/horn111/settlary`
+- Display name: `Resvary`
+- Bio: `Open-source prepaid credits and usage billing for AI products. Reserve before execution, charge actual usage, release the rest.`
+- Website: `https://github.com/horn111/resvary`
 
-Use the GitHub URL until the renamed Vercel deployment or a custom Settlary domain is live.
+Use the GitHub URL until the renamed Vercel deployment or a custom Resvary domain is live.
 
 ## Assets
 
-- `settlary-x-avatar.png` — 800 × 800 px
-- `settlary-x-header.png` — 1500 × 500 px, upload-ready with wordmark and tagline
-- `settlary-x-header-clean.png` — 1500 × 500 px without text
+- `resvary-x-avatar.png` — 800 × 800 px
+- `resvary-x-header.png` — 1500 × 500 px, upload-ready with wordmark and tagline
+- `resvary-x-header-clean.png` — 1500 × 500 px without text
+- `resvary-rebrand-announcement.png` — 1600 × 900 px, X rebrand announcement
 
-The primary mark combines controlled payment rails with a central proof node. Construction circles, axes, and measurement guides communicate precision, verification, and settlement infrastructure.
+## Rebrand announcement
+
+> The project has a new name: Resvary.
+>
+> The product remains focused on open-source prepaid credits and usage billing for AI applications.
+>
+> Reserve before execution. Commit actual usage. Release the rest. Keep an auditable receipt.
+>
+> github.com/horn111/resvary
+
+The primary mark combines two controlled credit boundaries with a movable authorization node. It represents a balance moving through reservation, commit, and release without leaving the permitted range.
 
 ## Palette
 

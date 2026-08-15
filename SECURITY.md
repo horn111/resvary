@@ -20,7 +20,7 @@ See [docs/credit-security-model.md](docs/credit-security-model.md) for the full 
 
 ## Reporting a Vulnerability
 
-We take the security of Settlary seriously. If you believe you have found a security vulnerability, please report it to us as described below.
+We take the security of Resvary seriously. If you believe you have found a security vulnerability, please report it to us as described below.
 
 **Please do NOT report security vulnerabilities through public GitHub issues.**
 
@@ -60,7 +60,7 @@ The following are in scope for security reports:
 
 ## Security Best Practices
 
-When using Settlary in production:
+When using Resvary in production:
 
 1. **Never commit `.env` files** — Use environment variables or secrets managers
 2. **Rotate wallet keys regularly** — Especially for seller-side payment collection

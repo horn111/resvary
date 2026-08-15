@@ -2,12 +2,12 @@ import type { ProjectConfig } from '../prompts.js';
 
 export function nextTemplate(config: ProjectConfig): string {
   if (config.template === 'ai-credits') {
-    return `import { CreditLedger } from '@settlary/sdk/credits';
-import { createSqliteCreditStore } from '@settlary/sqlite';
+    return `import { CreditLedger } from '@resvary/sdk/credits';
+import { createSqliteCreditStore } from '@resvary/sqlite';
 
 const ledger = new CreditLedger({
   projectId: 'my_ai_product',
-  store: createSqliteCreditStore({ path: '.settlary/settlary.sqlite' }),
+  store: createSqliteCreditStore({ path: '.resvary/resvary.sqlite' }),
 });
 
 export async function POST(request: Request) {
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
   const price =
     config.pricing === 'request' ? '0.001' : config.pricing === 'second' ? '0.01' : '0.50';
 
-  return `import { nextPaywall } from '@settlary/sdk/middleware';
+  return `import { nextPaywall } from '@resvary/sdk/middleware';
 
 export const GET = nextPaywall(
   { 

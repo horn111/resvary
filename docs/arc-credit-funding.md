@@ -1,10 +1,10 @@
 # Arc Credit Funding
 
-Arc USDC is Settlary's reference and first-class funding path for prepaid credit accounts. The internal credit ledger remains payment-rail agnostic, so usage accounting does not depend on payment transport and teams can add other funding methods without changing the reserve, commit, and release lifecycle.
+Arc USDC is Resvary's reference and first-class funding path for prepaid credit accounts. The internal credit ledger remains payment-rail agnostic, so usage accounting does not depend on payment transport and teams can add other funding methods without changing the reserve, commit, and release lifecycle.
 
 ```typescript
-import { CreditLedger } from '@settlary/sdk/credits';
-import { ArcCreditFunding } from '@settlary/sdk/funding/arc';
+import { CreditLedger } from '@resvary/sdk/credits';
+import { ArcCreditFunding } from '@resvary/sdk/funding/arc';
 
 const funding = new ArcCreditFunding({
   ledger: credits,

@@ -1,9 +1,9 @@
-# create-settlary
+# create-resvary
 
-Scaffold a Settlary application with prepaid credits and usage billing for AI products.
+Scaffold a Resvary application with prepaid credits and usage billing for AI products.
 
 ```bash
-npm create settlary@latest my-ai-app
+npm create resvary@latest my-ai-app
 ```
 
 The default starter includes:

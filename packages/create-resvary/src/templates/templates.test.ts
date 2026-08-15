@@ -22,14 +22,14 @@ describe('starter templates', () => {
     };
     expect(ai.type).toBe('module');
     expect(ai.engines.node).toBe('>=24');
-    expect(ai.dependencies['@settlary/sqlite']).toBe('^0.3.0-alpha.0');
+    expect(ai.dependencies['@resvary/sqlite']).toBe('^0.3.0-alpha.0');
 
     const legacy = JSON.parse(packageTemplate({ ...base, template: 'paid-api' })) as {
       engines: { node: string };
       dependencies: Record<string, string>;
     };
     expect(legacy.engines.node).toBe('>=20');
-    expect(legacy.dependencies['@settlary/sqlite']).toBeUndefined();
+    expect(legacy.dependencies['@resvary/sqlite']).toBeUndefined();
     expect(ai.devDependencies.tsx).toBeUndefined();
 
     const express = JSON.parse(packageTemplate({ ...base, framework: 'express' })) as {

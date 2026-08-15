@@ -3,15 +3,15 @@ import type { ProjectConfig } from '../prompts.js';
 export function expressTemplate(config: ProjectConfig): string {
   if (config.template === 'ai-credits') {
     return `import express from 'express';
-import { CreditLedger } from '@settlary/sdk/credits';
-import { createSqliteCreditStore } from '@settlary/sqlite';
+import { CreditLedger } from '@resvary/sdk/credits';
+import { createSqliteCreditStore } from '@resvary/sqlite';
 
 const app = express();
 app.use(express.json());
 
 const ledger = new CreditLedger({
   projectId: 'my_ai_product',
-  store: createSqliteCreditStore({ path: '.settlary/settlary.sqlite' }),
+  store: createSqliteCreditStore({ path: '.resvary/resvary.sqlite' }),
 });
 
 app.post('/api/generate', async (req, res, next) => {
@@ -55,7 +55,7 @@ app.post('/api/generate', async (req, res, next) => {
 });
 
 app.listen(process.env.PORT || 3000, () => {
-  console.log('Settlary AI credits API is running on http://localhost:3000');
+  console.log('Resvary AI credits API is running on http://localhost:3000');
 });
 `;
   }
@@ -64,7 +64,7 @@ app.listen(process.env.PORT || 3000, () => {
     config.pricing === 'request' ? '0.001' : config.pricing === 'second' ? '0.01' : '0.50';
 
   return `import express from 'express';
-import { expressPaywall } from '@settlary/sdk/middleware';
+import { expressPaywall } from '@resvary/sdk/middleware';
 
 const app = express();
 const port = process.env.PORT || 3000;

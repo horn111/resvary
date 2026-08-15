@@ -20,7 +20,7 @@ describe('Arc invoices and receipts', () => {
 
     expect(invoice.status).toBe('open');
     expect(invoice.amountUnits).toBe('19000000');
-    expect(invoice.memo).toBe('settlary:invoice:v1:inv_demo');
+    expect(invoice.memo).toBe('resvary:invoice:v1:inv_demo');
     expect(invoice.paymentUri).toContain('arc://pay?');
     expect(invoice.paymentUri).toContain('amount=19.00');
   });

@@ -4,7 +4,7 @@
  * @example
  * ```typescript
  * // app/api/data/route.ts
- * import { nextPaywall } from '@settlary/sdk/middleware';
+ * import { nextPaywall } from '@resvary/sdk/middleware';
  *
  * export const GET = nextPaywall(
  *   { price: '0.001' },

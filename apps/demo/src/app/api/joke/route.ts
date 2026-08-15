@@ -1,4 +1,4 @@
-import { nextPaywall } from '@settlary/sdk/middleware';
+import { nextPaywall } from '@resvary/sdk/middleware';
 
 const DEMO_SELLER = '0x1111111111111111111111111111111111111111';
 

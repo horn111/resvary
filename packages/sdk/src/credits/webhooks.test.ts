@@ -3,7 +3,7 @@ import { verifyWebhookSignature } from '../receipts/index.js';
 import { createCreditWebhookEvent, signCreditOutboxEvent } from './webhooks.js';
 
 describe('credit outbox webhooks', () => {
-  it('uses the existing Settlary signature format', () => {
+  it('uses the existing Resvary signature format', () => {
     const event = {
       id: 'evt_credit',
       projectId: 'project_ai',

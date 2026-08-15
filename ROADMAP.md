@@ -2,7 +2,7 @@
 
 > Last updated: August 2026
 
-Settlary is now focused on open-source prepaid credits and usage billing for AI products. Arc remains an optional funding rail, not the product category.
+Resvary is now focused on open-source prepaid credits and usage billing for AI products. Arc remains an optional funding rail, not the product category.
 
 ## 0.3 alpha: shipped in repository
 
@@ -35,7 +35,7 @@ The next item is selected from design-partner evidence rather than implemented i
 
 - Stripe-funded credits if card checkout is the adoption blocker;
 - self-hosted HTTP service if teams need non-TypeScript or multi-service access;
-- hosted control plane if teams ask Settlary to operate persistence and delivery;
+- hosted control plane if teams ask Resvary to operate persistence and delivery;
 - Arc production funding after Arc mainnet and legal review.
 
 ## Later

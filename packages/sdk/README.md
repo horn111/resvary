@@ -1,13 +1,13 @@
-# @settlary/sdk
+# @resvary/sdk
 
 Open-source prepaid credits and usage billing for AI products.
 
 Primary imports:
 
 ```typescript
-import { CreditLedger } from '@settlary/sdk/credits';
-import { createMeterDefinition, createPriceVersion, rateUsage } from '@settlary/sdk/pricing';
-import { ArcCreditFunding } from '@settlary/sdk/funding/arc';
+import { CreditLedger } from '@resvary/sdk/credits';
+import { createMeterDefinition, createPriceVersion, rateUsage } from '@resvary/sdk/pricing';
+import { ArcCreditFunding } from '@resvary/sdk/funding/arc';
 ```
 
 The SDK provides USD credit accounts, manual grants, reserve/commit/release, immutable usage receipts, idempotency, a transactional outbox, and signed credit webhooks. It has no database or AI provider dependency.

@@ -1,5 +1,5 @@
 /**
- * Core type definitions for Settlary.
+ * Core type definitions for Resvary.
  */
 
 /** Supported x402 protocol versions */

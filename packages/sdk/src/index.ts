@@ -1,5 +1,5 @@
 /**
- * @settlary/sdk
+ * @resvary/sdk
  *
  * Open-source prepaid credits and usage billing for AI products.
  *

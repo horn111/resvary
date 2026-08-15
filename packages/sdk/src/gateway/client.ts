@@ -3,7 +3,7 @@
  *
  * @example
  * ```typescript
- * import { GatewayClient } from '@settlary/sdk/gateway';
+ * import { GatewayClient } from '@resvary/sdk/gateway';
  *
  * const gateway = new GatewayClient({
  *   walletAddress: '0x...',

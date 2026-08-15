@@ -1,11 +1,11 @@
 {
-  "name": "settlary",
+  "name": "resvary",
   "version": "0.3.0-alpha.0",
   "private": true,
   "description": "Open-source prepaid credits and usage billing for AI products",
   "repository": {
     "type": "git",
-    "url": "https://github.com/horn111/settlary.git"
+    "url": "https://github.com/horn111/resvary.git"
   },
   "author": "horn111",
   "license": "Apache-2.0",
@@ -20,7 +20,8 @@
     "test": "npm run test --workspaces --if-present",
     "clean": "npm run clean --workspaces --if-present && rm -rf node_modules",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
-    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\""
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "design:check": "node scripts/check-claude-design.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

@@ -1,5 +1,5 @@
 {
-  "name": "@settlary/sdk",
+  "name": "@resvary/sdk",
   "version": "0.3.0-alpha.0",
   "description": "Prepaid credits and usage billing SDK for AI products",
   "type": "module",
@@ -51,7 +51,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "clean": "node -e \"const fs=require('node:fs');fs.rmSync('dist',{recursive:true,force:true});fs.rmSync('tsconfig.tsbuildinfo',{force:true})\"",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
@@ -78,12 +78,12 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/horn111/settlary.git",
+    "url": "https://github.com/horn111/resvary.git",
     "directory": "packages/sdk"
   },
-  "homepage": "https://github.com/horn111/settlary#readme",
+  "homepage": "https://github.com/horn111/resvary#readme",
   "bugs": {
-    "url": "https://github.com/horn111/settlary/issues"
+    "url": "https://github.com/horn111/resvary/issues"
   },
   "dependencies": {
     "viem": "^2.55.8"

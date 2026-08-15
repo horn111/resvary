@@ -13,7 +13,7 @@ export interface ParsedInvoiceMemo {
 
 const SAFE_ID = /^[a-zA-Z0-9_-]+$/;
 
-export function createInvoiceMemo(invoiceId: string, namespace = 'settlary'): string {
+export function createInvoiceMemo(invoiceId: string, namespace = 'resvary'): string {
   const cleanInvoiceId = invoiceId.trim();
   const cleanNamespace = namespace.trim();
 

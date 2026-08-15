@@ -40,7 +40,7 @@ npm-debug.log*
 # Misc
 .turbo/
 .vercel/
-.settlary/
+.resvary/
 
 # Private grant application working files
 docs/grant.md

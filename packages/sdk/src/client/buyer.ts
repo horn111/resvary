@@ -9,7 +9,7 @@
  *
  * @example
  * ```typescript
- * import { BuyerClient } from '@settlary/sdk/client';
+ * import { BuyerClient } from '@resvary/sdk/client';
  *
  * const buyer = new BuyerClient({
  *   privateKey: '0x...',

@@ -5,7 +5,7 @@ import { runPrompts } from './prompts.js';
 import { generateProject } from './generator.js';
 
 async function main() {
-  console.log(pc.cyan('\n⚡ create-settlary\n'));
+  console.log(pc.cyan('\n⚡ create-resvary\n'));
 
   const args = process.argv.slice(2);
   const initialProjectName = args[0];

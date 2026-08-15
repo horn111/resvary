@@ -1,0 +1,23 @@
+:root {
+  --color-canvas: #0a0a0a;
+  --color-code-surface: #0c0c0c;
+  --color-surface-raised: #0e0e0e;
+  --color-header: rgb(10 10 10 / 78%);
+  --color-white: #ffffff;
+  --color-ink: #f2f2f0;
+  --color-ink-strong: #dededb;
+  --color-ink-body: #b8b8b5;
+  --color-ink-muted: #9b9b98;
+  --color-ink-subtle: #868684;
+  --color-line-strong: rgb(242 242 240 / 22%);
+  --color-line: rgb(242 242 240 / 14%);
+  --color-line-soft: rgb(242 242 240 / 8%);
+  color-scheme: dark;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+}

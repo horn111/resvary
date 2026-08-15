@@ -1,0 +1,316 @@
+.claudeDesign {
+  min-height: 100vh;
+  overflow: clip;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+}
+
+.skipLink {
+  position: fixed;
+  inset-block-start: 0.75rem;
+  inset-inline-start: 0.75rem;
+  z-index: 100;
+  translate: 0 -200%;
+  padding: 0.75rem 1rem;
+  background: var(--color-ink);
+  color: var(--color-canvas);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.skipLink:focus {
+  translate: 0;
+}
+
+.claudeDesign :global(*) {
+  box-sizing: border-box;
+}
+
+.claudeDesign :global(a),
+.claudeDesign :global(button),
+.claudeDesign :global(summary) {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.claudeDesign :global(a:focus-visible),
+.claudeDesign :global(button:focus-visible),
+.claudeDesign :global(summary:focus-visible) {
+  outline: 1px solid var(--color-ink);
+  outline-offset: 4px;
+}
+
+.claudeDesign :global(canvas) {
+  touch-action: pan-y;
+}
+
+.claudeDesign :global([data-claude-ref='setProgress']) {
+  width: 100% !important;
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+
+.claudeDesign :global([data-mobile-nav]) {
+  display: none;
+}
+
+.claudeDesign :global(section:not(#top)) {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 52rem;
+}
+
+.claudeDesign :global([data-benefit-grid]) {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+
+.claudeDesign :global([data-credit-model-table]) {
+  table-layout: fixed;
+}
+
+@media (min-width: 48rem) {
+  .claudeDesign :global(#top h1 > span:first-child) {
+    translate: 0 var(--hero-left-shift, -1.53em);
+  }
+
+  .claudeDesign :global(#top h1 > span:last-child) {
+    translate: 0 var(--hero-right-shift, 0.94em);
+  }
+}
+
+@media (min-width: 80rem) {
+  .claudeDesign :global(#top h1 > span:last-child) {
+    translate: clamp(-15rem, -12vw, -4rem) var(--hero-right-shift, 0.94em);
+  }
+}
+
+@media (max-width: 63.99rem) {
+  .claudeDesign :global(header > nav),
+  .claudeDesign :global(header > a:last-child) {
+    display: none !important;
+  }
+
+  .claudeDesign :global([data-mobile-nav]) {
+    display: block;
+    margin-inline-start: auto;
+    font-family: var(--font-mono), monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .claudeDesign :global([data-mobile-nav] > summary) {
+    display: flex;
+    min-width: 3.75rem;
+    min-height: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--color-line-strong);
+  }
+
+  .claudeDesign :global([data-mobile-nav] > nav) {
+    position: fixed;
+    inset-block-start: 4.45rem;
+    inset-inline: 0;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1px;
+    padding: 1px;
+    background: var(--color-line);
+    color: var(--color-ink-strong);
+  }
+
+  .claudeDesign :global([data-mobile-nav] > nav a) {
+    display: flex;
+    min-height: 3rem;
+    align-items: center;
+    padding-inline: 1.125rem;
+    background: var(--color-canvas);
+  }
+}
+
+@media (max-width: 47.99rem) {
+  .claudeDesign :global(header) {
+    min-height: 3.75rem;
+    flex-wrap: nowrap !important;
+    padding: max(1rem, env(safe-area-inset-top)) max(1.125rem, env(safe-area-inset-right)) 1rem
+      max(1.125rem, env(safe-area-inset-left)) !important;
+  }
+
+  .claudeDesign :global(header > a:first-child) {
+    min-height: 2.75rem;
+  }
+
+  .claudeDesign :global(section:not(#top)) {
+    padding: 4.5rem max(1.125rem, env(safe-area-inset-right)) 4.5rem
+      max(1.125rem, env(safe-area-inset-left)) !important;
+  }
+
+  .claudeDesign :global(section [style*='grid-template-columns:minmax']) {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 2.25rem !important;
+  }
+
+  .claudeDesign :global(section [style*='grid-template-columns:repeat(auto-fit']) {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .claudeDesign :global([data-benefit-grid]) {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .claudeDesign :global([data-credit-model-table]),
+  .claudeDesign :global([data-credit-model-table] tbody),
+  .claudeDesign :global([data-credit-model-table] tr),
+  .claudeDesign :global([data-credit-model-table] td) {
+    display: block;
+    width: 100%;
+  }
+
+  .claudeDesign :global([data-credit-model-table] thead) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .claudeDesign :global([data-credit-model-table] tr) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.875rem 1rem;
+    padding: 1.125rem 0;
+    border-bottom: 1px solid var(--color-line-soft);
+  }
+
+  .claudeDesign :global([data-credit-model-table] td) {
+    padding: 0 !important;
+    border: 0 !important;
+  }
+
+  .claudeDesign :global([data-credit-model-table] td:first-child) {
+    grid-column: 1 / -1;
+    color: var(--color-ink-body);
+    font-family: var(--font-sans), sans-serif;
+    font-size: 0.95rem;
+    line-height: 1.45;
+  }
+
+  .claudeDesign :global([data-credit-model-table] td:nth-child(n + 2))::before {
+    display: block;
+    margin-bottom: 0.375rem;
+    color: var(--color-ink-muted);
+    font-family: var(--font-mono), monospace;
+    font-size: 0.625rem;
+    letter-spacing: 0.1em;
+    line-height: 1.4;
+    text-transform: uppercase;
+  }
+
+  .claudeDesign :global([data-credit-model-table] td:nth-child(2))::before {
+    content: 'Balance column';
+  }
+
+  .claudeDesign :global([data-credit-model-table] td:nth-child(3))::before {
+    content: 'Resvary 0.3 alpha';
+  }
+
+  .claudeDesign :global(#top) {
+    min-height: calc(100svh - 3.75rem) !important;
+  }
+
+  .claudeDesign :global(#top > div:nth-child(2)) {
+    min-height: 31rem;
+    align-items: flex-start !important;
+    padding: 4.25rem 1.125rem 0 !important;
+  }
+
+  .claudeDesign :global(#top > div:nth-child(2) > div:first-child) {
+    top: 58% !important;
+    width: min(78vw, 25rem) !important;
+    height: min(78vw, 25rem) !important;
+    opacity: 0.68;
+  }
+
+  .claudeDesign :global(#top h1) {
+    display: flex !important;
+    flex-direction: column;
+    align-items: flex-start !important;
+    justify-content: flex-start !important;
+    gap: 0 !important;
+    font-size: clamp(2.45rem, 12vw, 4.2rem) !important;
+    line-height: 0.96 !important;
+  }
+
+  .claudeDesign :global(#top h1 > span:last-child) {
+    align-self: flex-end;
+    margin-top: 0.12em;
+    text-align: right !important;
+  }
+
+  .claudeDesign :global(#top > div:last-child) {
+    align-items: flex-start !important;
+    padding: 0 1.125rem 2rem !important;
+  }
+
+  .claudeDesign :global(#top > div:last-child > div:last-child) {
+    align-items: flex-start !important;
+    white-space: normal !important;
+  }
+
+  .claudeDesign :global(h2) {
+    max-width: 21ch !important;
+    font-size: clamp(2rem, 10vw, 3.35rem) !important;
+    overflow-wrap: anywhere;
+  }
+
+  .claudeDesign :global(pre) {
+    max-width: calc(100vw - 2.25rem);
+    overflow-x: auto !important;
+  }
+
+  .claudeDesign :global(button),
+  .claudeDesign :global(a[style*='padding:14px']) {
+    min-height: 3rem;
+  }
+
+  .claudeDesign :global(footer) {
+    padding-right: max(1.125rem, env(safe-area-inset-right)) !important;
+    padding-left: max(1.125rem, env(safe-area-inset-left)) !important;
+  }
+
+  .claudeDesign :global(footer nav) {
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 0.5rem 1.5rem !important;
+  }
+
+  .claudeDesign :global(footer nav a) {
+    display: flex;
+    min-height: 2.75rem;
+    align-items: center;
+  }
+}
+
+@media (max-width: 22.99rem) {
+  .claudeDesign :global(footer nav) {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .claudeDesign,
+  .claudeDesign :global(*) {
+    scroll-behavior: auto !important;
+  }
+
+  .claudeDesign :global([data-reveal]),
+  .claudeDesign :global(#top h1 span),
+  .claudeDesign :global(#top > div:last-child) {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}

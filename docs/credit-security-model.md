@@ -15,7 +15,7 @@ SQLite is an alpha local/single-node backend. Multi-process and production deplo
 
 ## Legal product boundary
 
-Settlary supplies billing software. It does not provide custody or operate a consumer wallet.
+Resvary supplies billing software. It does not provide custody or operate a consumer wallet.
 
 The intended credits are:
 

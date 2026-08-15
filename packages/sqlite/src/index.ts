@@ -13,7 +13,7 @@ import {
   type WatcherCursor,
   type WebhookDeliveryAttempt,
   type WebhookEvent,
-} from '@settlary/sdk/receipts';
+} from '@resvary/sdk/receipts';
 
 export {
   SqliteCreditStore,
@@ -44,7 +44,7 @@ export class SqliteReceiptStore implements ReceiptStore {
 
   async saveInvoice(invoice: PaymentInvoice): Promise<void> {
     this.db.prepare(`
-      INSERT INTO settlary_invoices (id, status, customer_id, created_at, payload)
+      INSERT INTO resvary_invoices (id, status, customer_id, created_at, payload)
       VALUES (?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         status = excluded.status,
@@ -62,12 +62,12 @@ export class SqliteReceiptStore implements ReceiptStore {
 
   async getInvoice(id: string): Promise<PaymentInvoice | undefined> {
     return parsePayloadRow<PaymentInvoice>(this.db.prepare(
-      'SELECT payload FROM settlary_invoices WHERE id = ?',
+      'SELECT payload FROM resvary_invoices WHERE id = ?',
     ).get(id));
   }
 
   async listInvoices(filter: ReceiptStoreInvoiceFilter = {}): Promise<PaymentInvoice[]> {
-    return this.allPayloads<PaymentInvoice>('SELECT payload FROM settlary_invoices ORDER BY created_at ASC')
+    return this.allPayloads<PaymentInvoice>('SELECT payload FROM resvary_invoices ORDER BY created_at ASC')
       .filter((invoice) => {
         if (filter.status && invoice.status !== filter.status) {
           return false;
@@ -83,7 +83,7 @@ export class SqliteReceiptStore implements ReceiptStore {
 
   async saveReceipt(receipt: PaymentReceipt): Promise<void> {
     this.db.prepare(`
-      INSERT INTO settlary_receipts (id, invoice_id, tx_hash_norm, status, created_at, payload)
+      INSERT INTO resvary_receipts (id, invoice_id, tx_hash_norm, status, created_at, payload)
       VALUES (?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         invoice_id = excluded.invoice_id,
@@ -103,7 +103,7 @@ export class SqliteReceiptStore implements ReceiptStore {
 
   async getReceipt(id: string): Promise<PaymentReceipt | undefined> {
     return parsePayloadRow<PaymentReceipt>(this.db.prepare(
-      'SELECT payload FROM settlary_receipts WHERE id = ?',
+      'SELECT payload FROM resvary_receipts WHERE id = ?',
     ).get(id));
   }
 
@@ -113,17 +113,17 @@ export class SqliteReceiptStore implements ReceiptStore {
   ): Promise<PaymentReceipt | undefined> {
     const row = invoiceId
       ? this.db.prepare(
-        'SELECT payload FROM settlary_receipts WHERE tx_hash_norm = ? AND invoice_id = ? LIMIT 1',
+        'SELECT payload FROM resvary_receipts WHERE tx_hash_norm = ? AND invoice_id = ? LIMIT 1',
       ).get(txHash.toLowerCase(), invoiceId)
       : this.db.prepare(
-        'SELECT payload FROM settlary_receipts WHERE tx_hash_norm = ? LIMIT 1',
+        'SELECT payload FROM resvary_receipts WHERE tx_hash_norm = ? LIMIT 1',
       ).get(txHash.toLowerCase());
 
     return parsePayloadRow<PaymentReceipt>(row);
   }
 
   async listReceipts(): Promise<PaymentReceipt[]> {
-    return this.allPayloads<PaymentReceipt>('SELECT payload FROM settlary_receipts ORDER BY created_at ASC');
+    return this.allPayloads<PaymentReceipt>('SELECT payload FROM resvary_receipts ORDER BY created_at ASC');
   }
 
   async saveWebhookEvent(event: WebhookEvent): Promise<void> {
@@ -255,7 +255,7 @@ export class SqliteReceiptStore implements ReceiptStore {
     this.db.exec(`
       PRAGMA journal_mode = WAL;
 
-      CREATE TABLE IF NOT EXISTS settlary_invoices (
+      CREATE TABLE IF NOT EXISTS resvary_invoices (
         id TEXT PRIMARY KEY,
         status TEXT NOT NULL,
         customer_id TEXT,
@@ -263,13 +263,13 @@ export class SqliteReceiptStore implements ReceiptStore {
         payload TEXT NOT NULL
       );
 
-      CREATE INDEX IF NOT EXISTS settlary_invoices_status
-        ON settlary_invoices(status);
+      CREATE INDEX IF NOT EXISTS resvary_invoices_status
+        ON resvary_invoices(status);
 
-      CREATE INDEX IF NOT EXISTS settlary_invoices_customer_id
-        ON settlary_invoices(customer_id);
+      CREATE INDEX IF NOT EXISTS resvary_invoices_customer_id
+        ON resvary_invoices(customer_id);
 
-      CREATE TABLE IF NOT EXISTS settlary_receipts (
+      CREATE TABLE IF NOT EXISTS resvary_receipts (
         id TEXT PRIMARY KEY,
         invoice_id TEXT NOT NULL,
         tx_hash_norm TEXT,
@@ -278,8 +278,8 @@ export class SqliteReceiptStore implements ReceiptStore {
         payload TEXT NOT NULL
       );
 
-      CREATE UNIQUE INDEX IF NOT EXISTS settlary_receipts_invoice_tx_hash
-        ON settlary_receipts(invoice_id, tx_hash_norm)
+      CREATE UNIQUE INDEX IF NOT EXISTS resvary_receipts_invoice_tx_hash
+        ON resvary_receipts(invoice_id, tx_hash_norm)
         WHERE tx_hash_norm IS NOT NULL;
 
       CREATE TABLE IF NOT EXISTS arc_webhook_events (

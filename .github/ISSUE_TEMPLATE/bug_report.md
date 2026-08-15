@@ -1,6 +1,6 @@
 ---
 name: Bug Report
-about: Report a bug to help us improve Settlary
+about: Report a bug to help us improve Resvary
 title: '[BUG] '
 labels: bug
 assignees: ''
