@@ -15,6 +15,7 @@
   "dependencies": {
     "@resvary/sdk": "*",
     "@resvary/sqlite": "*",
+    "@vercel/analytics": "^2.0.1",
     "next": "^16.3.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
