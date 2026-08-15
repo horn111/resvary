@@ -6,7 +6,7 @@ import {
   type PaymentInvoice,
   type FindMemoPaymentProofResult,
   type MemoPaymentRequest,
-} from '@settlary/sdk/receipts';
+} from '@resvary/sdk/receipts';
 import { jsonSafeResponse, proofErrorResponse } from '../responses';
 import { getDemoReceiptStore } from '../../../webhook-inbox/store';
 

@@ -3,7 +3,7 @@
  *
  * @example
  * ```typescript
- * import { UsageMeter } from '@settlary/sdk/billing';
+ * import { UsageMeter } from '@resvary/sdk/billing';
  *
  * const meter = new UsageMeter({ endpoint: '/api/data' });
  *

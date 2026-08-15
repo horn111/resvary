@@ -1,5 +1,5 @@
 /**
- * Types for Settlary invoice, receipt, and webhook workflows.
+ * Types for Resvary invoice, receipt, and webhook workflows.
  */
 
 export type StablecoinSymbol = 'USDC' | 'EURC';

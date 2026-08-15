@@ -1,0 +1,159 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-14T00:00:00Z",
+  "title": "Design System: Resvary",
+  "extensions": {
+    "colorMeta": {
+      "canvas": {
+        "role": "neutral",
+        "displayName": "Settlement Black",
+        "canonical": "#0a0a0a",
+        "tonalRamp": [
+          "#050505",
+          "#0a0a0a",
+          "#171717",
+          "#303030",
+          "#555555",
+          "#858585",
+          "#c0c0c0",
+          "#f2f2f0"
+        ]
+      },
+      "ink": {
+        "role": "primary",
+        "displayName": "Ledger Ink",
+        "canonical": "#f2f2f0",
+        "tonalRamp": [
+          "#171717",
+          "#303030",
+          "#555555",
+          "#777775",
+          "#9b9b98",
+          "#b8b8b5",
+          "#dededb",
+          "#f2f2f0"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Construction Line",
+        "canonical": "rgb(242 242 240 / 14%)",
+        "tonalRamp": [
+          "#111111",
+          "#1b1b1b",
+          "#292929",
+          "#3d3d3d",
+          "#5d5d5d",
+          "#858585",
+          "#b8b8b5",
+          "#ededeb"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Editorial Display",
+        "purpose": "Hero and section propositions."
+      },
+      "body": {
+        "displayName": "Explanatory Body",
+        "purpose": "Product meaning and operational constraints."
+      },
+      "label": {
+        "displayName": "Ledger Label",
+        "purpose": "Code, states, navigation, metadata, and measurements."
+      }
+    },
+    "shadows": [],
+    "motion": [
+      {
+        "name": "arrival",
+        "value": "cubic-bezier(.2,.7,.2,1)",
+        "purpose": "Authored hero and section arrival."
+      },
+      { "name": "feedback", "value": "160ms ease", "purpose": "Control and status feedback." }
+    ],
+    "breakpoints": [
+      { "name": "phone", "value": "47.99rem" },
+      { "name": "compact-header", "value": "63.99rem" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single filled action in a local decision group.",
+      "html": "<button class=\"ds-btn-primary\">RUN SIMULATED AI</button>",
+      "css": ".ds-btn-primary{min-height:44px;padding:14px 22px;border:1px solid var(--color-ink);background:var(--color-ink);color:var(--color-canvas);font:400 11px var(--font-mono),monospace;letter-spacing:.1em;text-transform:uppercase}.ds-btn-primary:hover{background:var(--color-white)}.ds-btn-primary:focus-visible{outline:1px solid var(--color-ink);outline-offset:4px}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "A transparent ledger action with a construction-line boundary.",
+      "html": "<button class=\"ds-btn-secondary\">REPLAY SAME REQUEST</button>",
+      "css": ".ds-btn-secondary{min-height:44px;padding:14px 22px;border:1px solid var(--color-line-strong);background:transparent;color:var(--color-ink-strong);font:400 11px var(--font-mono),monospace;letter-spacing:.1em;text-transform:uppercase}.ds-btn-secondary:hover{border-color:var(--color-ink-muted);color:var(--color-white)}.ds-btn-secondary:focus-visible{outline:1px solid var(--color-ink);outline-offset:4px}"
+    },
+    {
+      "name": "Ledger Status",
+      "kind": "custom",
+      "description": "A compact operational state with a non-color text label.",
+      "html": "<p class=\"ds-ledger-status\"><span aria-hidden=\"true\"></span> CREDIT LEDGER READY.</p>",
+      "css": ".ds-ledger-status{display:flex;align-items:center;gap:12px;color:var(--color-ink-muted);font:400 12px var(--font-mono),monospace}.ds-ledger-status span{width:6px;height:6px;background:var(--color-ink)}"
+    },
+    {
+      "name": "Data Record",
+      "kind": "card",
+      "description": "A square inspectable machine-output surface.",
+      "html": "<article class=\"ds-record\"><h3>LATEST RECEIPT</h3><pre>{\"amount\":\"0.00157\"}</pre></article>",
+      "css": ".ds-record{border:1px solid var(--color-line);background:var(--color-canvas);color:var(--color-ink-body)}.ds-record h3{margin:0;padding:16px;border-bottom:1px solid var(--color-line-soft);font:400 11px var(--font-mono),monospace;letter-spacing:.1em}.ds-record pre{margin:0;padding:16px;background:var(--color-code-surface);font:400 12px/1.6 var(--font-mono),monospace}"
+    },
+    {
+      "name": "Compact Navigation",
+      "kind": "nav",
+      "description": "Tracked technical destinations with a disclosure treatment at compact widths.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Primary\"><a href=\"#product\">PRODUCT</a><a href=\"#demo\">DEMO</a><a href=\"#pricing\">ACCESS</a></nav>",
+      "css": ".ds-nav{display:flex;gap:24px;color:var(--color-ink-body);font:400 11px var(--font-mono),monospace;letter-spacing:.1em}.ds-nav a{min-height:44px;display:flex;align-items:center;color:inherit;text-decoration:none}.ds-nav a:hover{color:var(--color-white)}.ds-nav a:focus-visible{outline:1px solid var(--color-ink);outline-offset:4px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Settlement Instrument",
+    "overview": "Resvary looks like a precise instrument for inspecting credit movement, not a generic finance dashboard. The system uses a near-black field, restrained off-white hierarchy, square construction lines, and technical mono labels. Large editorial typography explains the product while receipts, code, balances, and lifecycle states provide operational proof. The hero mark, receipt printer, and particle word are the authored moments. Everything around them stays flat, quiet, and inspectable so motion and bright ink retain meaning.",
+    "keyCharacteristics": [
+      "Monochrome hierarchy with no decorative accent palette.",
+      "Large editorial headings paired with measurement-oriented mono labels.",
+      "Square controls and thin construction lines instead of rounded SaaS cards.",
+      "Motion reserved for the settlement mark, receipt lifecycle, and direct feedback."
+    ],
+    "rules": [
+      {
+        "name": "The Monochrome Evidence Rule",
+        "body": "Bright ink marks action or proof. Muted ink carries context. Color is not introduced merely to decorate status.",
+        "section": "colors"
+      },
+      {
+        "name": "The Measurement Rule",
+        "body": "Mono type belongs to information that can be operated, verified, or counted. Product claims remain in the sans family.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Ledger Rule",
+        "body": "A border defines structure; a shadow appears only when it expresses light emitted by an animated particle or focused settlement node.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do preserve the near-black continuous field and off-white hierarchy.",
+      "Do use square controls, thin rules, and tabular numerals for balances.",
+      "Do keep claims next to operational proof: code, receipts, states, or ledger records.",
+      "Do stop nonessential canvas motion when its scene leaves the viewport."
+    ],
+    "donts": [
+      "Don't add colored gradients, glass cards, rounded SaaS panels, or decorative icon grids.",
+      "Don't use mono type as a costume for ordinary marketing prose.",
+      "Don't hide core navigation or demo functionality on smaller screens.",
+      "Don't bind interactions to visible copy; use stable semantic hooks."
+    ]
+  }
+}

@@ -1,6 +1,6 @@
 # Prepaid Credits
 
-Settlary models closed-loop USD product credits for an individual merchant project. One account is identified by `projectId + customerId`; wallets and email addresses are not customer identities.
+Resvary models closed-loop USD product credits for an individual merchant project. One account is identified by `projectId + customerId`; wallets and email addresses are not customer identities.
 
 ## Core flow
 

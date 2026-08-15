@@ -4,7 +4,7 @@ import {
   verifyMemoPaymentProof,
   type PaymentInvoice,
   type MemoPaymentRequest,
-} from '@settlary/sdk/receipts';
+} from '@resvary/sdk/receipts';
 import { jsonSafeResponse, proofErrorResponse } from './responses';
 
 export const dynamic = 'force-dynamic';

@@ -1,4 +1,4 @@
-const BIGINT_MARKER = '__settlaryBigInt';
+const BIGINT_MARKER = '__resvaryBigInt';
 
 type SerializedBigInt = {
   [BIGINT_MARKER]: string;

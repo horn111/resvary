@@ -1,6 +1,6 @@
 ---
 name: Feature Request
-about: Suggest a new feature for Settlary
+about: Suggest a new feature for Resvary
 title: '[FEATURE] '
 labels: enhancement
 assignees: ''

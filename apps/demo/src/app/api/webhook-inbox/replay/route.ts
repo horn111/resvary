@@ -1,4 +1,4 @@
-import type { WebhookEvent } from '@settlary/sdk/receipts';
+import type { WebhookEvent } from '@resvary/sdk/receipts';
 import { DEMO_WEBHOOK_SECRET, DEMO_WEBHOOK_TARGET, getDemoWebhookInbox } from '../store';
 
 export const dynamic = 'force-dynamic';

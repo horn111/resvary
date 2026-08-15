@@ -1,8 +1,8 @@
 # Why Arc?
 
-> Arc is now an optional USDC funding rail for Settlary credits, not the product category. The credit ledger itself is payment-rail agnostic.
+> Arc is now an optional USDC funding rail for Resvary credits, not the product category. The credit ledger itself is payment-rail agnostic.
 
-Settlary is built on [Arc](https://arc.network), Circle's Layer 1 blockchain. Here's why Arc is the foundation for its usage-based billing and paid API workflows.
+Resvary is built on [Arc](https://arc.network), Circle's Layer 1 blockchain. Here's why Arc is the foundation for its usage-based billing and paid API workflows.
 
 ## USDC-Native Gas
 

@@ -2,7 +2,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { CreditLedger, InsufficientCreditsError, type CreditAccount } from '@settlary/sdk/credits';
+import { CreditLedger, InsufficientCreditsError, type CreditAccount } from '@resvary/sdk/credits';
 import { createSqliteCreditStore } from './credit.js';
 
 describe('SqliteCreditStore', () => {
@@ -119,5 +119,5 @@ describe('SqliteCreditStore', () => {
 });
 
 function tempDatabasePath(): string {
-  return join(mkdtempSync(join(tmpdir(), 'settlary-credits-')), 'settlary.sqlite');
+  return join(mkdtempSync(join(tmpdir(), 'resvary-credits-')), 'resvary.sqlite');
 }

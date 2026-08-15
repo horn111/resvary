@@ -16,7 +16,7 @@ describe('createWebhookRouteHandler', () => {
 
     const response = await handler(new Request('https://seller.app/webhooks/arc', {
       method: 'POST',
-      headers: { 'x-settlary-signature': signature.header },
+      headers: { 'x-resvary-signature': signature.header },
       body: serializeWebhookPayload(event),
     }));
     const body = await response.json() as { ok: boolean };

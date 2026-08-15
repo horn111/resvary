@@ -1,11 +1,11 @@
 {
-  "name": "@settlary/demo",
+  "name": "@resvary/demo",
   "version": "0.3.0-alpha.0",
   "private": true,
-  "description": "Settlary prepaid AI credits and usage billing demo",
+  "description": "Resvary prepaid AI credits and usage billing demo",
   "scripts": {
     "dev": "next dev",
-    "prebuild": "npm run build --workspace=@settlary/sdk && npm run build --workspace=@settlary/sqlite",
+    "prebuild": "node ../../scripts/check-claude-design.mjs && npm run build --workspace=@resvary/sdk && npm run build --workspace=@resvary/sqlite",
     "build": "next build",
     "start": "next start"
   },
@@ -13,8 +13,8 @@
     "node": ">=24.0.0"
   },
   "dependencies": {
-    "@settlary/sdk": "*",
-    "@settlary/sqlite": "*",
+    "@resvary/sdk": "*",
+    "@resvary/sqlite": "*",
     "next": "^16.3.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"

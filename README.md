@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="assets/brand/settlary-x-avatar.png" alt="Settlary logo" width="112" />
+  <img src="assets/brand/resvary-x-avatar.png" alt="Resvary logo" width="112" />
 </p>
 
-<h1 align="center">Settlary</h1>
+<h1 align="center">Resvary</h1>
 
 <p align="center"><strong>Open-source prepaid credits and usage billing for AI products.</strong></p>
 
-Settlary gives AI applications a durable balance ledger and a safe request lifecycle:
+Resvary gives AI applications a durable balance ledger and a safe request lifecycle:
 
 ```text
 grant or top up credits
@@ -19,18 +19,18 @@ grant or top up credits
 
 The credit engine is payment-rail agnostic. The existing Arc Testnet invoice, memo proof, payment receipt, and signed webhook modules remain available and now serve as an optional USDC funding adapter.
 
-## Why Settlary
+## Why Resvary
 
 AI costs are known only after a model or tool finishes. A single `balance -= cost` update is not enough when requests retry, overlap, fail, or report usage late.
 
-Settlary provides:
+Resvary provides:
 
 - USD-denominated credits with six-decimal integer arithmetic;
 - multi-dimensional prices for tokens, seconds, images, jobs, or tool calls;
 - atomic `reserve → commit/release` operations;
 - idempotency for grants, reservations, charges, and funding confirmations;
 - immutable ledger entries and per-charge usage receipts;
-- transactional outbox events using the existing `x-settlary-signature` format;
+- transactional outbox events using the existing `x-resvary-signature` format;
 - in-memory and SQLite stores;
 - optional Arc Testnet USDC top-ups;
 - an interactive Next.js demo and Express/Next.js starter generator.
@@ -38,17 +38,17 @@ Settlary provides:
 ## Quickstart
 
 ```bash
-npm install @settlary/sdk @settlary/sqlite
+npm install @resvary/sdk @resvary/sqlite
 ```
 
 ```typescript
-import { CreditLedger } from '@settlary/sdk/credits';
-import { createSqliteCreditStore } from '@settlary/sqlite';
+import { CreditLedger } from '@resvary/sdk/credits';
+import { createSqliteCreditStore } from '@resvary/sqlite';
 
 const credits = new CreditLedger({
   projectId: 'my_ai_product',
   store: createSqliteCreditStore({
-    path: '.settlary/settlary.sqlite',
+    path: '.resvary/resvary.sqlite',
   }),
 });
 
@@ -112,9 +112,9 @@ npm run dev
 Open [http://localhost:3000](http://localhost:3000). The default flow is deterministic and does not require an AI API key. Optional OpenAI-compatible mode uses:
 
 ```dotenv
-SETTLARY_AI_BASE_URL=https://api.openai.com/v1
-SETTLARY_AI_API_KEY=
-SETTLARY_AI_MODEL=
+RESVARY_AI_BASE_URL=https://api.openai.com/v1
+RESVARY_AI_API_KEY=
+RESVARY_AI_MODEL=
 ```
 
 The old payment operations APIs remain under `/api/receipts`, `/api/receipts/proof`, and `/api/webhook-inbox`.
@@ -123,12 +123,12 @@ The old payment operations APIs remain under `/api/receipts`, `/api/receipts/pro
 
 | Import                      | Responsibility                                                              |
 | --------------------------- | --------------------------------------------------------------------------- |
-| `@settlary/sdk/credits`     | Accounts, grants, reservations, usage receipts, ledger, idempotency, outbox |
-| `@settlary/sdk/pricing`     | Meters, immutable price versions, integer usage rating                      |
-| `@settlary/sdk/funding/arc` | Arc invoice/payment receipt to credit grant adapter                         |
-| `@settlary/sqlite`          | Persistent credit and payment receipt stores                                |
-| `@settlary/sdk/receipts`    | Stablecoin invoices, proofs, payment receipts, signed webhooks              |
-| `@settlary/sdk/middleware`  | Compatible legacy x402 Express and Next.js paywalls                         |
+| `@resvary/sdk/credits`     | Accounts, grants, reservations, usage receipts, ledger, idempotency, outbox |
+| `@resvary/sdk/pricing`     | Meters, immutable price versions, integer usage rating                      |
+| `@resvary/sdk/funding/arc` | Arc invoice/payment receipt to credit grant adapter                         |
+| `@resvary/sqlite`          | Persistent credit and payment receipt stores                                |
+| `@resvary/sdk/receipts`    | Stablecoin invoices, proofs, payment receipts, signed webhooks              |
+| `@resvary/sdk/middleware`  | Compatible legacy x402 Express and Next.js paywalls                         |
 
 `UsageMeter` and `createBillingPlan` remain available for compatibility but are deprecated. New integrations should use the credit ledger and versioned pricing.
 
@@ -137,7 +137,7 @@ The old payment operations APIs remain under `/api/receipts`, `/api/receipts/pro
 - Money is never calculated with JavaScript floating point in the new engine.
 - A project/customer account cannot have a negative available balance.
 - SQLite mutations use `BEGIN IMMEDIATE` and store the balance change, receipt, idempotency result, and outbox event together.
-- Credits are closed-loop product credits. Settlary does not support user-to-user transfer, cash-out, redemption, custody, tax invoices, subscriptions, or marketplace balances.
+- Credits are closed-loop product credits. Resvary does not support user-to-user transfer, cash-out, redemption, custody, tax invoices, subscriptions, or marketplace balances.
 - SQLite is intended for local, single-node, and design-partner deployments. Postgres and a self-hosted HTTP service are later milestones.
 - Arc funding is Testnet-first and is not a production money-flow claim.
 

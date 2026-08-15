@@ -1,6 +1,6 @@
 # Usage Rating
 
-Settlary prices integer usage dimensions without JavaScript floating point.
+Resvary prices integer usage dimensions without JavaScript floating point.
 
 ```typescript
 const meter = await credits.registerMeter({

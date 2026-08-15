@@ -1,5 +1,5 @@
 /**
- * Local in-memory inbox for signed Settlary Receipts webhooks.
+ * Local in-memory inbox for signed Resvary Receipts webhooks.
  */
 
 import { randomBytes } from 'node:crypto';

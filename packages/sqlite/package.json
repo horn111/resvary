@@ -1,7 +1,7 @@
 {
-  "name": "@settlary/sqlite",
+  "name": "@resvary/sqlite",
   "version": "0.3.0-alpha.0",
-  "description": "SQLite persistence for Settlary credits, usage receipts, and payment receipts",
+  "description": "SQLite persistence for Resvary credits, usage receipts, and payment receipts",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -19,14 +19,14 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "clean": "node -e \"const fs=require('node:fs');fs.rmSync('dist',{recursive:true,force:true});fs.rmSync('tsconfig.tsbuildinfo',{force:true})\"",
     "test": "vitest run"
   },
   "engines": {
     "node": ">=24.0.0"
   },
   "dependencies": {
-    "@settlary/sdk": "*"
+    "@resvary/sdk": "*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

@@ -78,7 +78,7 @@ jobs:
       - name: Run tests
         run: |
           npm run test --workspace=packages/sdk
-          npm run test --workspace=packages/create-settlary
+          npm run test --workspace=packages/create-resvary
 
   sqlite:
     name: SQLite durability

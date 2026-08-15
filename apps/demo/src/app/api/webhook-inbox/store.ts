@@ -4,15 +4,15 @@ import {
   PersistentReceiptLedger,
   PersistentWebhookInbox,
   type ReceiptStore,
-} from '@settlary/sdk/receipts';
+} from '@resvary/sdk/receipts';
 
-export const DEMO_WEBHOOK_SECRET = 'settlary_receipts_demo_secret';
+export const DEMO_WEBHOOK_SECRET = 'resvary_receipts_demo_secret';
 export const DEMO_WEBHOOK_TARGET = 'https://seller.app/webhooks/arc';
 
 const globalWebhookInbox = globalThis as typeof globalThis & {
-  __settlaryReceiptStore?: ReceiptStore;
-  __settlaryReceiptStoreMode?: DemoReceiptStoreMode;
-  __settlaryWebhookInbox?: PersistentWebhookInbox;
+  __resvaryReceiptStore?: ReceiptStore;
+  __resvaryReceiptStoreMode?: DemoReceiptStoreMode;
+  __resvaryWebhookInbox?: PersistentWebhookInbox;
 };
 
 export type DemoReceiptStoreMode = 'memory' | 'sqlite';
@@ -31,25 +31,25 @@ type SqliteReceiptStoreModule = {
 };
 
 export async function getDemoReceiptStore(): Promise<ReceiptStore> {
-  if (globalWebhookInbox.__settlaryReceiptStore) {
-    return globalWebhookInbox.__settlaryReceiptStore;
+  if (globalWebhookInbox.__resvaryReceiptStore) {
+    return globalWebhookInbox.__resvaryReceiptStore;
   }
 
   const mode = getDemoReceiptStoreMode();
-  globalWebhookInbox.__settlaryReceiptStoreMode = mode;
+  globalWebhookInbox.__resvaryReceiptStoreMode = mode;
 
   if (mode === 'sqlite') {
     const { createSqliteReceiptStore } = await importOptionalSqliteStore();
     const store = createSqliteReceiptStore({
-      path: process.env.SETTLARY_RECEIPTS_SQLITE_PATH
-        ?? join(process.cwd(), '.settlary', 'receipts.sqlite'),
+      path: process.env.RESVARY_RECEIPTS_SQLITE_PATH
+        ?? join(process.cwd(), '.resvary', 'receipts.sqlite'),
     });
-    globalWebhookInbox.__settlaryReceiptStore = store;
+    globalWebhookInbox.__resvaryReceiptStore = store;
     return store;
   }
 
   const store = new InMemoryReceiptStore();
-  globalWebhookInbox.__settlaryReceiptStore = store;
+  globalWebhookInbox.__resvaryReceiptStore = store;
   return store;
 }
 
@@ -58,19 +58,19 @@ export async function getDemoReceiptLedger(): Promise<PersistentReceiptLedger> {
 }
 
 export async function getDemoWebhookInbox(): Promise<PersistentWebhookInbox> {
-  if (globalWebhookInbox.__settlaryWebhookInbox) {
-    return globalWebhookInbox.__settlaryWebhookInbox;
+  if (globalWebhookInbox.__resvaryWebhookInbox) {
+    return globalWebhookInbox.__resvaryWebhookInbox;
   }
 
-  globalWebhookInbox.__settlaryWebhookInbox = new PersistentWebhookInbox({
+  globalWebhookInbox.__resvaryWebhookInbox = new PersistentWebhookInbox({
     store: await getDemoReceiptStore(),
   });
-  return globalWebhookInbox.__settlaryWebhookInbox;
+  return globalWebhookInbox.__resvaryWebhookInbox;
 }
 
 export async function getDemoReceiptStoreSummary(): Promise<DemoReceiptStoreSummary> {
   const store = await getDemoReceiptStore();
-  const mode = globalWebhookInbox.__settlaryReceiptStoreMode ?? getDemoReceiptStoreMode();
+  const mode = globalWebhookInbox.__resvaryReceiptStoreMode ?? getDemoReceiptStoreMode();
 
   return {
     mode,
@@ -83,7 +83,7 @@ export async function getDemoReceiptStoreSummary(): Promise<DemoReceiptStoreSumm
 }
 
 function getDemoReceiptStoreMode(): DemoReceiptStoreMode {
-  return process.env.SETTLARY_RECEIPTS_STORE === 'sqlite' ? 'sqlite' : 'memory';
+  return process.env.RESVARY_RECEIPTS_STORE === 'sqlite' ? 'sqlite' : 'memory';
 }
 
 async function importOptionalSqliteStore(): Promise<SqliteReceiptStoreModule> {
@@ -91,10 +91,10 @@ async function importOptionalSqliteStore(): Promise<SqliteReceiptStoreModule> {
     const runtimeImport = new Function('specifier', 'return import(specifier)') as (
       specifier: string,
     ) => Promise<SqliteReceiptStoreModule>;
-    return await runtimeImport('@settlary/sqlite');
+    return await runtimeImport('@resvary/sqlite');
   } catch (error) {
     throw new Error(
-      'SETTLARY_RECEIPTS_STORE=sqlite requires the optional @settlary/sqlite package to be installed and built.',
+      'RESVARY_RECEIPTS_STORE=sqlite requires the optional @resvary/sqlite package to be installed and built.',
       { cause: error },
     );
   }

@@ -20,8 +20,8 @@ import type {
   PriceVersion,
   UsageEvent,
   UsageReceipt,
-} from '@settlary/sdk/credits';
-import { parseReceiptStoreValue, serializeReceiptStoreValue } from '@settlary/sdk/receipts';
+} from '@resvary/sdk/credits';
+import { parseReceiptStoreValue, serializeReceiptStoreValue } from '@resvary/sdk/receipts';
 
 export interface SqliteCreditStoreConfig {
   path: string;
@@ -143,12 +143,12 @@ export class SqliteCreditStore implements CreditStore {
       PRAGMA busy_timeout = 5000;
       PRAGMA foreign_keys = ON;
 
-      CREATE TABLE IF NOT EXISTS settlary_schema_migrations (
+      CREATE TABLE IF NOT EXISTS resvary_schema_migrations (
         version INTEGER PRIMARY KEY,
         applied_at INTEGER NOT NULL
       );
 
-      CREATE TABLE IF NOT EXISTS settlary_credit_accounts (
+      CREATE TABLE IF NOT EXISTS resvary_credit_accounts (
         id TEXT PRIMARY KEY,
         project_id TEXT NOT NULL,
         customer_id TEXT NOT NULL,
@@ -157,15 +157,15 @@ export class SqliteCreditStore implements CreditStore {
         UNIQUE(project_id, customer_id)
       );
 
-      CREATE TABLE IF NOT EXISTS settlary_credit_grants (
+      CREATE TABLE IF NOT EXISTS resvary_credit_grants (
         id TEXT PRIMARY KEY,
         account_id TEXT NOT NULL,
         created_at INTEGER NOT NULL,
         payload TEXT NOT NULL
       );
-      CREATE INDEX IF NOT EXISTS settlary_credit_grants_account ON settlary_credit_grants(account_id);
+      CREATE INDEX IF NOT EXISTS resvary_credit_grants_account ON resvary_credit_grants(account_id);
 
-      CREATE TABLE IF NOT EXISTS settlary_meters (
+      CREATE TABLE IF NOT EXISTS resvary_meters (
         id TEXT PRIMARY KEY,
         project_id TEXT NOT NULL,
         meter_key TEXT NOT NULL,
@@ -173,7 +173,7 @@ export class SqliteCreditStore implements CreditStore {
         UNIQUE(project_id, meter_key)
       );
 
-      CREATE TABLE IF NOT EXISTS settlary_price_versions (
+      CREATE TABLE IF NOT EXISTS resvary_price_versions (
         id TEXT PRIMARY KEY,
         meter_id TEXT NOT NULL,
         version INTEGER NOT NULL,
@@ -182,7 +182,7 @@ export class SqliteCreditStore implements CreditStore {
         UNIQUE(meter_id, version)
       );
 
-      CREATE TABLE IF NOT EXISTS settlary_credit_reservations (
+      CREATE TABLE IF NOT EXISTS resvary_credit_reservations (
         id TEXT PRIMARY KEY,
         account_id TEXT NOT NULL,
         project_id TEXT NOT NULL,
@@ -192,17 +192,17 @@ export class SqliteCreditStore implements CreditStore {
         created_at INTEGER NOT NULL,
         payload TEXT NOT NULL
       );
-      CREATE INDEX IF NOT EXISTS settlary_credit_reservations_open
-        ON settlary_credit_reservations(project_id, customer_id, status, expires_at);
+      CREATE INDEX IF NOT EXISTS resvary_credit_reservations_open
+        ON resvary_credit_reservations(project_id, customer_id, status, expires_at);
 
-      CREATE TABLE IF NOT EXISTS settlary_usage_events (
+      CREATE TABLE IF NOT EXISTS resvary_usage_events (
         id TEXT PRIMARY KEY,
         account_id TEXT NOT NULL,
         received_at INTEGER NOT NULL,
         payload TEXT NOT NULL
       );
 
-      CREATE TABLE IF NOT EXISTS settlary_usage_receipts (
+      CREATE TABLE IF NOT EXISTS resvary_usage_receipts (
         id TEXT PRIMARY KEY,
         account_id TEXT NOT NULL,
         reservation_id TEXT NOT NULL UNIQUE,
@@ -210,17 +210,17 @@ export class SqliteCreditStore implements CreditStore {
         created_at INTEGER NOT NULL,
         payload TEXT NOT NULL
       );
-      CREATE INDEX IF NOT EXISTS settlary_usage_receipts_account ON settlary_usage_receipts(account_id, created_at);
+      CREATE INDEX IF NOT EXISTS resvary_usage_receipts_account ON resvary_usage_receipts(account_id, created_at);
 
-      CREATE TABLE IF NOT EXISTS settlary_ledger_entries (
+      CREATE TABLE IF NOT EXISTS resvary_ledger_entries (
         id TEXT PRIMARY KEY,
         account_id TEXT NOT NULL,
         created_at INTEGER NOT NULL,
         payload TEXT NOT NULL
       );
-      CREATE INDEX IF NOT EXISTS settlary_ledger_entries_account ON settlary_ledger_entries(account_id, created_at);
+      CREATE INDEX IF NOT EXISTS resvary_ledger_entries_account ON resvary_ledger_entries(account_id, created_at);
 
-      CREATE TABLE IF NOT EXISTS settlary_funding_intents (
+      CREATE TABLE IF NOT EXISTS resvary_funding_intents (
         id TEXT PRIMARY KEY,
         project_id TEXT NOT NULL,
         customer_id TEXT NOT NULL,
@@ -229,7 +229,7 @@ export class SqliteCreditStore implements CreditStore {
         payload TEXT NOT NULL
       );
 
-      CREATE TABLE IF NOT EXISTS settlary_funding_transactions (
+      CREATE TABLE IF NOT EXISTS resvary_funding_transactions (
         id TEXT PRIMARY KEY,
         funding_intent_id TEXT NOT NULL,
         network TEXT NOT NULL,
@@ -239,7 +239,7 @@ export class SqliteCreditStore implements CreditStore {
         UNIQUE(network, tx_hash_norm)
       );
 
-      CREATE TABLE IF NOT EXISTS settlary_idempotency_keys (
+      CREATE TABLE IF NOT EXISTS resvary_idempotency_keys (
         scope TEXT NOT NULL,
         key TEXT NOT NULL,
         created_at INTEGER NOT NULL,
@@ -247,7 +247,7 @@ export class SqliteCreditStore implements CreditStore {
         PRIMARY KEY(scope, key)
       );
 
-      CREATE TABLE IF NOT EXISTS settlary_outbox_events (
+      CREATE TABLE IF NOT EXISTS resvary_outbox_events (
         id TEXT PRIMARY KEY,
         project_id TEXT NOT NULL,
         type TEXT NOT NULL,
@@ -255,10 +255,10 @@ export class SqliteCreditStore implements CreditStore {
         created_at INTEGER NOT NULL,
         payload TEXT NOT NULL
       );
-      CREATE INDEX IF NOT EXISTS settlary_outbox_events_pending
-        ON settlary_outbox_events(project_id, status, created_at);
+      CREATE INDEX IF NOT EXISTS resvary_outbox_events_pending
+        ON resvary_outbox_events(project_id, status, created_at);
 
-      INSERT OR IGNORE INTO settlary_schema_migrations(version, applied_at)
+      INSERT OR IGNORE INTO resvary_schema_migrations(version, applied_at)
         VALUES (1, CAST(strftime('%s', 'now') AS INTEGER) * 1000);
     `);
   }
@@ -339,7 +339,7 @@ class SqliteCreditTransaction implements CreditStoreTransaction {
   async saveAccount(value: CreditAccount) {
     upsert(
       this.db,
-      'settlary_credit_accounts',
+      'resvary_credit_accounts',
       ['id', 'project_id', 'customer_id', 'updated_at'],
       [value.id, value.projectId, value.customerId, value.updatedAt],
       value,
@@ -348,7 +348,7 @@ class SqliteCreditTransaction implements CreditStoreTransaction {
   async saveGrant(value: CreditGrant) {
     insert(
       this.db,
-      'settlary_credit_grants',
+      'resvary_credit_grants',
       ['id', 'account_id', 'created_at'],
       [value.id, value.accountId, value.createdAt],
       value,
@@ -357,7 +357,7 @@ class SqliteCreditTransaction implements CreditStoreTransaction {
   async saveMeter(value: MeterDefinition) {
     insert(
       this.db,
-      'settlary_meters',
+      'resvary_meters',
       ['id', 'project_id', 'meter_key'],
       [value.id, value.projectId, value.key],
       value,
@@ -366,7 +366,7 @@ class SqliteCreditTransaction implements CreditStoreTransaction {
   async savePriceVersion(value: PriceVersion) {
     insert(
       this.db,
-      'settlary_price_versions',
+      'resvary_price_versions',
       ['id', 'meter_id', 'version', 'created_at'],
       [value.id, value.meterId, value.version, value.createdAt],
       value,
@@ -375,7 +375,7 @@ class SqliteCreditTransaction implements CreditStoreTransaction {
   async saveReservation(value: CreditReservation) {
     upsert(
       this.db,
-      'settlary_credit_reservations',
+      'resvary_credit_reservations',
       ['id', 'account_id', 'project_id', 'customer_id', 'status', 'expires_at', 'created_at'],
       [
         value.id,
@@ -392,7 +392,7 @@ class SqliteCreditTransaction implements CreditStoreTransaction {
   async saveUsageEvent(value: UsageEvent) {
     insert(
       this.db,
-      'settlary_usage_events',
+      'resvary_usage_events',
       ['id', 'account_id', 'received_at'],
       [value.id, value.accountId, value.receivedAt],
       value,
@@ -401,7 +401,7 @@ class SqliteCreditTransaction implements CreditStoreTransaction {
   async saveUsageReceipt(value: UsageReceipt) {
     insert(
       this.db,
-      'settlary_usage_receipts',
+      'resvary_usage_receipts',
       ['id', 'account_id', 'reservation_id', 'usage_event_id', 'created_at'],
       [value.id, value.accountId, value.reservationId, value.usageEventId, value.createdAt],
       value,
@@ -410,7 +410,7 @@ class SqliteCreditTransaction implements CreditStoreTransaction {
   async saveLedgerEntry(value: LedgerEntry) {
     insert(
       this.db,
-      'settlary_ledger_entries',
+      'resvary_ledger_entries',
       ['id', 'account_id', 'created_at'],
       [value.id, value.accountId, value.createdAt],
       value,
@@ -419,7 +419,7 @@ class SqliteCreditTransaction implements CreditStoreTransaction {
   async saveOutboxEvent(value: CreditOutboxEvent) {
     upsert(
       this.db,
-      'settlary_outbox_events',
+      'resvary_outbox_events',
       ['id', 'project_id', 'type', 'status', 'created_at'],
       [value.id, value.projectId, value.type, value.status, value.createdAt],
       value,
@@ -428,7 +428,7 @@ class SqliteCreditTransaction implements CreditStoreTransaction {
   async saveIdempotencyRecord(value: IdempotencyRecord) {
     insert(
       this.db,
-      'settlary_idempotency_keys',
+      'resvary_idempotency_keys',
       ['scope', 'key', 'created_at'],
       [value.scope, value.key, value.createdAt],
       value,
@@ -438,7 +438,7 @@ class SqliteCreditTransaction implements CreditStoreTransaction {
   async saveFundingIntent(value: FundingIntent) {
     upsert(
       this.db,
-      'settlary_funding_intents',
+      'resvary_funding_intents',
       ['id', 'project_id', 'customer_id', 'status', 'created_at'],
       [value.id, value.projectId, value.customerId, value.status, value.createdAt],
       value,
@@ -447,7 +447,7 @@ class SqliteCreditTransaction implements CreditStoreTransaction {
   async saveFundingTransaction(value: FundingTransaction) {
     insert(
       this.db,
-      'settlary_funding_transactions',
+      'resvary_funding_transactions',
       ['id', 'funding_intent_id', 'network', 'tx_hash_norm', 'created_at'],
       [value.id, value.fundingIntentId, value.network, value.txHash.toLowerCase(), value.createdAt],
       value,
@@ -458,50 +458,50 @@ class SqliteCreditTransaction implements CreditStoreTransaction {
 function reader(db: DatabaseSyncType): CreditStoreReader {
   return {
     async getAccount(id) {
-      return one<CreditAccount>(db, 'SELECT payload FROM settlary_credit_accounts WHERE id = ?', [
+      return one<CreditAccount>(db, 'SELECT payload FROM resvary_credit_accounts WHERE id = ?', [
         id,
       ]);
     },
     async getAccountByCustomer(projectId, customerId) {
       return one<CreditAccount>(
         db,
-        'SELECT payload FROM settlary_credit_accounts WHERE project_id = ? AND customer_id = ?',
+        'SELECT payload FROM resvary_credit_accounts WHERE project_id = ? AND customer_id = ?',
         [projectId, customerId],
       );
     },
     async listAccounts(filter = {}) {
       return all<CreditAccount>(
         db,
-        'SELECT payload FROM settlary_credit_accounts ORDER BY updated_at ASC',
+        'SELECT payload FROM resvary_credit_accounts ORDER BY updated_at ASC',
       ).filter((item) => matchesBalanceFilter(item, filter));
     },
     async getGrant(id) {
-      return one<CreditGrant>(db, 'SELECT payload FROM settlary_credit_grants WHERE id = ?', [id]);
+      return one<CreditGrant>(db, 'SELECT payload FROM resvary_credit_grants WHERE id = ?', [id]);
     },
     async listGrants(accountId) {
       return accountId
         ? all<CreditGrant>(
             db,
-            'SELECT payload FROM settlary_credit_grants WHERE account_id = ? ORDER BY created_at ASC',
+            'SELECT payload FROM resvary_credit_grants WHERE account_id = ? ORDER BY created_at ASC',
             [accountId],
           )
         : all<CreditGrant>(
             db,
-            'SELECT payload FROM settlary_credit_grants ORDER BY created_at ASC',
+            'SELECT payload FROM resvary_credit_grants ORDER BY created_at ASC',
           );
     },
     async getMeter(id) {
-      return one<MeterDefinition>(db, 'SELECT payload FROM settlary_meters WHERE id = ?', [id]);
+      return one<MeterDefinition>(db, 'SELECT payload FROM resvary_meters WHERE id = ?', [id]);
     },
     async getMeterByKey(projectId, key) {
       return one<MeterDefinition>(
         db,
-        'SELECT payload FROM settlary_meters WHERE project_id = ? AND meter_key = ?',
+        'SELECT payload FROM resvary_meters WHERE project_id = ? AND meter_key = ?',
         [projectId, key],
       );
     },
     async getPriceVersion(id) {
-      return one<PriceVersion>(db, 'SELECT payload FROM settlary_price_versions WHERE id = ?', [
+      return one<PriceVersion>(db, 'SELECT payload FROM resvary_price_versions WHERE id = ?', [
         id,
       ]);
     },
@@ -509,35 +509,35 @@ function reader(db: DatabaseSyncType): CreditStoreReader {
       return meterId
         ? all<PriceVersion>(
             db,
-            'SELECT payload FROM settlary_price_versions WHERE meter_id = ? ORDER BY version ASC',
+            'SELECT payload FROM resvary_price_versions WHERE meter_id = ? ORDER BY version ASC',
             [meterId],
           )
         : all<PriceVersion>(
             db,
-            'SELECT payload FROM settlary_price_versions ORDER BY created_at ASC',
+            'SELECT payload FROM resvary_price_versions ORDER BY created_at ASC',
           );
     },
     async getReservation(id) {
       return one<CreditReservation>(
         db,
-        'SELECT payload FROM settlary_credit_reservations WHERE id = ?',
+        'SELECT payload FROM resvary_credit_reservations WHERE id = ?',
         [id],
       );
     },
     async listReservations(filter = {}) {
       return all<CreditReservation>(
         db,
-        'SELECT payload FROM settlary_credit_reservations ORDER BY created_at ASC',
+        'SELECT payload FROM resvary_credit_reservations ORDER BY created_at ASC',
       ).filter(
         (item) =>
           matchesBalanceFilter(item, filter) && (!filter.status || item.status === filter.status),
       );
     },
     async getUsageEvent(id) {
-      return one<UsageEvent>(db, 'SELECT payload FROM settlary_usage_events WHERE id = ?', [id]);
+      return one<UsageEvent>(db, 'SELECT payload FROM resvary_usage_events WHERE id = ?', [id]);
     },
     async getUsageReceipt(id) {
-      return one<UsageReceipt>(db, 'SELECT payload FROM settlary_usage_receipts WHERE id = ?', [
+      return one<UsageReceipt>(db, 'SELECT payload FROM resvary_usage_receipts WHERE id = ?', [
         id,
       ]);
     },
@@ -545,35 +545,35 @@ function reader(db: DatabaseSyncType): CreditStoreReader {
       return accountId
         ? all<UsageReceipt>(
             db,
-            'SELECT payload FROM settlary_usage_receipts WHERE account_id = ? ORDER BY created_at ASC',
+            'SELECT payload FROM resvary_usage_receipts WHERE account_id = ? ORDER BY created_at ASC',
             [accountId],
           )
         : all<UsageReceipt>(
             db,
-            'SELECT payload FROM settlary_usage_receipts ORDER BY created_at ASC',
+            'SELECT payload FROM resvary_usage_receipts ORDER BY created_at ASC',
           );
     },
     async listLedgerEntries(accountId) {
       return accountId
         ? all<LedgerEntry>(
             db,
-            'SELECT payload FROM settlary_ledger_entries WHERE account_id = ? ORDER BY created_at ASC, rowid ASC',
+            'SELECT payload FROM resvary_ledger_entries WHERE account_id = ? ORDER BY created_at ASC, rowid ASC',
             [accountId],
           )
         : all<LedgerEntry>(
             db,
-            'SELECT payload FROM settlary_ledger_entries ORDER BY created_at ASC, rowid ASC',
+            'SELECT payload FROM resvary_ledger_entries ORDER BY created_at ASC, rowid ASC',
           );
     },
     async getOutboxEvent(id) {
-      return one<CreditOutboxEvent>(db, 'SELECT payload FROM settlary_outbox_events WHERE id = ?', [
+      return one<CreditOutboxEvent>(db, 'SELECT payload FROM resvary_outbox_events WHERE id = ?', [
         id,
       ]);
     },
     async listOutboxEvents(filter = {}) {
       return all<CreditOutboxEvent>(
         db,
-        'SELECT payload FROM settlary_outbox_events ORDER BY created_at ASC, rowid ASC',
+        'SELECT payload FROM resvary_outbox_events ORDER BY created_at ASC, rowid ASC',
       ).filter(
         (item) =>
           (!filter.projectId || item.projectId === filter.projectId) &&
@@ -584,12 +584,12 @@ function reader(db: DatabaseSyncType): CreditStoreReader {
     async getIdempotencyRecord(scope, key) {
       return one<IdempotencyRecord>(
         db,
-        'SELECT payload FROM settlary_idempotency_keys WHERE scope = ? AND key = ?',
+        'SELECT payload FROM resvary_idempotency_keys WHERE scope = ? AND key = ?',
         [scope, key],
       );
     },
     async getFundingIntent(id) {
-      return one<FundingIntent>(db, 'SELECT payload FROM settlary_funding_intents WHERE id = ?', [
+      return one<FundingIntent>(db, 'SELECT payload FROM resvary_funding_intents WHERE id = ?', [
         id,
       ]);
     },
@@ -597,25 +597,25 @@ function reader(db: DatabaseSyncType): CreditStoreReader {
       return projectId
         ? all<FundingIntent>(
             db,
-            'SELECT payload FROM settlary_funding_intents WHERE project_id = ? ORDER BY created_at ASC',
+            'SELECT payload FROM resvary_funding_intents WHERE project_id = ? ORDER BY created_at ASC',
             [projectId],
           )
         : all<FundingIntent>(
             db,
-            'SELECT payload FROM settlary_funding_intents ORDER BY created_at ASC',
+            'SELECT payload FROM resvary_funding_intents ORDER BY created_at ASC',
           );
     },
     async getFundingTransaction(id) {
       return one<FundingTransaction>(
         db,
-        'SELECT payload FROM settlary_funding_transactions WHERE id = ?',
+        'SELECT payload FROM resvary_funding_transactions WHERE id = ?',
         [id],
       );
     },
     async getFundingTransactionByTxHash(network, txHash) {
       return one<FundingTransaction>(
         db,
-        'SELECT payload FROM settlary_funding_transactions WHERE network = ? AND tx_hash_norm = ?',
+        'SELECT payload FROM resvary_funding_transactions WHERE network = ? AND tx_hash_norm = ?',
         [network, txHash.toLowerCase()],
       );
     },
@@ -623,12 +623,12 @@ function reader(db: DatabaseSyncType): CreditStoreReader {
       return fundingIntentId
         ? all<FundingTransaction>(
             db,
-            'SELECT payload FROM settlary_funding_transactions WHERE funding_intent_id = ? ORDER BY created_at ASC',
+            'SELECT payload FROM resvary_funding_transactions WHERE funding_intent_id = ? ORDER BY created_at ASC',
             [fundingIntentId],
           )
         : all<FundingTransaction>(
             db,
-            'SELECT payload FROM settlary_funding_transactions ORDER BY created_at ASC',
+            'SELECT payload FROM resvary_funding_transactions ORDER BY created_at ASC',
           );
     },
   };

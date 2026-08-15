@@ -1,12 +1,12 @@
-# @settlary/sqlite
+# @resvary/sqlite
 
-SQLite persistence for Settlary credits, usage receipts, and stablecoin payment receipts.
+SQLite persistence for Resvary credits, usage receipts, and stablecoin payment receipts.
 
 ```typescript
-import { CreditLedger } from '@settlary/sdk/credits';
-import { createSqliteCreditStore } from '@settlary/sqlite';
+import { CreditLedger } from '@resvary/sdk/credits';
+import { createSqliteCreditStore } from '@resvary/sqlite';
 
-const store = createSqliteCreditStore({ path: '.settlary/settlary.sqlite' });
+const store = createSqliteCreditStore({ path: '.resvary/resvary.sqlite' });
 const credits = new CreditLedger({ projectId: 'my_ai_product', store });
 ```
 

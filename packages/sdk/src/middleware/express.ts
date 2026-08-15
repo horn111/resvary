@@ -4,7 +4,7 @@
  * @example
  * ```typescript
  * import express from 'express';
- * import { expressPaywall } from '@settlary/sdk/middleware';
+ * import { expressPaywall } from '@resvary/sdk/middleware';
  *
  * const app = express();
  *

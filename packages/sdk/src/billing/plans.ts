@@ -3,7 +3,7 @@
  *
  * @example
  * ```typescript
- * import { createBillingPlan } from '@settlary/sdk/billing';
+ * import { createBillingPlan } from '@resvary/sdk/billing';
  *
  * const apiPlan = createBillingPlan({
  *   name: 'API Standard',

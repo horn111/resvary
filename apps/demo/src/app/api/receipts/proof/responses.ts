@@ -1,4 +1,4 @@
-import { MemoPaymentProofError } from '@settlary/sdk/receipts';
+import { MemoPaymentProofError } from '@resvary/sdk/receipts';
 
 export function jsonSafeResponse(value: unknown, init?: ResponseInit): Response {
   return Response.json(toJsonSafeValue(value), init);

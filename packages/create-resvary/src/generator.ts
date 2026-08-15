@@ -21,7 +21,7 @@ export async function generateProject(config: ProjectConfig): Promise<string[]> 
   await write(
     targetDir,
     '.gitignore',
-    'node_modules\n.env\ndist\n.next\n.settlary\n',
+    'node_modules\n.env\ndist\n.next\n.resvary\n',
     filesCreated,
   );
 
@@ -51,7 +51,7 @@ export async function generateProject(config: ProjectConfig): Promise<string[]> 
       await write(
         targetDir,
         'next.config.mjs',
-        "export default { serverExternalPackages: ['@settlary/sqlite'] };\n",
+        "export default { serverExternalPackages: ['@resvary/sqlite'] };\n",
         filesCreated,
       );
     }
