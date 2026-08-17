@@ -11,21 +11,23 @@ Use the GitHub URL until the renamed Vercel deployment or a custom Resvary domai
 ## Assets
 
 - `resvary-x-avatar.png` — 800 × 800 px
-- `resvary-x-header.png` — 1500 × 500 px, upload-ready with wordmark and tagline
-- `resvary-x-header-clean.png` — 1500 × 500 px without text
-- `resvary-rebrand-announcement.png` — 1600 × 900 px, X rebrand announcement
+- `resvary-x-header.png` — 1500 × 500 px, upload-ready with split hero typography
+- `resvary-x-header-clean.png` — 1500 × 500 px, text-free hero background
+- `resvary-rebrand-announcement.png` — 1600 × 900 px, minimal X rebrand announcement
+
+Regenerate the PNG files with `node scripts/render-brand-assets.mjs`.
+
+## Logo lock
+
+The Resvary mark is fixed. Its two rail profiles and authorization-node position mirror the canonical hero implementation in `apps/demo/src/app/claude-design-controller.tsx`. Do not redraw, simplify, mirror, or otherwise reinterpret the mark when producing new assets. Only layout, surrounding copy, and non-logo background treatment may change.
 
 ## Rebrand announcement
 
-> The project has a new name: Resvary.
+> Resvary.
 >
-> The product remains focused on open-source prepaid credits and usage billing for AI applications.
->
-> Reserve before execution. Commit actual usage. Release the rest. Keep an auditable receipt.
->
-> github.com/horn111/resvary
+> New name. Same focus.
 
-The primary mark combines two controlled credit boundaries with a movable authorization node. It represents a balance moving through reservation, commit, and release without leaving the permitted range.
+The primary mark combines two controlled credit boundaries with an authorization node. It represents a balance moving through reservation, commit, and release without leaving the permitted range.
 
 ## Palette
 

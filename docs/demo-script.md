@@ -25,4 +25,14 @@ Set `RESVARY_AI_API_KEY` and `RESVARY_AI_MODEL`; optionally set `RESVARY_AI_BASE
 
 ## Arc funding proof
 
-The original payment operations routes remain available at `/api/receipts` and related proof/inbox endpoints. They demonstrate the payment evidence used by `ArcCreditFunding`; they are no longer the primary homepage narrative.
+Set `RESVARY_ARC_FUNDING_RECIPIENT` to a public Arc Testnet recipient address and restart the demo.
+
+1. Click **Create live Arc request**.
+2. Copy the Memo contract address and transaction calldata.
+3. Send the transaction from a funded Arc Testnet EOA.
+4. Paste the transaction hash into the demo and click **Verify and grant credits**.
+5. Resvary verifies the Memo event, USDC transfer, recipient, amount, and memo ID through Arc RPC.
+6. Inspect the linked funding transaction, credit grant, ledger entry, and Arcscan link.
+7. Submit the same transaction hash again to confirm that the ledger does not create a second grant.
+
+The demo never requests or stores the EOA private key. The standalone payment proof and webhook routes remain available at `/api/receipts` and related proof/inbox endpoints.
