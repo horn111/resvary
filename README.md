@@ -17,7 +17,7 @@ grant or top up credits
 → issue an auditable usage receipt
 ```
 
-The credit engine is payment-rail agnostic. The existing Arc Testnet invoice, memo proof, payment receipt, and signed webhook modules remain available and now serve as an optional USDC funding adapter.
+The credit engine is payment-rail agnostic. The existing Arc Testnet invoice, memo proof, payment receipt, and signed webhook modules provide Resvary's reference external USDC funding path.
 
 ## Why Resvary
 
@@ -32,7 +32,7 @@ Resvary provides:
 - immutable ledger entries and per-charge usage receipts;
 - transactional outbox events using the existing `x-resvary-signature` format;
 - in-memory and SQLite stores;
-- optional Arc Testnet USDC top-ups;
+- Arc Testnet USDC top-ups through the reference funding adapter;
 - an interactive Next.js demo and Express/Next.js starter generator.
 
 ## Quickstart
@@ -121,8 +121,8 @@ The old payment operations APIs remain under `/api/receipts`, `/api/receipts/pro
 
 ## Modules
 
-| Import                      | Responsibility                                                              |
-| --------------------------- | --------------------------------------------------------------------------- |
+| Import                     | Responsibility                                                              |
+| -------------------------- | --------------------------------------------------------------------------- |
 | `@resvary/sdk/credits`     | Accounts, grants, reservations, usage receipts, ledger, idempotency, outbox |
 | `@resvary/sdk/pricing`     | Meters, immutable price versions, integer usage rating                      |
 | `@resvary/sdk/funding/arc` | Arc invoice/payment receipt to credit grant adapter                         |

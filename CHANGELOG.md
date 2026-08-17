@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Pivoted
 
-- Repositioned Resvary as open-source prepaid credits and usage billing for AI products; Arc is now an optional USDC funding rail.
+- Repositioned Resvary as open-source prepaid credits and usage billing for AI products; Arc is the reference external USDC funding path.
 
 ### Added
 
