@@ -36,6 +36,34 @@ async function createFixture(now = 1_000) {
 }
 
 describe('CreditLedger', () => {
+  it('never records settlement before the funding transaction was accepted', async () => {
+    const { ledger, setNow } = await createFixture(1_000);
+    const intent = await ledger.createFundingIntent({
+      customerId: 'cus_funding',
+      amount: '1',
+      rail: 'circle_gateway_nanopayment',
+      network: 'eip155:5042002',
+      invoiceId: 'gateway:test',
+      idempotencyKey: 'funding-intent-1',
+    });
+    setNow(2_000);
+    const result = await ledger.confirmFunding({
+      fundingIntentId: intent.id,
+      rail: 'circle_gateway_nanopayment',
+      network: 'eip155:5042002',
+      externalPaymentId: 'authorization-hash-1',
+      amount: '1',
+      paymentReceiptId: 'gateway:authorization-hash-1',
+      settlementStatus: 'settled',
+      settledAt: 1_500,
+      requireExactAmount: true,
+      idempotencyKey: 'funding-confirm-1',
+    });
+
+    expect(result.fundingTransaction.acceptedAt).toBe(2_000);
+    expect(result.fundingTransaction.settledAt).toBe(2_000);
+  });
+
   it('grants, reserves, commits actual usage, and releases the remainder atomically', async () => {
     const { ledger, price } = await createFixture();
     await ledger.grantCredits({ customerId: 'cus_1', amount: '5', idempotencyKey: 'grant-1' });

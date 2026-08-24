@@ -13,6 +13,22 @@
 
 SQLite is an alpha local/single-node backend. Multi-process and production deployments should wait for the Postgres adapter or supply a `CreditStore` with equivalent transaction isolation.
 
+## Funding-specific controls
+
+### Direct Arc
+
+- Validate chain ID, Memo contract, Memo ID, calldata hash, sender, recipient, USDC amount, transaction status, and confirmation depth.
+- Bound RPC ranges, persist cursors, and rescan a small overlap.
+- Treat a saved payment receipt as the recovery boundary; retry the local grant with the same external payment ID.
+
+### Circle Gateway
+
+- Use the official batching facilitator for verify and settle.
+- Match scheme, network, asset, exact amount, recipient, payer when configured, nonce, and expiry to a server-created funding intent.
+- Persist only the normalized authorization hash and evidence fields. Never persist the full signature or a buyer private key.
+- Grant credits only after `settle.success`.
+- Route later disputes to `reconciliation_required`; do not edit ledger history or silently debit the customer.
+
 ## Legal product boundary
 
 Resvary supplies billing software. It does not provide custody or operate a consumer wallet.

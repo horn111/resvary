@@ -126,6 +126,13 @@ export class SqliteCreditStore implements CreditStore {
   getFundingTransaction(id: string) {
     return reader(this.db).getFundingTransaction(id);
   }
+  getFundingTransactionByExternalPayment(
+    rail: FundingTransaction['rail'],
+    network: string,
+    externalPaymentId: string,
+  ) {
+    return reader(this.db).getFundingTransactionByExternalPayment(rail, network, externalPaymentId);
+  }
   getFundingTransactionByTxHash(network: string, txHash: `0x${string}`) {
     return reader(this.db).getFundingTransactionByTxHash(network, txHash);
   }
@@ -261,6 +268,120 @@ export class SqliteCreditStore implements CreditStore {
       INSERT OR IGNORE INTO resvary_schema_migrations(version, applied_at)
         VALUES (1, CAST(strftime('%s', 'now') AS INTEGER) * 1000);
     `);
+    this.migrateFundingV2();
+  }
+
+  private migrateFundingV2(): void {
+    const row = this.db
+      .prepare('SELECT MAX(version) AS version FROM resvary_schema_migrations')
+      .get() as { version?: number | null } | undefined;
+    if ((row?.version ?? 0) >= 2) return;
+
+    this.db.exec('BEGIN IMMEDIATE;');
+    try {
+      this.db.exec(`
+        ALTER TABLE resvary_funding_transactions
+          ADD COLUMN rail TEXT NOT NULL DEFAULT 'arc_direct';
+        ALTER TABLE resvary_funding_transactions
+          ADD COLUMN external_payment_id_norm TEXT;
+        UPDATE resvary_funding_transactions
+          SET external_payment_id_norm = tx_hash_norm
+          WHERE external_payment_id_norm IS NULL;
+
+        ALTER TABLE resvary_funding_transactions
+          RENAME TO resvary_funding_transactions_v1;
+        CREATE TABLE resvary_funding_transactions (
+          id TEXT PRIMARY KEY,
+          funding_intent_id TEXT NOT NULL,
+          rail TEXT NOT NULL,
+          network TEXT NOT NULL,
+          external_payment_id_norm TEXT NOT NULL,
+          tx_hash_norm TEXT,
+          created_at INTEGER NOT NULL,
+          payload TEXT NOT NULL,
+          UNIQUE(rail, network, external_payment_id_norm)
+        );
+        INSERT INTO resvary_funding_transactions(
+          id,
+          funding_intent_id,
+          rail,
+          network,
+          external_payment_id_norm,
+          tx_hash_norm,
+          created_at,
+          payload
+        )
+        SELECT
+          id,
+          funding_intent_id,
+          rail,
+          network,
+          external_payment_id_norm,
+          tx_hash_norm,
+          created_at,
+          payload
+        FROM resvary_funding_transactions_v1;
+        DROP TABLE resvary_funding_transactions_v1;
+        CREATE INDEX resvary_funding_transactions_tx_hash
+          ON resvary_funding_transactions(network, tx_hash_norm);
+      `);
+
+      const intents = this.db
+        .prepare('SELECT id, payload FROM resvary_funding_intents')
+        .all() as Array<{ id: string; payload: string }>;
+      for (const intentRow of intents) {
+        const intent = parseReceiptStoreValue<FundingIntent>(intentRow.payload);
+        this.db
+          .prepare('UPDATE resvary_funding_intents SET payload = ? WHERE id = ?')
+          .run(
+            serializeReceiptStoreValue({ ...intent, rail: intent.rail ?? 'arc_direct' }),
+            intentRow.id,
+          );
+      }
+
+      const transactions = this.db
+        .prepare('SELECT id, payload FROM resvary_funding_transactions')
+        .all() as Array<{ id: string; payload: string }>;
+      for (const transactionRow of transactions) {
+        const transaction = parseReceiptStoreValue<FundingTransaction>(transactionRow.payload);
+        const externalPaymentId =
+          transaction.externalPaymentId ?? transaction.txHash ?? transactionRow.id;
+        const migrated: FundingTransaction = {
+          ...transaction,
+          rail: transaction.rail ?? 'arc_direct',
+          externalPaymentId,
+          settlementStatus: transaction.settlementStatus ?? 'settled',
+          acceptedAt: transaction.acceptedAt ?? transaction.createdAt,
+          settledAt: transaction.settledAt ?? transaction.createdAt,
+          evidence: transaction.evidence ?? {
+            amountUnits: transaction.amountUnits,
+            payer: transaction.payer,
+          },
+        };
+        this.db
+          .prepare(
+            `
+          UPDATE resvary_funding_transactions
+          SET rail = ?, external_payment_id_norm = ?, payload = ?
+          WHERE id = ?
+        `,
+          )
+          .run(
+            migrated.rail,
+            migrated.externalPaymentId.toLowerCase(),
+            serializeReceiptStoreValue(migrated),
+            transactionRow.id,
+          );
+      }
+
+      this.db
+        .prepare('INSERT INTO resvary_schema_migrations(version, applied_at) VALUES (2, ?)')
+        .run(Date.now());
+      this.db.exec('COMMIT;');
+    } catch (error) {
+      this.db.exec('ROLLBACK;');
+      throw error;
+    }
   }
 }
 
@@ -328,6 +449,13 @@ class SqliteCreditTransaction implements CreditStoreTransaction {
   }
   getFundingTransaction(id: string) {
     return reader(this.db).getFundingTransaction(id);
+  }
+  getFundingTransactionByExternalPayment(
+    rail: FundingTransaction['rail'],
+    network: string,
+    externalPaymentId: string,
+  ) {
+    return reader(this.db).getFundingTransactionByExternalPayment(rail, network, externalPaymentId);
   }
   getFundingTransactionByTxHash(network: string, txHash: `0x${string}`) {
     return reader(this.db).getFundingTransactionByTxHash(network, txHash);
@@ -445,11 +573,27 @@ class SqliteCreditTransaction implements CreditStoreTransaction {
     );
   }
   async saveFundingTransaction(value: FundingTransaction) {
-    insert(
+    upsert(
       this.db,
       'resvary_funding_transactions',
-      ['id', 'funding_intent_id', 'network', 'tx_hash_norm', 'created_at'],
-      [value.id, value.fundingIntentId, value.network, value.txHash.toLowerCase(), value.createdAt],
+      [
+        'id',
+        'funding_intent_id',
+        'rail',
+        'network',
+        'external_payment_id_norm',
+        'tx_hash_norm',
+        'created_at',
+      ],
+      [
+        value.id,
+        value.fundingIntentId,
+        value.rail,
+        value.network,
+        value.externalPaymentId.toLowerCase(),
+        value.txHash?.toLowerCase() ?? `external:${value.externalPaymentId.toLowerCase()}`,
+        value.createdAt,
+      ],
       value,
     );
   }
@@ -485,10 +629,7 @@ function reader(db: DatabaseSyncType): CreditStoreReader {
             'SELECT payload FROM resvary_credit_grants WHERE account_id = ? ORDER BY created_at ASC',
             [accountId],
           )
-        : all<CreditGrant>(
-            db,
-            'SELECT payload FROM resvary_credit_grants ORDER BY created_at ASC',
-          );
+        : all<CreditGrant>(db, 'SELECT payload FROM resvary_credit_grants ORDER BY created_at ASC');
     },
     async getMeter(id) {
       return one<MeterDefinition>(db, 'SELECT payload FROM resvary_meters WHERE id = ?', [id]);
@@ -501,9 +642,7 @@ function reader(db: DatabaseSyncType): CreditStoreReader {
       );
     },
     async getPriceVersion(id) {
-      return one<PriceVersion>(db, 'SELECT payload FROM resvary_price_versions WHERE id = ?', [
-        id,
-      ]);
+      return one<PriceVersion>(db, 'SELECT payload FROM resvary_price_versions WHERE id = ?', [id]);
     },
     async listPriceVersions(meterId) {
       return meterId
@@ -537,9 +676,7 @@ function reader(db: DatabaseSyncType): CreditStoreReader {
       return one<UsageEvent>(db, 'SELECT payload FROM resvary_usage_events WHERE id = ?', [id]);
     },
     async getUsageReceipt(id) {
-      return one<UsageReceipt>(db, 'SELECT payload FROM resvary_usage_receipts WHERE id = ?', [
-        id,
-      ]);
+      return one<UsageReceipt>(db, 'SELECT payload FROM resvary_usage_receipts WHERE id = ?', [id]);
     },
     async listUsageReceipts(accountId) {
       return accountId
@@ -610,6 +747,14 @@ function reader(db: DatabaseSyncType): CreditStoreReader {
         db,
         'SELECT payload FROM resvary_funding_transactions WHERE id = ?',
         [id],
+      );
+    },
+    async getFundingTransactionByExternalPayment(rail, network, externalPaymentId) {
+      return one<FundingTransaction>(
+        db,
+        `SELECT payload FROM resvary_funding_transactions
+         WHERE rail = ? AND network = ? AND external_payment_id_norm = ?`,
+        [rail, network, externalPaymentId.toLowerCase()],
       );
     },
     async getFundingTransactionByTxHash(network, txHash) {

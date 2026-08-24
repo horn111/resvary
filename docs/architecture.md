@@ -15,7 +15,9 @@ AI application
           └─ SqliteCreditStore
 
 Optional funding
-  Arc invoice → memo proof → payment receipt → ArcCreditFunding → credit grant
+  Direct Arc transfer -> Memo proof -> payment receipt --+
+                                                        +-> funding transaction -> credit grant
+  Gateway authorization -> Circle verify -> settle -----+
 ```
 
 The embedded SDK is the supported alpha interface. Domain commands do not depend on HTTP, Next.js, Express, a wallet, or an AI provider. A future service can therefore wrap the same operations without replacing the ledger.
@@ -61,4 +63,4 @@ The existing receipt subsystem remains separate because a payment receipt and us
 - payment receipt: which external transfer funded an account;
 - usage receipt: why a specific amount of product credits was charged.
 
-`ArcCreditFunding` validates their connection and guarantees one grant per `network + txHash`.
+Funding adapters validate this connection and guarantee one grant per `rail + network + externalPaymentId`. Direct Arc uses the transaction hash. Gateway uses a hash of normalized authorization fields and stores no full signature.

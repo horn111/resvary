@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 0.4 Alpha - Circle-native funding proof
+
+#### Added
+
+- Funding rails and settlement evidence with uniqueness by `rail + network + externalPaymentId`.
+- SQLite schema migration v2 with automatic backfill of existing direct Arc funding records.
+- `ArcFundingWorker` for persisted resume, bounded scans, confirmation depth, overlap rescans, RPC retry, and crash reconciliation.
+- Optional `@resvary/circle` package using the official `@circle-fin/x402-batching` facilitator client.
+- Gateway Nanopayment verification, settlement, exact-amount checks, authorization hashing, and exactly-once credit grants.
+- Framework-neutral Request/Response handler plus Next.js and Express-compatible adapters.
+- Dual-rail demo, buyer example, recovery guide, 0.3-to-0.4 migration guide, video plan, and public evidence checklist.
+
+#### Changed
+
+- Renamed the misleading legacy `GatewayClient` implementation to `ArcWalletBalanceClient`; the old name remains as a deprecated alias.
+- Removed the non-functional `ARC_MAINNET` placeholder.
+- Updated package versions to `0.4.0-alpha.0`.
+
+#### Security
+
+- Gateway credits are granted only after successful facilitator settlement.
+- Full payment signatures and private keys are never persisted.
+- Later adverse Gateway events move funding to `reconciliation_required` without silently reversing spent credits.
+
 ### Pivoted
 
 - Repositioned Resvary as open-source prepaid credits and usage billing for AI products; Arc is the reference external USDC funding path.

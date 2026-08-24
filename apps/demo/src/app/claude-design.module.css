@@ -213,7 +213,7 @@
   }
 
   .claudeDesign :global([data-credit-model-table] td:nth-child(3))::before {
-    content: 'Resvary 0.3 alpha';
+    content: 'Resvary 0.4 alpha';
   }
 
   .claudeDesign :global(#top) {

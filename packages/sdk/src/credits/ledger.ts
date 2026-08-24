@@ -12,7 +12,10 @@ import type {
   CreditEventType,
   CreditGrant,
   CreditGrantSource,
+  FundingEvidence,
   FundingIntent,
+  FundingRail,
+  FundingSettlementStatus,
   FundingTransaction,
   CreditOutboxEvent,
   CreditReservation,
@@ -110,18 +113,35 @@ export interface RunMeteredResult<T> {
 export interface CreateFundingIntentInput extends EnsureAccountInput {
   id?: string;
   amount: string;
+  rail?: FundingRail;
   network: string;
   invoiceId: string;
+  expiresAt?: number;
 }
 
 export interface ConfirmFundingInput {
   fundingIntentId: string;
+  rail?: FundingRail;
   network: string;
-  txHash: `0x${string}`;
+  externalPaymentId?: string;
+  txHash?: `0x${string}`;
   amount: string;
   paymentReceiptId: string;
   payer?: `0x${string}`;
+  settlementStatus?: Extract<FundingSettlementStatus, 'accepted' | 'settled'>;
+  settledAt?: number;
+  requireExactAmount?: boolean;
+  evidence?: Omit<FundingEvidence, 'amountUnits'>;
   idempotencyKey: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface UpdateFundingSettlementInput {
+  fundingTransactionId: string;
+  status: Extract<FundingSettlementStatus, 'settled' | 'reconciliation_required'>;
+  idempotencyKey: string;
+  settledAt?: number;
+  reason?: string;
   metadata?: Record<string, unknown>;
 }
 
@@ -305,9 +325,11 @@ export class CreditLedger {
           status: 'pending',
           requestedAmount: creditUnitsToString(requestedUnits),
           requestedUnits: requestedUnits.toString(),
+          rail: input.rail ?? 'arc_direct',
           network: requireText(input.network, 'network'),
           invoiceId: requireText(input.invoiceId, 'invoiceId'),
           createdAt: now,
+          expiresAt: input.expiresAt,
           metadata: input.metadata,
         };
         await tx.saveFundingIntent(intent);
@@ -324,32 +346,54 @@ export class CreditLedger {
     fundingTransaction: FundingTransaction;
   }> {
     const amountUnits = toCreditUnits(input.amount);
-    return this.store.transaction((tx) =>
-      this.idempotent(tx, 'confirm_funding', input.idempotencyKey, input, async () => {
-        const intent = await tx.getFundingIntent(input.fundingIntentId);
-        if (!intent || intent.projectId !== this.projectId)
-          throw new CreditNotFoundError('Funding intent', input.fundingIntentId);
-        if (intent.network !== input.network)
-          throw new InvalidCreditStateError('Funding network does not match the intent');
-        const existing = await tx.getFundingTransactionByTxHash(input.network, input.txHash);
-        if (existing) {
-          if (existing.fundingIntentId !== intent.id) {
-            throw new InvalidCreditStateError(
-              `Funding transaction is already assigned: ${input.txHash}`,
-            );
-          }
-          const account = await this.requireAccountById(tx, intent.accountId);
-          const grant = await tx.getGrant(existing.grantId);
-          if (!grant) throw new CreditNotFoundError('Credit grant', existing.grantId);
-          return { account, grant, fundingIntent: intent, fundingTransaction: existing };
-        }
-        if (intent.status !== 'pending')
-          throw new InvalidCreditStateError(`Funding intent is ${intent.status}: ${intent.id}`);
-        if (amountUnits < parseCreditUnits(intent.requestedUnits)) {
+    const rail = input.rail ?? 'arc_direct';
+    const externalPaymentId = requireText(
+      input.externalPaymentId ?? input.txHash ?? '',
+      'externalPaymentId',
+    );
+
+    return this.store.transaction(async (tx) => {
+      const intent = await tx.getFundingIntent(input.fundingIntentId);
+      if (!intent || intent.projectId !== this.projectId)
+        throw new CreditNotFoundError('Funding intent', input.fundingIntentId);
+      if (intent.network !== input.network)
+        throw new InvalidCreditStateError('Funding network does not match the intent');
+      if (intent.rail !== rail)
+        throw new InvalidCreditStateError('Funding rail does not match the intent');
+      if (intent.expiresAt !== undefined && intent.expiresAt <= this.now())
+        throw new InvalidCreditStateError(`Funding intent is expired: ${intent.id}`);
+
+      const existing = await tx.getFundingTransactionByExternalPayment(
+        rail,
+        input.network,
+        externalPaymentId,
+      );
+      if (existing) {
+        if (existing.fundingIntentId !== intent.id) {
           throw new InvalidCreditStateError(
-            `Funding underpayment: ${amountUnits} < ${intent.requestedUnits}`,
+            `Funding payment is already assigned: ${externalPaymentId}`,
           );
         }
+        const account = await this.requireAccountById(tx, intent.accountId);
+        const grant = await tx.getGrant(existing.grantId);
+        if (!grant) throw new CreditNotFoundError('Credit grant', existing.grantId);
+        return { account, grant, fundingIntent: intent, fundingTransaction: existing };
+      }
+
+      return this.idempotent(tx, 'confirm_funding', input.idempotencyKey, input, async () => {
+        if (intent.status !== 'pending')
+          throw new InvalidCreditStateError(`Funding intent is ${intent.status}: ${intent.id}`);
+        const requestedUnits = parseCreditUnits(intent.requestedUnits);
+        if (
+          input.requireExactAmount ? amountUnits !== requestedUnits : amountUnits < requestedUnits
+        ) {
+          throw new InvalidCreditStateError(
+            input.requireExactAmount
+              ? `Funding amount mismatch: ${amountUnits} !== ${intent.requestedUnits}`
+              : `Funding underpayment: ${amountUnits} < ${intent.requestedUnits}`,
+          );
+        }
+
         const now = this.now();
         const current = await this.requireAccountById(tx, intent.accountId);
         const grant: CreditGrant = {
@@ -359,8 +403,8 @@ export class CreditLedger {
           customerId: current.customerId,
           amount: creditUnitsToString(amountUnits),
           amountUnits: amountUnits.toString(),
-          source: 'arc',
-          externalRef: `${input.network}:${input.txHash.toLowerCase()}`,
+          source: rail === 'arc_direct' ? 'arc' : 'circle_gateway_nanopayment',
+          externalRef: `${rail}:${input.network}:${externalPaymentId.toLowerCase()}`,
           createdAt: now,
           metadata: {
             ...input.metadata,
@@ -375,19 +419,32 @@ export class CreditLedger {
           now,
         );
         const confirmedIntent: FundingIntent = { ...intent, status: 'confirmed', confirmedAt: now };
+        const settlementStatus = input.settlementStatus ?? 'settled';
+        const settledAt =
+          settlementStatus === 'settled' ? Math.max(input.settledAt ?? now, now) : undefined;
         const fundingTransaction: FundingTransaction = {
           id: createId('ftx'),
           fundingIntentId: intent.id,
           projectId: this.projectId,
           customerId: account.customerId,
           accountId: account.id,
+          rail,
           network: input.network,
+          externalPaymentId,
           txHash: input.txHash,
           amount: grant.amount,
           amountUnits: grant.amountUnits,
           paymentReceiptId: input.paymentReceiptId,
           grantId: grant.id,
-          payer: input.payer,
+          payer: input.payer ?? input.evidence?.payer,
+          settlementStatus,
+          acceptedAt: now,
+          settledAt,
+          evidence: {
+            ...input.evidence,
+            amountUnits: amountUnits.toString(),
+            payer: input.payer ?? input.evidence?.payer,
+          },
           createdAt: now,
           metadata: input.metadata,
         };
@@ -408,16 +465,64 @@ export class CreditLedger {
         );
         await this.saveOutboxEvent(
           tx,
-          'funding.confirmed',
-          {
-            fundingIntent: confirmedIntent,
-            fundingTransaction,
-            account,
-            grant,
-          },
+          'funding.accepted',
+          { fundingIntent: confirmedIntent, fundingTransaction },
           now,
         );
+        await this.saveOutboxEvent(
+          tx,
+          'funding.confirmed',
+          { fundingIntent: confirmedIntent, fundingTransaction, account, grant },
+          now,
+        );
+        if (settlementStatus === 'settled') {
+          await this.saveOutboxEvent(
+            tx,
+            'funding.settled',
+            { fundingIntent: confirmedIntent, fundingTransaction },
+            fundingTransaction.settledAt!,
+          );
+        }
         return { account, grant, fundingIntent: confirmedIntent, fundingTransaction };
+      });
+    });
+  }
+
+  async updateFundingSettlement(input: UpdateFundingSettlementInput): Promise<FundingTransaction> {
+    return this.store.transaction((tx) =>
+      this.idempotent(tx, 'update_funding_settlement', input.idempotencyKey, input, async () => {
+        const transaction = await tx.getFundingTransaction(input.fundingTransactionId);
+        if (!transaction || transaction.projectId !== this.projectId) {
+          throw new CreditNotFoundError('Funding transaction', input.fundingTransactionId);
+        }
+        if (transaction.settlementStatus === input.status) return transaction;
+        if (
+          transaction.settlementStatus === 'settled' &&
+          input.status !== 'reconciliation_required'
+        ) {
+          throw new InvalidCreditStateError(
+            `Funding transaction is already settled: ${transaction.id}`,
+          );
+        }
+        const now = this.now();
+        const updated: FundingTransaction = {
+          ...transaction,
+          settlementStatus: input.status,
+          settledAt: input.status === 'settled' ? (input.settledAt ?? now) : transaction.settledAt,
+          metadata: {
+            ...transaction.metadata,
+            ...input.metadata,
+            reconciliationReason: input.reason,
+          },
+        };
+        await tx.saveFundingTransaction(updated);
+        await this.saveOutboxEvent(
+          tx,
+          input.status === 'settled' ? 'funding.settled' : 'funding.reconciliation_required',
+          { fundingTransaction: updated, reason: input.reason },
+          now,
+        );
+        return updated;
       }),
     );
   }

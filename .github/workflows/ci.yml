@@ -72,13 +72,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build SDK
-        run: npm run build --workspace=packages/sdk
-
-      - name: Run tests
-        run: |
-          npm run test --workspace=packages/sdk
-          npm run test --workspace=packages/create-resvary
+      - name: Run workspace tests
+        run: npm test
 
   sqlite:
     name: SQLite durability

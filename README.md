@@ -17,7 +17,7 @@ grant or top up credits
 → issue an auditable usage receipt
 ```
 
-The credit engine is payment-rail agnostic. The existing Arc Testnet invoice, memo proof, payment receipt, and signed webhook modules provide Resvary's reference external USDC funding path.
+The credit engine is payment-rail agnostic. Resvary 0.4 provides two Circle-native Testnet top-up paths: verified direct Arc USDC transfers and Circle Gateway Nanopayments. Both create exactly one grant in the same prepaid credit ledger.
 
 ## Why Resvary
 
@@ -32,7 +32,8 @@ Resvary provides:
 - immutable ledger entries and per-charge usage receipts;
 - transactional outbox events using the existing `x-resvary-signature` format;
 - in-memory and SQLite stores;
-- Arc Testnet USDC top-ups through the reference funding adapter;
+- direct Arc Testnet USDC top-ups with durable watcher recovery;
+- Circle Gateway Nanopayment top-ups through the official batching facilitator;
 - an interactive Next.js demo and Express/Next.js starter generator.
 
 ## Quickstart
@@ -100,6 +101,31 @@ console.log(result.balance.availableAmount);
 
 If the provider throws, `runMetered` releases the full reservation. If provider execution succeeds but commit fails, the reservation stays open so the same operation can be retried safely.
 
+## Circle-native Testnet funding
+
+Install the optional adapter when credits should be funded by direct Arc USDC or a Circle Gateway Nanopayment:
+
+```bash
+npm install @resvary/circle
+```
+
+```typescript
+import { GatewayNanopaymentFunding } from '@resvary/circle';
+
+const funding = new GatewayNanopaymentFunding({
+  ledger: credits,
+  sellerAddress: '0x1111111111111111111111111111111111111111',
+});
+
+const request = await funding.createFundingRequest({
+  customerId: 'customer_123',
+  amount: '5',
+  idempotencyKey: 'topup_123',
+});
+```
+
+Credits are created only after the official Circle facilitator verifies and settles the authorization. See the direct Arc and Gateway guides for the complete server flows.
+
 ## Demo
 
 Requires Node.js 24 because the persistent demo uses the built-in `node:sqlite` module.
@@ -125,7 +151,9 @@ The old payment operations APIs remain under `/api/receipts`, `/api/receipts/pro
 | -------------------------- | --------------------------------------------------------------------------- |
 | `@resvary/sdk/credits`     | Accounts, grants, reservations, usage receipts, ledger, idempotency, outbox |
 | `@resvary/sdk/pricing`     | Meters, immutable price versions, integer usage rating                      |
-| `@resvary/sdk/funding/arc` | Arc invoice/payment receipt to credit grant adapter                         |
+| `@resvary/sdk/funding/arc` | Direct Arc invoice/payment receipt to credit grant adapter                  |
+| `@resvary/sdk/funding`     | Durable Arc funding worker                                                  |
+| `@resvary/circle`          | Circle Gateway Nanopayments and HTTP handlers                               |
 | `@resvary/sqlite`          | Persistent credit and payment receipt stores                                |
 | `@resvary/sdk/receipts`    | Stablecoin invoices, proofs, payment receipts, signed webhooks              |
 | `@resvary/sdk/middleware`  | Compatible legacy x402 Express and Next.js paywalls                         |
@@ -139,7 +167,8 @@ The old payment operations APIs remain under `/api/receipts`, `/api/receipts/pro
 - SQLite mutations use `BEGIN IMMEDIATE` and store the balance change, receipt, idempotency result, and outbox event together.
 - Credits are closed-loop product credits. Resvary does not support user-to-user transfer, cash-out, redemption, custody, tax invoices, subscriptions, or marketplace balances.
 - SQLite is intended for local, single-node, and design-partner deployments. Postgres and a self-hosted HTTP service are later milestones.
-- Arc funding is Testnet-first and is not a production money-flow claim.
+- Direct Arc and Gateway funding are Testnet-only and are not production money-flow claims.
+- Resvary stores authorization hashes and normalized evidence, never buyer private keys or full Gateway signatures.
 
 ## Documentation
 
@@ -147,7 +176,11 @@ The old payment operations APIs remain under `/api/receipts`, `/api/receipts/pro
 - [Usage rating](docs/usage-rating.md)
 - [Architecture](docs/architecture.md)
 - [SQLite persistence](docs/persistence.md)
-- [Arc credit funding](docs/arc-credit-funding.md)
+- [Direct Arc credit funding](docs/arc-credit-funding.md)
+- [Circle Gateway funding](docs/circle-gateway-funding.md)
+- [Funding recovery](docs/funding-recovery.md)
+- [Migrate from 0.3 to 0.4](docs/migration-0.4.md)
+- [Release evidence checklist](docs/evidence/circle-funding-proof.md)
 - [Migration from legacy billing](docs/migration-to-credits.md)
 - [Security and legal model](docs/credit-security-model.md)
 - [Demo walkthrough](docs/demo-script.md)

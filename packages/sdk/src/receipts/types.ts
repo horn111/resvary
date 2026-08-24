@@ -4,13 +4,7 @@
 
 export type StablecoinSymbol = 'USDC' | 'EURC';
 
-export type InvoiceStatus =
-  | 'open'
-  | 'observed'
-  | 'paid'
-  | 'expired'
-  | 'refunded'
-  | 'void';
+export type InvoiceStatus = 'open' | 'observed' | 'paid' | 'expired' | 'refunded' | 'void';
 
 export type ReceiptStatus = 'paid' | 'refunded';
 
@@ -140,7 +134,10 @@ export type WebhookEventType =
   | 'credit.expired'
   | 'usage.charged'
   | 'funding.intent.created'
+  | 'funding.accepted'
   | 'funding.confirmed'
+  | 'funding.settled'
+  | 'funding.reconciliation_required'
   | 'funding.failed';
 
 export interface WebhookEvent<TData = unknown> {

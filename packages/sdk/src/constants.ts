@@ -39,15 +39,6 @@ export const ARC_TESTNET: NetworkConfig = {
   cctpDomainId: 26,
 } as const;
 
-/** Arc Mainnet configuration (placeholder — launching Summer 2026) */
-export const ARC_MAINNET: NetworkConfig = {
-  chainId: 0, // TBD
-  rpcUrl: '', // TBD
-  name: 'Arc Mainnet',
-  usdcAddress: '0x0000000000000000000000000000000000000000', // TBD
-  explorerUrl: '', // TBD
-} as const;
-
 /** Default configuration values */
 export const DEFAULTS = {
   network: 'arc-testnet',

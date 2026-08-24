@@ -1,9 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import {
-  encodeAbiParameters,
-  encodeEventTopics,
-  parseAbiItem,
-} from 'viem';
+import { encodeAbiParameters, encodeEventTopics, parseAbiItem } from 'viem';
 import { ARC_TESTNET_CONTRACTS } from '../constants.js';
 import { ReceiptLedger } from './ledger.js';
 import { ARC_MEMO_ABI, createMemoPaymentRequest } from './memo-payment.js';
@@ -14,7 +10,9 @@ const seller = '0x1111111111111111111111111111111111111111' as const;
 const buyer = '0x2222222222222222222222222222222222222222' as const;
 const txHash = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' as const;
 const blockHash = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' as const;
-const transferEvent = parseAbiItem('event Transfer(address indexed from,address indexed to,uint256 value)');
+const transferEvent = parseAbiItem(
+  'event Transfer(address indexed from,address indexed to,uint256 value)',
+);
 const memoEvent = ARC_MEMO_ABI.find((item) => item.type === 'event' && item.name === 'Memo');
 
 describe('ReceiptWatcher', () => {
@@ -58,10 +56,12 @@ describe('ReceiptWatcher', () => {
     const request = createMemoPaymentRequest(invoice);
     const publicClient = createMockClient({
       memoLogs: [memoLog(request)],
-      receiptLogs: [transferLog({
-        address: ARC_TESTNET_CONTRACTS.nativeUsdcSystemEmitter,
-        value: 19_000_000_000_000_000_000n,
-      })],
+      receiptLogs: [
+        transferLog({
+          address: ARC_TESTNET_CONTRACTS.nativeUsdcSystemEmitter,
+          value: 19_000_000_000_000_000_000n,
+        }),
+      ],
     });
     const watcher = new ReceiptWatcher({ ledger, publicClient });
 
@@ -77,10 +77,13 @@ describe('ReceiptWatcher', () => {
     const invoice = ledger.createInvoice({ id: 'inv_wrong_hash', amount: '19.00', payTo: seller });
     const request = createMemoPaymentRequest(invoice);
     const publicClient = createMockClient({
-      memoLogs: [memoLog({
-        ...request,
-        callDataHash: '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff' as `0x${string}`,
-      })],
+      memoLogs: [
+        memoLog({
+          ...request,
+          callDataHash:
+            '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff' as `0x${string}`,
+        }),
+      ],
       receiptLogs: [transferLog({ value: 19_000_000n })],
     });
     const watcher = new ReceiptWatcher({ ledger, publicClient });
@@ -132,14 +135,81 @@ describe('ReceiptWatcher', () => {
     secondWatcher.watchInvoice(invoice);
     await secondWatcher.pollOnce();
 
-    expect(secondClient.getLogs).toHaveBeenCalledWith(expect.objectContaining({
-      fromBlock: 12n,
-      toBlock: 13n,
-    }));
+    expect(secondClient.getLogs).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fromBlock: 12n,
+        toBlock: 13n,
+      }),
+    );
+  });
+
+  it('validates Arc chain id before scanning', async () => {
+    const ledger = new ReceiptLedger();
+    const invoice = ledger.createInvoice({ id: 'inv_chain', amount: '1', payTo: seller });
+    const publicClient = {
+      ...createMockClient({ memoLogs: [], receiptLogs: [] }),
+      getChainId: vi.fn().mockResolvedValue(1),
+    };
+    const watcher = new ReceiptWatcher({ ledger, publicClient });
+
+    watcher.watchInvoice(invoice, { fromBlock: 10n });
+    await expect(watcher.pollOnce()).rejects.toThrow(
+      'Receipt watcher chain mismatch: expected 5042002, got 1',
+    );
+    expect(publicClient.getLogs).not.toHaveBeenCalled();
+  });
+
+  it('retries transient RPC failures and scans bounded ranges', async () => {
+    const store = new InMemoryReceiptStore();
+    const ledger = new ReceiptLedger();
+    const invoice = ledger.createInvoice({ id: 'inv_ranges', amount: '1', payTo: seller });
+    const publicClient = createMockClient({
+      latestBlock: 20n,
+      memoLogs: [],
+      receiptLogs: [],
+    });
+    publicClient.getBlockNumber
+      .mockRejectedValueOnce(new Error('temporary RPC failure'))
+      .mockResolvedValue(20n);
+    const watcher = new ReceiptWatcher({
+      ledger,
+      publicClient,
+      cursorStore: store,
+      maxBlockRange: 3,
+      cursorOverlap: 2,
+      retryAttempts: 2,
+      retryBaseDelayMs: 0,
+    });
+
+    watcher.watchInvoice(invoice, { fromBlock: 10n });
+    await watcher.pollOnce();
+
+    expect(publicClient.getBlockNumber).toHaveBeenCalledTimes(2);
+    expect(
+      publicClient.getLogs.mock.calls.map(([query]) => [query.fromBlock, query.toBlock]),
+    ).toEqual([
+      [10n, 12n],
+      [13n, 15n],
+      [16n, 18n],
+      [19n, 19n],
+    ]);
+    const request = createMemoPaymentRequest(invoice);
+    const cursor = await store.getWatcherCursor(
+      createWatcherCursorKey({
+        network: invoice.network,
+        invoiceId: invoice.id,
+        memoId: request.memoId,
+      }),
+    );
+    expect(cursor?.nextFromBlock).toBe(18n);
   });
 });
 
-function createMockClient(params: { memoLogs: unknown[]; receiptLogs: unknown[]; latestBlock?: bigint }) {
+function createMockClient(params: {
+  memoLogs: unknown[];
+  receiptLogs: unknown[];
+  latestBlock?: bigint;
+}) {
   return {
     getBlockNumber: vi.fn().mockResolvedValue(params.latestBlock ?? 12n),
     getLogs: vi.fn().mockResolvedValue(params.memoLogs),

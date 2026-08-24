@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "rail": "circle_gateway_nanopayment",
+  "testnetOnly": true,
+  "proofId": "gateway-proof-20260824183110",
+  "observedAt": "2026-08-24T18:31:16.139Z",
+  "endpoint": "http://localhost:3004/api/credits/gateway",
+  "network": "eip155:5042002",
+  "gatewayDomain": 26,
+  "sellerAddress": "0x4ae8B4E11b05380d0B122D99C1A29050Cf8Eba2d",
+  "payer": "0x1E3f8Fab778Eb5035f629Ac94a80bFf181557985",
+  "amount": "0.01",
+  "amountUnits": "10000",
+  "customerId": "gateway_proof_gateway-proof-20260824183110",
+  "fundingIntentId": "fund_af095f1043618672b7fbd9c6",
+  "fundingTransactionId": "ftx_1f53bd0d102f80b0f7d7b133",
+  "creditGrantId": "grant_635edf1266ec3e2809c21f19",
+  "authorizationHash": "0xe5a084e6d3e0d7171bcaae9fa4eeb2a3d5548f8b5a1db52605612619220287d1",
+  "nonce": "0xd80fe254250fe2d462e65b9945f1b4342a85111c4fe98fea8bac3c47d426e36a",
+  "facilitatorReference": "52fbe79a-542a-42bb-9c91-83b19de98e4a",
+  "acceptedAt": 1787596275678,
+  "settledAt": 1787596275678,
+  "settlementStatus": "settled",
+  "balanceAfterFunding": "0.01",
+  "replay": {
+    "replayed": true,
+    "sameGrant": true,
+    "balanceUnchanged": true
+  },
+  "lifecycle": {
+    "reservationId": "rsv_f4d6557988974d0d718d5107",
+    "usageReceiptId": "urcpt_a974d1fc2536168875460162",
+    "chargedAmount": "0.001",
+    "releasedAmount": "0.001",
+    "balanceAfterUsage": "0.009"
+  },
+  "gatewayBalances": {
+    "before": {
+      "availableUnits": "90000",
+      "available": "0.09"
+    },
+    "after": {
+      "availableUnits": "80000",
+      "available": "0.08"
+    }
+  },
+  "deposit": {
+    "depositTxHash": "0x5e94ca5f97104305ec884129ae61358933123d7efaadee52c9bf5c9208131012",
+    "amount": "0.1",
+    "reusedExistingGatewayBalance": true
+  },
+  "privacy": {
+    "privateKeyRecorded": false,
+    "fullPaymentSignatureRecorded": false
+  }
+}

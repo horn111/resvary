@@ -1,6 +1,6 @@
 {
   "name": "resvary",
-  "version": "0.3.0-alpha.0",
+  "version": "0.4.0-alpha.0",
   "private": true,
   "description": "Open-source prepaid credits and usage billing for AI products",
   "repository": {
@@ -14,14 +14,18 @@
     "apps/*"
   ],
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
+    "build": "npm run build:core && npm run build --workspace=create-resvary && npm run build --workspace=@resvary/demo",
+    "build:core": "npm run build --workspace=@resvary/sdk && npm run build --workspace=@resvary/sqlite && npm run build --workspace=@resvary/circle",
     "dev": "npm run dev --workspace=apps/demo",
     "typecheck": "tsc --noEmit --project packages/sdk/tsconfig.json",
-    "test": "npm run test --workspaces --if-present",
+    "test": "npm run build --workspace=@resvary/sdk && npm run test --workspaces --if-present",
     "clean": "npm run clean --workspaces --if-present && rm -rf node_modules",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
-    "design:check": "node scripts/check-claude-design.mjs"
+    "design:check": "node scripts/check-claude-design.mjs",
+    "proof:build": "npm run build:core",
+    "proof:arc": "npm run proof:build && node examples/arc-testnet-proof.mjs",
+    "proof:gateway": "npm run proof:build && node examples/gateway-nanopayment-proof.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
