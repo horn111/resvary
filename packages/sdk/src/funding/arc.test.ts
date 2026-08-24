@@ -28,13 +28,27 @@ describe('ArcCreditFunding', () => {
       receipt,
       idempotencyKey: 'confirm-1',
     });
+    const rebuiltReceipt = createReceipt(
+      request.invoice,
+      {
+        from: payer,
+        to: payTo,
+        amount: '5.25',
+        memo: request.invoice.memo,
+        txHash,
+      },
+      receipt.createdAt + 1_000,
+    );
+    expect(rebuiltReceipt.id).not.toBe(receipt.id);
     const replay = await funding.confirmPayment({
       fundingIntentId: request.fundingIntent.id,
-      receipt,
+      receipt: rebuiltReceipt,
       idempotencyKey: 'confirm-1',
     });
     expect(first.account.postedAmount).toBe('5.25');
     expect(replay.fundingTransaction.id).toBe(first.fundingTransaction.id);
+    expect(replay.fundingTransaction.paymentReceiptId).toBe(receipt.id);
+    expect(await ledger.listFundingTransactions(request.fundingIntent.id)).toHaveLength(1);
     expect((await ledger.getBalance('cus_1')).postedAmount).toBe('5.25');
   });
 

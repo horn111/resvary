@@ -3,7 +3,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import styles from './interactive-credit-demo.module.css';
 
-type DemoAction = 'grant' | 'run' | 'fail' | 'arc' | 'arc_prepare' | 'arc_confirm';
+type DemoAction =
+  | 'grant'
+  | 'run'
+  | 'fail'
+  | 'arc'
+  | 'arc_prepare'
+  | 'arc_confirm'
+  | 'gateway_prepare'
+  | 'gateway_settle'
+  | 'gateway_replay';
+type FundingMethod = 'arc' | 'gateway';
 
 type ArcFundingRequest = {
   fundingIntentId: string;
@@ -17,6 +27,16 @@ type ArcFundingRequest = {
     txData: string;
     memoId: string;
   };
+};
+
+type GatewayFundingRequest = {
+  fundingIntentId: string;
+  status: 'pending' | 'confirmed' | 'failed';
+  amount: string;
+  rail: 'circle_gateway_nanopayment';
+  network: string;
+  paymentRequired: Record<string, unknown>;
+  buyerCommand: string;
 };
 
 type DemoState = {
@@ -35,6 +55,8 @@ type DemoState = {
   persistence: string;
   arcLiveConfigured: boolean;
   arcFundingRequest: ArcFundingRequest | null;
+  gatewayFundingRequest: GatewayFundingRequest | null;
+  gatewayFundingTransaction: Record<string, unknown> | null;
 };
 
 export function InteractiveCreditDemo() {
@@ -44,6 +66,7 @@ export function InteractiveCreditDemo() {
   const [error, setError] = useState('');
   const [lastRunKey, setLastRunKey] = useState('');
   const [arcTxHash, setArcTxHash] = useState('');
+  const [fundingMethod, setFundingMethod] = useState<FundingMethod>('arc');
   const mutationController = useRef<AbortController | null>(null);
 
   const refresh = useCallback(async (signal?: AbortSignal) => {
@@ -101,7 +124,11 @@ export function InteractiveCreditDemo() {
           action,
           idempotencyKey,
           fundingIntentId:
-            action === 'arc_confirm' ? state?.arcFundingRequest?.fundingIntentId : undefined,
+            action === 'arc_confirm'
+              ? state?.arcFundingRequest?.fundingIntentId
+              : action === 'gateway_settle' || action === 'gateway_replay'
+                ? state?.gatewayFundingRequest?.fundingIntentId
+                : undefined,
           txHash: action === 'arc_confirm' ? arcTxHash.trim() : undefined,
         }),
         signal: controller.signal,
@@ -125,7 +152,13 @@ export function InteractiveCreditDemo() {
                   ? 'Live Arc Testnet funding request created.'
                   : action === 'arc_confirm'
                     ? 'Arc Testnet payment verified and credits granted once.'
-                    : 'Usage committed and the unused reservation was released.',
+                    : action === 'gateway_prepare'
+                      ? 'Gateway Nanopayment funding request created.'
+                      : action === 'gateway_settle'
+                        ? 'Gateway payment settled and credits granted once.'
+                        : action === 'gateway_replay'
+                          ? 'The same Gateway authorization returned the stored grant.'
+                          : 'Usage committed and the unused reservation was released.',
       );
     } catch (requestError) {
       if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
@@ -144,6 +177,7 @@ export function InteractiveCreditDemo() {
   const latestReservation = state?.reservations.at(-1) ?? { status: 'No reservation yet' };
   const latestReceipt = state?.receipts.at(-1) ?? { status: 'No usage receipt yet' };
   const latestFunding = state?.arcLiveFundingTransaction ?? null;
+  const latestGatewayFunding = state?.gatewayFundingTransaction ?? null;
   const ledger = state?.ledgerEntries.slice(-6) ?? [];
   const explorerUrl = getExplorerUrl(latestFunding);
 
@@ -183,21 +217,79 @@ export function InteractiveCreditDemo() {
         >
           Simulate failure
         </button>
-        <button disabled={Boolean(busy)} onClick={() => void run('arc')} type="button">
-          Simulate Arc $2
-        </button>
+      </div>
+
+      <div className={styles.actions} aria-label="Funding method">
         <button
-          disabled={Boolean(busy) || !state?.arcLiveConfigured}
-          onClick={() => void run('arc_prepare')}
-          title={
-            state?.arcLiveConfigured
-              ? 'Create calldata for a real Arc Testnet payment'
-              : 'Set RESVARY_ARC_FUNDING_RECIPIENT to enable live proof'
-          }
+          className={fundingMethod === 'arc' ? styles.primaryAction : undefined}
+          disabled={Boolean(busy)}
+          onClick={() => setFundingMethod('arc')}
           type="button"
         >
-          Create live Arc request
+          Arc USDC
         </button>
+        <button
+          className={fundingMethod === 'gateway' ? styles.primaryAction : undefined}
+          disabled={Boolean(busy)}
+          onClick={() => setFundingMethod('gateway')}
+          type="button"
+        >
+          Gateway Nanopayment
+        </button>
+      </div>
+
+      <div className={styles.actions} aria-label="Funding actions">
+        {fundingMethod === 'arc' ? (
+          <>
+            <button disabled={Boolean(busy)} onClick={() => void run('arc')} type="button">
+              Simulate Arc $2
+            </button>
+            <button
+              disabled={Boolean(busy) || !state?.arcLiveConfigured}
+              onClick={() => void run('arc_prepare')}
+              title={
+                state?.arcLiveConfigured
+                  ? 'Create calldata for a real Arc Testnet payment'
+                  : 'Set RESVARY_ARC_FUNDING_RECIPIENT to enable live proof'
+              }
+              type="button"
+            >
+              Create live Arc request
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              disabled={Boolean(busy)}
+              onClick={() => void run('gateway_prepare')}
+              type="button"
+            >
+              Create Gateway request
+            </button>
+            <button
+              disabled={
+                Boolean(busy) ||
+                !state?.gatewayFundingRequest ||
+                state.gatewayFundingRequest.status !== 'pending'
+              }
+              onClick={() => void run('gateway_settle')}
+              type="button"
+            >
+              Verify, settle, and credit
+            </button>
+            <button
+              disabled={
+                Boolean(busy) ||
+                !state?.gatewayFundingRequest ||
+                state.gatewayFundingRequest.status !== 'confirmed'
+              }
+              onClick={() => void run('gateway_replay')}
+              type="button"
+            >
+              Replay authorization
+            </button>
+          </>
+        )}
       </div>
 
       <div className={styles.statusRow}>
@@ -217,6 +309,41 @@ export function InteractiveCreditDemo() {
         <Metric label="Reserved" value={state?.balance?.reservedAmount ?? '0'} />
         <Metric label="Available" value={state?.balance?.availableAmount ?? '0'} />
       </dl>
+
+      {state?.gatewayFundingRequest ? (
+        <section className={styles.arcProof} aria-labelledby="gateway-proof-title">
+          <div className={styles.arcProofHeading}>
+            <div>
+              <span className={styles.label}>Circle Gateway � Arc Testnet</span>
+              <h4 id="gateway-proof-title">
+                {state.gatewayFundingRequest.status === 'confirmed'
+                  ? 'Settled once; replay returns the same grant'
+                  : 'One Nanopayment funds the credit ledger'}
+              </h4>
+            </div>
+            <span className={styles.arcAmount}>{state.gatewayFundingRequest.amount} USDC</span>
+          </div>
+          <p className={styles.arcInstructions}>
+            This deterministic demo uses the same verify � settle � credit adapter with a local
+            facilitator fixture. The public evidence flow replaces that fixture with Circle&apos;s
+            Testnet facilitator and records its settlement reference.
+          </p>
+          <dl className={styles.arcDetails}>
+            <ArcDetail label="Rail" value={state.gatewayFundingRequest.rail} />
+            <ArcDetail label="Network" value={state.gatewayFundingRequest.network} />
+            <ArcDetail label="Buyer example" value={state.gatewayFundingRequest.buyerCommand} />
+          </dl>
+          <div className={styles.arcResult}>
+            <Record
+              title="x402 payment requirements"
+              value={state.gatewayFundingRequest.paymentRequired}
+            />
+            {latestGatewayFunding ? (
+              <Record title="Gateway payment!� credit grant" value={latestGatewayFunding} />
+            ) : null}
+          </div>
+        </section>
+      ) : null}
 
       {state?.arcFundingRequest ? (
         <section className={styles.arcProof} aria-labelledby="arc-proof-title">

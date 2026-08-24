@@ -119,7 +119,7 @@ const copyReplacements = [
   ],
   [
     'Resvary 0.3 validates the embedded credit domain, SQLite persistence, starter integration, and Arc Testnet funding path. It does not claim to provide a hosted billing service or a complete financial stack.',
-    'Resvary 0.3 includes the embedded credit domain, SQLite persistence, starter integration, and Arc Testnet funding. Hosted billing, Postgres, and multi-node deployment remain planned work.',
+    'Resvary 0.4 includes the embedded credit domain, SQLite persistence, direct Arc Testnet funding, and Gateway Nanopayment funding. Hosted billing, Postgres, mainnet settlement, and multi-node deployment remain planned work.',
   ],
   [
     'Resvary ships as an Apache-2.0 TypeScript monorepo. You can inspect the balance rules, run the test suite, use the embedded store interface, and extend funding without sending usage data to a hosted billing vendor.',
@@ -134,6 +134,7 @@ const copyReplacements = [
     'Resvary is free software under Apache-2.0, and self-hosting is the only way to run it right now. A managed service is on the roadmap for teams that would rather not operate the ledger themselves — nothing is billable yet.',
     'Run Resvary in your application today. Design-partner reviews are available for a small number of AI teams. A managed service remains a roadmap item with no launch date or price.',
   ],
+  ['Unchanged  Resvary never holds customer funds', 'Resvary never holds customer funds'],
   ['>Self-hosted</span>', '>Open-source alpha</span>'],
   ['>$0</span>', '>Apache-2.0</span>'],
   ['>Apache-2.0, available now</span>', '>Source available now</span>'],
@@ -174,6 +175,8 @@ for (const [currentCopy, improvedCopy] of copyReplacements) {
   }
   markup = markup.replaceAll(currentCopy, improvedCopy);
 }
+
+markup = markup.replaceAll('0.3 alpha', '0.4 alpha');
 
 markup = markup
   .replaceAll('href="https://resvary.vercel.app"', 'href="#interactive-demo"')

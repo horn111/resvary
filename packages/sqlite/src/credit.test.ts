@@ -1,6 +1,7 @@
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { describe, expect, it } from 'vitest';
 import { CreditLedger, InsufficientCreditsError, type CreditAccount } from '@resvary/sdk/credits';
 import { createSqliteCreditStore } from './credit.js';
@@ -56,6 +57,112 @@ describe('SqliteCreditStore', () => {
     expect(replay.account.postedAmount).toBe('2');
     expect((await second.getBalance('cus_1')).postedAmount).toBe('1.996');
     secondStore.close();
+  });
+
+  it('migrates v1 funding records to the v2 rail and settlement model', async () => {
+    const path = tempDatabasePath();
+    const database = new DatabaseSync(path);
+    const txHash = `0x${'ab'.repeat(32)}`;
+    const intent = {
+      id: 'fund_v1',
+      projectId: 'project_v1',
+      customerId: 'customer_v1',
+      accountId: 'account_v1',
+      status: 'confirmed',
+      requestedAmount: '2',
+      requestedUnits: '2000000',
+      network: 'arc-testnet',
+      invoiceId: 'invoice_v1',
+      createdAt: 100,
+      confirmedAt: 200,
+    };
+    const transaction = {
+      id: 'ftx_v1',
+      fundingIntentId: intent.id,
+      projectId: intent.projectId,
+      customerId: intent.customerId,
+      accountId: intent.accountId,
+      network: intent.network,
+      txHash,
+      amount: '2',
+      amountUnits: '2000000',
+      paymentReceiptId: 'receipt_v1',
+      grantId: 'grant_v1',
+      payer: '0x2222222222222222222222222222222222222222',
+      createdAt: 200,
+    };
+    database.exec(`
+      CREATE TABLE resvary_schema_migrations (
+        version INTEGER PRIMARY KEY,
+        applied_at INTEGER NOT NULL
+      );
+      INSERT INTO resvary_schema_migrations(version, applied_at) VALUES (1, 1);
+      CREATE TABLE resvary_funding_intents (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL,
+        customer_id TEXT NOT NULL,
+        status TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        payload TEXT NOT NULL
+      );
+      CREATE TABLE resvary_funding_transactions (
+        id TEXT PRIMARY KEY,
+        funding_intent_id TEXT NOT NULL,
+        network TEXT NOT NULL,
+        tx_hash_norm TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        payload TEXT NOT NULL,
+        UNIQUE(network, tx_hash_norm)
+      );
+    `);
+    database
+      .prepare(
+        'INSERT INTO resvary_funding_intents(id, project_id, customer_id, status, created_at, payload) VALUES (?, ?, ?, ?, ?, ?)',
+      )
+      .run(
+        intent.id,
+        intent.projectId,
+        intent.customerId,
+        intent.status,
+        intent.createdAt,
+        JSON.stringify(intent),
+      );
+    database
+      .prepare(
+        'INSERT INTO resvary_funding_transactions(id, funding_intent_id, network, tx_hash_norm, created_at, payload) VALUES (?, ?, ?, ?, ?, ?)',
+      )
+      .run(
+        transaction.id,
+        transaction.fundingIntentId,
+        transaction.network,
+        txHash.toLowerCase(),
+        transaction.createdAt,
+        JSON.stringify(transaction),
+      );
+    database.close();
+
+    const store = createSqliteCreditStore({ path });
+    expect(await store.getFundingIntent(intent.id)).toMatchObject({ rail: 'arc_direct' });
+    expect(
+      await store.getFundingTransactionByExternalPayment('arc_direct', intent.network, txHash),
+    ).toMatchObject({
+      externalPaymentId: txHash,
+      rail: 'arc_direct',
+      settlementStatus: 'settled',
+      acceptedAt: transaction.createdAt,
+      settledAt: transaction.createdAt,
+    });
+    store.close();
+
+    const migrated = new DatabaseSync(path);
+    expect(
+      (
+        migrated.prepare('SELECT MAX(version) AS version FROM resvary_schema_migrations').get() as {
+          version: number;
+        }
+      ).version,
+    ).toBe(2);
+    migrated.close();
   });
 
   it('rolls a failed transaction back completely', async () => {
@@ -114,6 +221,76 @@ describe('SqliteCreditStore', () => {
       InsufficientCreditsError,
     );
     expect((await ledger.getBalance('cus_1')).availableAmount).toBe('0');
+    store.close();
+  });
+
+  it('keys funding uniqueness by rail, network, and external payment id', async () => {
+    const store = createSqliteCreditStore({ path: tempDatabasePath() });
+    const ledger = new CreditLedger({ projectId: 'project_funding', store });
+    const externalPaymentId = `0x${'aa'.repeat(32)}`;
+
+    const direct = await ledger.createFundingIntent({
+      customerId: 'cus_direct',
+      amount: '1',
+      rail: 'arc_direct',
+      network: 'arc-testnet',
+      invoiceId: 'invoice_direct',
+      idempotencyKey: 'intent_direct',
+    });
+    const gateway = await ledger.createFundingIntent({
+      customerId: 'cus_gateway',
+      amount: '1',
+      rail: 'circle_gateway_nanopayment',
+      network: 'arc-testnet',
+      invoiceId: 'invoice_gateway',
+      idempotencyKey: 'intent_gateway',
+    });
+
+    await ledger.confirmFunding({
+      fundingIntentId: direct.id,
+      rail: 'arc_direct',
+      network: 'arc-testnet',
+      externalPaymentId,
+      txHash: externalPaymentId as `0x${string}`,
+      amount: '1',
+      paymentReceiptId: 'receipt_direct',
+      idempotencyKey: 'confirm_direct',
+    });
+    await ledger.confirmFunding({
+      fundingIntentId: gateway.id,
+      rail: 'circle_gateway_nanopayment',
+      network: 'arc-testnet',
+      externalPaymentId,
+      txHash: externalPaymentId as `0x${string}`,
+      amount: '1',
+      paymentReceiptId: 'receipt_gateway',
+      requireExactAmount: true,
+      idempotencyKey: 'confirm_gateway',
+    });
+
+    expect(await ledger.listFundingTransactions()).toHaveLength(2);
+
+    const duplicate = await ledger.createFundingIntent({
+      customerId: 'cus_duplicate',
+      amount: '1',
+      rail: 'circle_gateway_nanopayment',
+      network: 'arc-testnet',
+      invoiceId: 'invoice_duplicate',
+      idempotencyKey: 'intent_duplicate',
+    });
+    await expect(
+      ledger.confirmFunding({
+        fundingIntentId: duplicate.id,
+        rail: 'circle_gateway_nanopayment',
+        network: 'arc-testnet',
+        externalPaymentId,
+        amount: '1',
+        paymentReceiptId: 'receipt_duplicate',
+        requireExactAmount: true,
+        idempotencyKey: 'confirm_duplicate',
+      }),
+    ).rejects.toThrow('already assigned');
+
     store.close();
   });
 });

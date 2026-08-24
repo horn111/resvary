@@ -29,9 +29,19 @@ export {
 
 export * from './credits/index.js';
 export { createMeterDefinition, createPriceVersion, rateUsage } from './pricing/index.js';
-export { ArcCreditFunding, type ArcCreditFundingConfig, type ArcFundingRequest } from './funding/index.js';
+export {
+  ArcCreditFunding,
+  type ArcCreditFundingConfig,
+  type ArcFundingRequest,
+} from './funding/index.js';
 
-export { GatewayClient, type GatewayClientConfig } from './gateway/client.js';
+export {
+  ArcWalletBalanceClient,
+  GatewayClient,
+  ARC_NATIVE_USDC_DECIMALS,
+  type ArcWalletBalanceClientConfig,
+  type GatewayClientConfig,
+} from './gateway/client.js';
 
 export {
   ReceiptWatcher,
@@ -83,7 +93,7 @@ export {
   type WebhookRouteResult,
 } from './receipts/index.js';
 
-export { ARC_TESTNET, ARC_TESTNET_CONTRACTS, ARC_MAINNET, USDC_DECIMALS } from './constants.js';
+export { ARC_TESTNET, ARC_TESTNET_CONTRACTS, USDC_DECIMALS } from './constants.js';
 
 export type {
   PaymentRequirements,

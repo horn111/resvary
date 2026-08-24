@@ -22,7 +22,7 @@ describe('starter templates', () => {
     };
     expect(ai.type).toBe('module');
     expect(ai.engines.node).toBe('>=24');
-    expect(ai.dependencies['@resvary/sqlite']).toBe('^0.3.0-alpha.0');
+    expect(ai.dependencies['@resvary/sqlite']).toBe('^0.4.0-alpha.0');
 
     const legacy = JSON.parse(packageTemplate({ ...base, template: 'paid-api' })) as {
       engines: { node: string };

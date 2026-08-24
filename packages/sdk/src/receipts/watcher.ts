@@ -16,7 +16,12 @@ import { ARC_TESTNET, USDC_DECIMALS } from '../constants.js';
 import { createMemoPaymentRequest, ERC20_TRANSFER_ABI } from './memo-payment.js';
 import { createMemoPaymentProofFromReceipt } from './proof.js';
 import { createWatcherCursorKey, type ReceiptStore } from './store.js';
-import type { PaymentInvoice, PaymentReceipt, MemoPaymentRequest, ObservedPayment } from './types.js';
+import type {
+  PaymentInvoice,
+  PaymentReceipt,
+  MemoPaymentRequest,
+  ObservedPayment,
+} from './types.js';
 
 const MEMO_EVENT = parseAbiItem(
   'event Memo(address indexed sender,address indexed target,bytes32 callDataHash,bytes32 indexed memoId,bytes memo,uint256 memoIndex)',
@@ -25,7 +30,8 @@ const MEMO_EVENT = parseAbiItem(
 export type ReceiptWatcherClient = Pick<
   PublicClient,
   'getBlockNumber' | 'getLogs' | 'getTransactionReceipt'
->;
+> &
+  Partial<Pick<PublicClient, 'getChainId'>>;
 
 type MemoLog = {
   transactionHash?: `0x${string}` | null;
@@ -66,7 +72,10 @@ type MaybePromise<T> = T | Promise<T>;
 
 export interface ReceiptLedgerWriter {
   recordPayment(invoiceId: string, payment: ObservedPayment): MaybePromise<PaymentReceipt>;
-  getReceiptByTxHash(txHash: `0x${string}`, invoiceId?: string): MaybePromise<PaymentReceipt | undefined>;
+  getReceiptByTxHash(
+    txHash: `0x${string}`,
+    invoiceId?: string,
+  ): MaybePromise<PaymentReceipt | undefined>;
 }
 
 export interface ReceiptWatcherConfig {
@@ -77,6 +86,11 @@ export interface ReceiptWatcherConfig {
   fromBlock?: bigint;
   confirmations?: number;
   pollIntervalMs?: number;
+  expectedChainId?: number;
+  maxBlockRange?: number;
+  cursorOverlap?: number;
+  retryAttempts?: number;
+  retryBaseDelayMs?: number;
   onReceipt?: (receipt: PaymentReceipt, invoice: PaymentInvoice) => void | Promise<void>;
   onEvent?: (event: ReceiptWatcherLifecycleEvent) => void | Promise<void>;
   onError?: (error: unknown) => void;
@@ -88,6 +102,11 @@ export class ReceiptWatcher {
   private readonly client: ReceiptWatcherClient;
   private readonly confirmations: bigint;
   private readonly pollIntervalMs: number;
+  private readonly expectedChainId: number;
+  private readonly maxBlockRange: bigint;
+  private readonly cursorOverlap: bigint;
+  private readonly retryAttempts: number;
+  private readonly retryBaseDelayMs: number;
   private readonly fromBlock?: bigint;
   private readonly onReceipt?: ReceiptWatcherConfig['onReceipt'];
   private readonly onEvent?: ReceiptWatcherConfig['onEvent'];
@@ -99,12 +118,24 @@ export class ReceiptWatcher {
   constructor(config: ReceiptWatcherConfig) {
     this.ledger = config.ledger;
     this.cursorStore = config.cursorStore;
-    this.client = config.publicClient ?? createPublicClient({
-      transport: http(config.rpcUrl ?? ARC_TESTNET.rpcUrl),
-    });
+    this.client =
+      config.publicClient ??
+      createPublicClient({
+        transport: http(config.rpcUrl ?? ARC_TESTNET.rpcUrl),
+      });
     this.confirmations = BigInt(config.confirmations ?? 1);
     this.pollIntervalMs = config.pollIntervalMs ?? 5_000;
+    this.expectedChainId = config.expectedChainId ?? ARC_TESTNET.chainId;
+    this.maxBlockRange = BigInt(config.maxBlockRange ?? 2_000);
+    this.cursorOverlap = BigInt(config.cursorOverlap ?? 0);
+    this.retryAttempts = config.retryAttempts ?? 3;
+    this.retryBaseDelayMs = config.retryBaseDelayMs ?? 250;
     this.fromBlock = config.fromBlock;
+    if (this.maxBlockRange <= 0n) throw new Error('maxBlockRange must be positive');
+    if (this.cursorOverlap < 0n) throw new Error('cursorOverlap cannot be negative');
+    if (!Number.isSafeInteger(this.retryAttempts) || this.retryAttempts < 1) {
+      throw new Error('retryAttempts must be a positive integer');
+    }
     this.onReceipt = config.onReceipt;
     this.onEvent = config.onEvent;
     this.onError = config.onError;
@@ -127,10 +158,16 @@ export class ReceiptWatcher {
       return [];
     }
 
-    const latestBlock = await this.client.getBlockNumber();
-    const toBlock = latestBlock > this.confirmations
-      ? latestBlock - this.confirmations
-      : 0n;
+    if (this.client.getChainId) {
+      const chainId = await this.withRetry(() => this.client.getChainId!());
+      if (chainId !== this.expectedChainId) {
+        throw new Error(
+          `Receipt watcher chain mismatch: expected ${this.expectedChainId}, got ${chainId}`,
+        );
+      }
+    }
+    const latestBlock = await this.withRetry(() => this.client.getBlockNumber());
+    const toBlock = latestBlock > this.confirmations ? latestBlock - this.confirmations : 0n;
     const receipts: PaymentReceipt[] = [];
 
     for (const invoice of this.invoices.values()) {
@@ -140,16 +177,21 @@ export class ReceiptWatcher {
         continue;
       }
 
-      await this.emit({
-        type: 'watcher.poll',
-        fromBlock,
-        toBlock,
-        invoiceCount: this.invoices.size,
-      });
+      let chunkFrom = fromBlock;
+      while (chunkFrom <= toBlock) {
+        const chunkTo = minBigInt(toBlock, chunkFrom + this.maxBlockRange - 1n);
+        await this.emit({
+          type: 'watcher.poll',
+          fromBlock: chunkFrom,
+          toBlock: chunkTo,
+          invoiceCount: this.invoices.size,
+        });
 
-      const invoiceReceipts = await this.pollInvoice(invoice, request, fromBlock, toBlock);
-      receipts.push(...invoiceReceipts);
-      await this.saveCursor(invoice, request, toBlock + 1n);
+        const invoiceReceipts = await this.pollInvoice(invoice, request, chunkFrom, chunkTo);
+        receipts.push(...invoiceReceipts);
+        await this.saveCursor(invoice, request, chunkTo + 1n);
+        chunkFrom = chunkTo + 1n;
+      }
     }
 
     return receipts;
@@ -183,13 +225,15 @@ export class ReceiptWatcher {
     fromBlock: bigint,
     toBlock: bigint,
   ): Promise<PaymentReceipt[]> {
-    const memoLogs = await this.client.getLogs({
-      address: request.memoContract,
-      event: MEMO_EVENT,
-      args: { memoId: request.memoId },
-      fromBlock,
-      toBlock,
-    }) as MemoLog[];
+    const memoLogs = (await this.withRetry(() =>
+      this.client.getLogs({
+        address: request.memoContract,
+        event: MEMO_EVENT,
+        args: { memoId: request.memoId },
+        fromBlock,
+        toBlock,
+      }),
+    )) as MemoLog[];
 
     const receipts: PaymentReceipt[] = [];
 
@@ -220,7 +264,9 @@ export class ReceiptWatcher {
       blockNumber: match.blockNumber,
     });
 
-    const txReceipt = await this.client.getTransactionReceipt({ hash: match.txHash });
+    const txReceipt = await this.withRetry(() =>
+      this.client.getTransactionReceipt({ hash: match.txHash }),
+    );
     if (txReceipt.status !== 'success') {
       return null;
     }
@@ -304,7 +350,9 @@ export class ReceiptWatcher {
     request: MemoPaymentRequest,
     nextFromBlock: bigint,
   ): Promise<void> {
-    this.cursors.set(invoice.id, nextFromBlock);
+    const persistedFromBlock =
+      nextFromBlock > this.cursorOverlap ? nextFromBlock - this.cursorOverlap : 0n;
+    this.cursors.set(invoice.id, persistedFromBlock);
 
     if (!this.cursorStore) {
       return;
@@ -316,15 +364,31 @@ export class ReceiptWatcher {
       invoiceId: invoice.id,
       memoId: request.memoId,
       network: invoice.network,
-      nextFromBlock,
+      nextFromBlock: persistedFromBlock,
       updatedAt: Date.now(),
     });
     await this.emit({
       type: 'watcher.cursor_saved',
       invoiceId: invoice.id,
       cursorKey,
-      nextFromBlock,
+      nextFromBlock: persistedFromBlock,
     });
+  }
+
+  private async withRetry<T>(operation: () => Promise<T>): Promise<T> {
+    let lastError: unknown;
+    for (let attempt = 0; attempt < this.retryAttempts; attempt += 1) {
+      try {
+        return await operation();
+      } catch (error) {
+        lastError = error;
+        if (attempt + 1 >= this.retryAttempts) break;
+        const exponential = this.retryBaseDelayMs * 2 ** attempt;
+        const jitter = Math.floor(Math.random() * Math.max(1, this.retryBaseDelayMs));
+        await new Promise((resolve) => setTimeout(resolve, exponential + jitter));
+      }
+    }
+    throw lastError;
   }
 
   private getCursorKey(invoice: PaymentInvoice, request: MemoPaymentRequest): string {
@@ -419,9 +483,15 @@ function hasCompleteMemoArgs(args: MemoLog['args']): args is CompleteMemoArgs {
 }
 
 function memoArgsMatchRequest(args: CompleteMemoArgs, request: MemoPaymentRequest): boolean {
-  return sameAddress(args.target, request.target)
-    && args.memoId.toLowerCase() === request.memoId.toLowerCase()
-    && args.callDataHash.toLowerCase() === request.callDataHash.toLowerCase();
+  return (
+    sameAddress(args.target, request.target) &&
+    args.memoId.toLowerCase() === request.memoId.toLowerCase() &&
+    args.callDataHash.toLowerCase() === request.callDataHash.toLowerCase()
+  );
+}
+
+function minBigInt(a: bigint, b: bigint): bigint {
+  return a < b ? a : b;
 }
 
 function sameAddress(a: `0x${string}`, b: `0x${string}`): boolean {

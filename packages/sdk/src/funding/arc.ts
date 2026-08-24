@@ -12,12 +12,14 @@ import {
   type MemoPaymentRequest,
   type PaymentInvoice,
   type PaymentReceipt,
+  type ReceiptStore,
 } from '../receipts/index.js';
 
 export interface ArcCreditFundingConfig {
   ledger: CreditLedger;
   payTo: `0x${string}`;
   network?: string;
+  receiptStore?: ReceiptStore;
 }
 
 export interface ArcFundingRequest {
@@ -30,11 +32,13 @@ export class ArcCreditFunding {
   private readonly ledger: CreditLedger;
   private readonly payTo: `0x${string}`;
   private readonly network: string;
+  private readonly receiptStore?: ReceiptStore;
 
   constructor(config: ArcCreditFundingConfig) {
     this.ledger = config.ledger;
     this.payTo = config.payTo;
     this.network = config.network ?? 'arc-testnet';
+    this.receiptStore = config.receiptStore;
   }
 
   async createFundingRequest(input: {
@@ -61,12 +65,14 @@ export class ArcCreditFunding {
       id: fundingIntentId,
       customerId: input.customerId,
       amount: input.amount,
+      rail: 'arc_direct',
       network: this.network,
       invoiceId: invoice.id,
       idempotencyKey: input.idempotencyKey,
       metadata: input.metadata,
     });
 
+    await this.receiptStore?.saveInvoice(invoice);
     return { fundingIntent, invoice, paymentRequest: createMemoPaymentRequest(invoice) };
   }
 
@@ -98,11 +104,24 @@ export class ArcCreditFunding {
 
     return this.ledger.confirmFunding({
       fundingIntentId: intent.id,
+      rail: 'arc_direct',
       network: input.receipt.network,
+      externalPaymentId: input.receipt.txHash,
       txHash: input.receipt.txHash,
       amount: input.receipt.amount,
       paymentReceiptId: input.receipt.id,
       payer: input.receipt.payer,
+      settlementStatus: 'settled',
+      evidence: {
+        payer: input.receipt.payer,
+        recipient: input.receipt.payTo,
+        explorerUrl: input.receipt.onchainProof?.explorerUrl,
+        blockNumber: input.receipt.blockNumber?.toString(),
+        metadata: {
+          memoId: input.receipt.onchainProof?.memoId,
+          callDataHash: input.receipt.onchainProof?.callDataHash,
+        },
+      },
       idempotencyKey: input.idempotencyKey,
       metadata: input.metadata,
     });

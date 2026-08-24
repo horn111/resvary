@@ -8,7 +8,7 @@
 
 ## Prepaid credits alpha
 
-The `0.3.0-alpha` credit engine is intended for evaluation and design-partner deployments. SQLite is a local or single-node backend, not a multi-node production datastore.
+The `0.4.0-alpha.0` credit engine is intended for evaluation and design-partner deployments. SQLite is a local or single-node backend, not a multi-node production datastore.
 
 - Authorize `customerId`, grants, adjustments, price IDs, and project scope on the server.
 - Never expose admin grant or adjustment operations directly to an untrusted client.

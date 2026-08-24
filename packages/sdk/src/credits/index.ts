@@ -30,6 +30,7 @@ export {
   type RunMeteredCallbackResult,
   type RunMeteredInput,
   type RunMeteredResult,
+  type UpdateFundingSettlementInput,
 } from './ledger.js';
 export {
   InMemoryCreditStore,
@@ -50,8 +51,11 @@ export type {
   CreditOutboxEvent,
   CreditReservation,
   IdempotencyRecord,
+  FundingEvidence,
   FundingIntent,
   FundingIntentStatus,
+  FundingRail,
+  FundingSettlementStatus,
   FundingTransaction,
   LedgerBucket,
   LedgerEntry,

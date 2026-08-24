@@ -3,7 +3,7 @@ import type { ProjectConfig } from '../prompts.js';
 export function packageTemplate(config: ProjectConfig): string {
   const isExpress = config.framework === 'express';
   const sqliteDependency =
-    config.template === 'ai-credits' ? `,\n    "@resvary/sqlite": "^0.3.0-alpha.0"` : '';
+    config.template === 'ai-credits' ? `,\n    "@resvary/sqlite": "^0.4.0-alpha.0"` : '';
   const minimumNode = config.template === 'ai-credits' ? '24' : '20';
 
   return `{
@@ -20,7 +20,7 @@ export function packageTemplate(config: ProjectConfig): string {
     }
   },
   "dependencies": {
-    "@resvary/sdk": "^0.3.0-alpha.0"${sqliteDependency},
+    "@resvary/sdk": "^0.4.0-alpha.0"${sqliteDependency},
     ${
       isExpress
         ? `"express": "^4.18.2"`

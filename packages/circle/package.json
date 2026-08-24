@@ -1,0 +1,68 @@
+{
+  "name": "@resvary/circle",
+  "version": "0.4.0-alpha.0",
+  "description": "Circle-native Arc and Gateway funding adapters for Resvary prepaid credits",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./arc": {
+      "types": "./dist/arc.d.ts",
+      "import": "./dist/arc.js"
+    },
+    "./gateway": {
+      "types": "./dist/gateway.d.ts",
+      "import": "./dist/gateway.js"
+    },
+    "./nanopayments": {
+      "types": "./dist/nanopayments.d.ts",
+      "import": "./dist/nanopayments.js"
+    },
+    "./handlers": {
+      "types": "./dist/handlers.d.ts",
+      "import": "./dist/handlers.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "node -e \"const fs=require('node:fs');fs.rmSync('dist',{recursive:true,force:true});fs.rmSync('tsconfig.tsbuildinfo',{force:true})\"",
+    "test": "vitest run src",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "circle",
+    "arc",
+    "gateway",
+    "nanopayments",
+    "x402",
+    "prepaid-credits"
+  ],
+  "author": "horn111",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/horn111/resvary.git",
+    "directory": "packages/circle"
+  },
+  "dependencies": {
+    "@circle-fin/x402-batching": "^3.3.0",
+    "@resvary/sdk": "*",
+    "@x402/core": "^2.23.0",
+    "@x402/evm": "^2.23.0",
+    "viem": "^2.55.19"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "vitest": "^4.1.10"
+  }
+}

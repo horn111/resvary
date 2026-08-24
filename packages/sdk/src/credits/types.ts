@@ -1,6 +1,8 @@
 export type CreditCurrency = 'USD';
-export type CreditGrantSource = 'manual' | 'migration' | 'arc';
+export type CreditGrantSource = 'manual' | 'migration' | 'arc' | 'circle_gateway_nanopayment';
+export type FundingRail = 'arc_direct' | 'circle_gateway_nanopayment';
 export type FundingIntentStatus = 'pending' | 'confirmed' | 'failed';
+export type FundingSettlementStatus = 'accepted' | 'settled' | 'failed' | 'reconciliation_required';
 export type ReservationStatus = 'open' | 'committed' | 'released' | 'expired';
 export type LedgerEntryType = 'grant' | 'adjustment' | 'reserve' | 'release' | 'charge';
 export type LedgerBucket = 'posted' | 'reserved';
@@ -12,8 +14,23 @@ export type CreditEventType =
   | 'credit.expired'
   | 'usage.charged'
   | 'funding.intent.created'
+  | 'funding.accepted'
   | 'funding.confirmed'
+  | 'funding.settled'
+  | 'funding.reconciliation_required'
   | 'funding.failed';
+
+export interface FundingEvidence {
+  authorizationHash?: `0x${string}`;
+  nonce?: `0x${string}`;
+  payer?: `0x${string}`;
+  recipient?: `0x${string}`;
+  amountUnits: string;
+  facilitatorReference?: string;
+  explorerUrl?: string;
+  blockNumber?: string;
+  metadata?: Record<string, unknown>;
+}
 
 export interface CreditAccountKey {
   projectId: string;
@@ -196,9 +213,11 @@ export interface FundingIntent {
   status: FundingIntentStatus;
   requestedAmount: string;
   requestedUnits: string;
+  rail: FundingRail;
   network: string;
   invoiceId: string;
   createdAt: number;
+  expiresAt?: number;
   confirmedAt?: number;
   failedAt?: number;
   failureReason?: string;
@@ -211,13 +230,19 @@ export interface FundingTransaction {
   projectId: string;
   customerId: string;
   accountId: string;
+  rail: FundingRail;
   network: string;
-  txHash: `0x${string}`;
+  externalPaymentId: string;
+  txHash?: `0x${string}`;
   amount: string;
   amountUnits: string;
   paymentReceiptId: string;
   grantId: string;
   payer?: `0x${string}`;
+  settlementStatus: FundingSettlementStatus;
+  acceptedAt: number;
+  settledAt?: number;
+  evidence: FundingEvidence;
   createdAt: number;
   metadata?: Record<string, unknown>;
 }

@@ -8,7 +8,7 @@ All public website copy should be in English.
 
 **Product name:** Resvary
 
-**Current version:** 0.3 alpha
+**Current version:** 0.4 alpha
 
 **Primary category:** Prepaid credits and usage billing infrastructure for AI products
 
@@ -69,7 +69,7 @@ Primary navigation CTA:
 
 ### Status label
 
-> Open source · 0.3 alpha
+> Open source · 0.4 alpha
 
 ### Hero
 
@@ -191,7 +191,7 @@ Link: https://github.com/horn111/resvary
 
 **Heading:**
 
-> Included in the 0.3 alpha
+> Included in the 0.4 alpha
 
 - Closed-loop USD product credit accounts
 - Six-decimal integer credit arithmetic
@@ -376,30 +376,32 @@ Link: https://resvary.vercel.app
 
 > SQLite supports local, single-node, and design-partner deployments in the current alpha. Multi-process production deployments should use a custom `CreditStore` with equivalent transaction isolation or wait for the planned Postgres adapter.
 
-### Arc USDC funding
+### Circle-native funding
 
 **Heading:**
 
-> Arc USDC funds the same credit ledger
+> Two Circle rails fund the same credit ledger
 
 **Body:**
 
-> Arc USDC is Resvary's reference and first-class external funding path. The adapter creates an invoice, validates its payment receipt, and grants credits once for each `network + transaction hash` pair.
+> Direct Arc Testnet USDC and Circle Gateway Nanopayments are first-class funding paths. Each adapter turns verified external payment evidence into one credit grant. Resvary identifies payments by `rail + network + external payment ID` so a replay cannot change the balance twice.
 
-> Usage accounting remains payment-rail agnostic. Arc funding adds credits to the account; the reserve, commit, release, and usage receipt lifecycle stays unchanged.
+> Usage accounting remains payment-rail agnostic. Funding adds credits to the account; the reserve, commit, release, and usage receipt lifecycle stays unchanged.
 
-**Funding flow:**
+**Funding flows:**
 
-> Arc invoice → memo proof → payment receipt → funding confirmation → credit grant
+> Arc invoice!� memo proof � confirmed transfer � credit grant
+
+> Gateway requirements � verified nanopayment!� settlement � credit grant
 
 **Payment and usage receipt distinction:**
 
-- A payment receipt proves which external transfer funded an account.
+- A payment record proves which external transfer funded an account.
 - A usage receipt explains why product credits were charged.
 
 **Testnet disclosure:**
 
-> The current Arc integration is Testnet-first development infrastructure. The website must not describe it as a production mainnet money flow.
+> Both external funding integrations are Testnet-only in 0.4. The Gateway demo uses a clearly labelled local facilitator until a real public Testnet payment is attached to the evidence page. The website must not describe either path as production mainnet settlement.
 
 ### Open-source section
 
@@ -415,7 +417,8 @@ Link: https://resvary.vercel.app
 
 - `@resvary/sdk/credits`: accounts, grants, reservations, usage receipts, ledger, idempotency, and outbox
 - `@resvary/sdk/pricing`: meters, immutable price versions, and integer usage rating
-- `@resvary/sdk/funding/arc`: Arc payment receipt to credit grant adapter
+- `@resvary/sdk/funding/arc`: backward-compatible direct Arc funding adapter
+- `@resvary/circle`: Arc worker, Gateway Nanopayment adapter, and HTTP handlers
 - `@resvary/sqlite`: persistent credit and payment receipt stores
 - `@resvary/sdk/receipts`: stablecoin invoices, proofs, payment receipts, and signed webhooks
 - `@resvary/sdk/middleware`: compatible legacy x402 middleware for Express and Next.js
@@ -439,17 +442,17 @@ Link: https://github.com/horn111/resvary/blob/main/docs/architecture.md
 
 > A balance column records a number. Resvary records the lifecycle.
 
-| Capability | Balance column | Resvary 0.3 alpha |
-|---|---|---|
-| Available balance snapshot | Yes | Yes |
-| Atomic pre-request reservation | Custom work | Included |
-| Actual-usage commit and release | Custom work | Included |
-| Retry-safe mutating commands | Custom work | Included |
-| Immutable price history | Custom work | Included |
-| Per-charge usage receipts | Custom work | Included |
-| Append-only ledger entries | Custom work | Included |
-| Transactional outbox events | Custom work | Included |
-| Funding rail independence | Depends on implementation | Included in the domain model |
+| Capability                      | Balance column            | Resvary 0.4 alpha            |
+| ------------------------------- | ------------------------- | ---------------------------- |
+| Available balance snapshot      | Yes                       | Yes                          |
+| Atomic pre-request reservation  | Custom work               | Included                     |
+| Actual-usage commit and release | Custom work               | Included                     |
+| Retry-safe mutating commands    | Custom work               | Included                     |
+| Immutable price history         | Custom work               | Included                     |
+| Per-charge usage receipts       | Custom work               | Included                     |
+| Append-only ledger entries      | Custom work               | Included                     |
+| Transactional outbox events     | Custom work               | Included                     |
+| Funding rail independence       | Depends on implementation | Included in the domain model |
 
 ### Current boundaries
 
@@ -459,7 +462,7 @@ Link: https://github.com/horn111/resvary/blob/main/docs/architecture.md
 
 **Body:**
 
-> Resvary 0.3 validates the embedded credit domain, SQLite persistence, starter integration, and Arc Testnet funding path. It does not claim to provide a hosted billing service or a complete financial stack.
+> Resvary 0.4 validates the embedded credit domain, SQLite persistence, direct Arc Testnet funding, and Circle Gateway Nanopayment funding. It does not claim to provide a hosted billing service, mainnet settlement, or a complete financial stack.
 
 **Supported product boundary:**
 
@@ -524,7 +527,7 @@ Planned items must use words such as "planned," "future," or "roadmap." Do not p
 
 **Do I need crypto or Arc to use Resvary?**
 
-> No. Manual grants can fund an account without a blockchain. Arc USDC is the reference external funding path and does not change the usage ledger.
+> No. Manual grants work without a blockchain. Direct Arc USDC and Gateway Nanopayments are optional first-class funding rails; neither changes the usage ledger.
 
 **Is SQLite production-ready?**
 
@@ -602,9 +605,9 @@ Link: https://github.com/horn111/resvary
 
 > Apply server-side authorization, protect secrets and customer metadata, and keep credits inside the supported closed-loop boundary.
 
-**Arc credit funding:**
+**Circle-native funding:**
 
-> Convert a validated Arc payment receipt into an exactly-once credit grant while keeping usage accounting rail-independent.
+> Convert a confirmed Arc transfer or settled Gateway Nanopayment into an exactly-once credit grant while keeping usage accounting rail-independent.
 
 ## 6. About copy
 
@@ -632,7 +635,7 @@ Link: https://github.com/horn111/resvary
 
 **Status line:**
 
-> Resvary 0.3 alpha · Apache-2.0
+> Resvary 0.4 alpha · Apache-2.0
 
 **Footer links:**
 
@@ -690,19 +693,19 @@ Do not repeat keywords unnaturally or create claims for search engines that the 
 
 Use these terms consistently:
 
-| Term | Meaning |
-|---|---|
-| Product credits | Closed-loop USD-denominated units used inside one merchant project |
-| Posted | Granted credits minus committed charges |
-| Reserved | Credits held for open work |
-| Available | Posted minus reserved |
-| Reservation | Maximum authorized amount held before execution |
-| Commit | Final charge based on actual usage |
-| Release | Removal of unused or failed-work reservation |
-| Usage receipt | Operational record explaining one committed charge |
-| Payment receipt | Evidence that an external transfer funded an account |
-| Price version | Immutable rates used to calculate a charge |
-| Idempotency key | Stable command identifier used to make retries safe |
+| Term            | Meaning                                                               |
+| --------------- | --------------------------------------------------------------------- |
+| Product credits | Closed-loop USD-denominated units used inside one merchant project    |
+| Posted          | Granted credits minus committed charges                               |
+| Reserved        | Credits held for open work                                            |
+| Available       | Posted minus reserved                                                 |
+| Reservation     | Maximum authorized amount held before execution                       |
+| Commit          | Final charge based on actual usage                                    |
+| Release         | Removal of unused or failed-work reservation                          |
+| Usage receipt   | Operational record explaining one committed charge                    |
+| Payment receipt | Evidence that an external transfer funded an account                  |
+| Price version   | Immutable rates used to calculate a charge                            |
+| Idempotency key | Stable command identifier used to make retries safe                   |
 | Funding adapter | Integration that converts verified external value into a credit grant |
 
 Prefer these phrases:

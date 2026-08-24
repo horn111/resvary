@@ -41,6 +41,11 @@ export interface CreditStoreReader {
   getFundingIntent(id: string): Promise<FundingIntent | undefined>;
   listFundingIntents(projectId?: string): Promise<FundingIntent[]>;
   getFundingTransaction(id: string): Promise<FundingTransaction | undefined>;
+  getFundingTransactionByExternalPayment(
+    rail: FundingTransaction['rail'],
+    network: string,
+    externalPaymentId: string,
+  ): Promise<FundingTransaction | undefined>;
   getFundingTransactionByTxHash(
     network: string,
     txHash: `0x${string}`,
@@ -168,6 +173,17 @@ export class InMemoryCreditStore implements CreditStore {
   getFundingTransaction(id: string) {
     return reader(this.state).getFundingTransaction(id);
   }
+  getFundingTransactionByExternalPayment(
+    rail: FundingTransaction['rail'],
+    network: string,
+    externalPaymentId: string,
+  ) {
+    return reader(this.state).getFundingTransactionByExternalPayment(
+      rail,
+      network,
+      externalPaymentId,
+    );
+  }
   getFundingTransactionByTxHash(network: string, txHash: `0x${string}`) {
     return reader(this.state).getFundingTransactionByTxHash(network, txHash);
   }
@@ -241,6 +257,17 @@ class MemoryCreditTransaction implements CreditStoreTransaction {
   }
   getFundingTransaction(id: string) {
     return reader(this.state).getFundingTransaction(id);
+  }
+  getFundingTransactionByExternalPayment(
+    rail: FundingTransaction['rail'],
+    network: string,
+    externalPaymentId: string,
+  ) {
+    return reader(this.state).getFundingTransactionByExternalPayment(
+      rail,
+      network,
+      externalPaymentId,
+    );
   }
   getFundingTransactionByTxHash(network: string, txHash: `0x${string}`) {
     return reader(this.state).getFundingTransactionByTxHash(network, txHash);
@@ -393,10 +420,21 @@ function reader(state: MemoryState): CreditStoreReader {
     async getFundingTransaction(id) {
       return clone(state.fundingTransactions.get(id));
     },
+    async getFundingTransactionByExternalPayment(rail, network, externalPaymentId) {
+      const normalized = externalPaymentId.toLowerCase();
+      return clone(
+        [...state.fundingTransactions.values()].find(
+          (item) =>
+            item.rail === rail &&
+            item.network === network &&
+            item.externalPaymentId.toLowerCase() === normalized,
+        ),
+      );
+    },
     async getFundingTransactionByTxHash(network, txHash) {
       return clone(
         [...state.fundingTransactions.values()].find(
-          (item) => item.network === network && item.txHash.toLowerCase() === txHash.toLowerCase(),
+          (item) => item.network === network && item.txHash?.toLowerCase() === txHash.toLowerCase(),
         ),
       );
     },

@@ -2,23 +2,23 @@
 
 > Last updated: August 2026
 
-Resvary is now focused on open-source prepaid credits and usage billing for AI products. Arc remains an optional funding rail, not the product category.
+Resvary is an embedded, open-source prepaid credit ledger and usage billing SDK for AI products. Payment rails fund the ledger; they do not define the product.
 
-## 0.3 alpha: shipped in repository
+## 0.4 alpha: Circle-native funding proof
 
-- [x] USD credit accounts with six-decimal integer arithmetic
-- [x] Manual grants and compensating adjustments
-- [x] Multi-dimensional meters and immutable price versions
-- [x] Atomic reserve, commit, release, and expiry lifecycle
-- [x] Per-charge usage receipts and immutable ledger entries
-- [x] Idempotent mutation commands and duplicate usage protection
-- [x] Transactional outbox and signed credit webhook helper
-- [x] In-memory and SQLite stores
-- [x] Restart, rollback, and concurrent reservation coverage
-- [x] Arc Testnet invoice/payment receipt to credit grant adapter
-- [x] Interactive simulated AI demo with optional live provider
-- [x] AI credits starter for Express and Next.js
-- [x] Backward-compatible receipts, x402, and buyer APIs
+- [x] Funding rail and settlement domain model
+- [x] SQLite schema migration v2 and rail-scoped external payment uniqueness
+- [x] Durable Arc worker with persisted cursors, bounded scans, overlap, retry, and crash reconciliation
+- [x] Direct Arc Testnet proof path with exactly-once grants
+- [x] Optional `@resvary/circle` package
+- [x] Official Circle batching facilitator verify and settle integration
+- [x] Exact-amount Gateway Nanopayment top-ups and replay-safe grants
+- [x] Framework-neutral, Next.js, and Express HTTP handlers
+- [x] Dual-rail interactive demo
+- [x] Recovery, migration, threat-boundary, video, and evidence documentation
+- [ ] Publish two real public evidence records and release tag
+
+The final checkbox requires an external Arc Testnet transaction and Circle Gateway settlement. It cannot be satisfied by local tests or fabricated IDs.
 
 ## Next: production persistence
 
@@ -26,32 +26,21 @@ Resvary is now focused on open-source prepaid credits and usage billing for AI p
 - [ ] Cross-process concurrency and isolation tests
 - [ ] Durable outbox delivery worker with retries and dead-letter state
 - [ ] Structured logs, health checks, and migration CLI
-- [ ] Import/export for local SQLite data
 - [ ] Design-partner deployment guide
-
-## Candidate milestone: funding and distribution
-
-The next item is selected from design-partner evidence rather than implemented in parallel:
-
-- Stripe-funded credits if card checkout is the adoption blocker;
-- self-hosted HTTP service if teams need non-TypeScript or multi-service access;
-- hosted control plane if teams ask Resvary to operate persistence and delivery;
-- Arc production funding after Arc mainnet and legal review.
 
 ## Later
 
 - allowance and promotional grant policies;
 - tiered and package pricing;
-- dashboard, audit explorer, and usage analytics;
+- dashboard and audit explorer;
 - Fastify, Hono, Python, and Go clients;
-- reversals and product-level refund policies;
-- postpaid B2B usage and clearing adapters.
+- product-level refunds and compensating adjustments;
+- postpaid B2B usage.
 
-## Explicit non-goals for the alpha
+## Explicit non-goals
 
 - subscriptions, tax calculation, or tax invoices;
 - transferable or redeemable credits;
 - custody, cash-out, or marketplace wallets;
-- managed production queue or SLA;
-- expiring credit grants;
-- hosted authentication, RBAC, and tenant administration.
+- hosted control plane, RBAC, or managed workers;
+- Arc mainnet until public support, security review, and legal review exist.
