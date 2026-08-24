@@ -16,7 +16,7 @@ const jetBrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://resvary.vercel.app'),
+  metadataBase: new URL('https://www.resvary.xyz'),
   title: 'Resvary | Prepaid Credits and Usage Billing for AI Products',
   description:
     'Open-source TypeScript infrastructure for prepaid AI credits. Reserve spend before execution, charge actual usage, release the remainder, and issue auditable receipts.',
@@ -35,12 +35,26 @@ export const metadata: Metadata = {
     description:
       'A retry-safe credit ledger for variable AI usage, with reservations, immutable prices, idempotency, and per-charge receipts.',
     url: '/',
+    images: [
+      {
+        url: '/og/resvary-social-card.png',
+        width: 1200,
+        height: 630,
+        alt: 'Resvary prepaid credits and usage billing for AI products',
+      },
+    ],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Resvary: Prepaid Credits for AI Products',
     description:
       'Reserve spend before an AI request, charge actual usage, and release the remainder.',
+    images: [
+      {
+        url: '/og/resvary-social-card.png',
+        alt: 'Resvary prepaid credits and usage billing for AI products',
+      },
+    ],
   },
 };
 
