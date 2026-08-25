@@ -3,7 +3,7 @@
 ## Install
 
 ```bash
-npm install @resvary/sdk @resvary/sqlite
+npm install @resvary/sdk@alpha @resvary/sqlite@alpha
 ```
 
 Use Node.js 24+ for SQLite. The core SDK supports Node.js 20+.
@@ -15,7 +15,7 @@ Follow the quickstart in the root README to create a ledger, meter, and immutabl
 ## Scaffold an application
 
 ```bash
-npx create-resvary my-ai-product
+npx create-resvary@alpha my-ai-product
 ```
 
 Choose `AI prepaid credits` and either Next.js or Express. The legacy x402 paid API starter remains an explicit alternate template.

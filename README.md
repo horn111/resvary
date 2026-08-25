@@ -40,7 +40,7 @@ Resvary provides:
 ## Quickstart
 
 ```bash
-npm install @resvary/sdk @resvary/sqlite
+npm install @resvary/sdk@alpha @resvary/sqlite@alpha
 ```
 
 ```typescript
@@ -105,7 +105,7 @@ If the provider throws, `runMetered` releases the full reservation. If provider 
 For a multi-process deployment, install Postgres persistence and apply migrations before the application starts:
 
 ```bash
-npm install @resvary/postgres @resvary/worker
+npm install @resvary/postgres@alpha @resvary/worker@alpha
 DATABASE_URL=postgres://... npx resvary-postgres migrate
 ```
 
@@ -116,7 +116,7 @@ See the production persistence guide before moving an existing SQLite database.
 Install the optional adapter when credits should be funded by direct Arc USDC or a Circle Gateway Nanopayment:
 
 ```bash
-npm install @resvary/circle
+npm install @resvary/circle@alpha
 ```
 
 ```typescript

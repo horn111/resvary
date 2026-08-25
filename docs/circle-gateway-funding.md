@@ -5,7 +5,7 @@ Resvary 0.4 accepts Circle Gateway Nanopayments as a Testnet top-up rail. The pa
 ## Install
 
 ```bash
-npm install @resvary/sdk @resvary/circle @circle-fin/x402-batching
+npm install @resvary/sdk@alpha @resvary/circle@alpha @circle-fin/x402-batching
 ```
 
 ```typescript
