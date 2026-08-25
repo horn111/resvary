@@ -869,6 +869,8 @@ export class CreditLedger {
           ...event,
           status: 'delivered' as const,
           deliveredAt: input.deliveredAt ?? this.now(),
+          leaseOwner: undefined,
+          leaseExpiresAt: undefined,
         };
         await tx.saveOutboxEvent(delivered);
         return delivered;
@@ -1047,6 +1049,8 @@ export class CreditLedger {
       data,
       status: 'pending',
       createdAt,
+      attemptCount: 0,
+      nextAttemptAt: createdAt,
     });
   }
 

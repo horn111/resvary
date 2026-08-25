@@ -72,6 +72,31 @@ export interface CreditStore extends CreditStoreReader {
   transaction<T>(handler: (transaction: CreditStoreTransaction) => Promise<T>): Promise<T>;
 }
 
+export interface ClaimOutboxEventsInput {
+  workerId: string;
+  now: number;
+  leaseMs: number;
+  limit: number;
+  projectId?: string;
+}
+
+export interface FailOutboxEventInput {
+  eventId: string;
+  workerId: string;
+  now: number;
+  error: string;
+  nextAttemptAt: number;
+  deadLetter: boolean;
+}
+
+export interface OutboxDeliveryStore {
+  claimOutboxEvents(input: ClaimOutboxEventsInput): Promise<CreditOutboxEvent[]>;
+  completeOutboxEvent(eventId: string, workerId: string, deliveredAt: number): Promise<void>;
+  failOutboxEvent(input: FailOutboxEventInput): Promise<void>;
+  listDeadLetterEvents(projectId?: string): Promise<CreditOutboxEvent[]>;
+  requeueOutboxEvent(eventId: string, now: number): Promise<void>;
+}
+
 type MemoryState = {
   accounts: Map<string, CreditAccount>;
   grants: Map<string, CreditGrant>;
@@ -87,7 +112,7 @@ type MemoryState = {
   fundingTransactions: Map<string, FundingTransaction>;
 };
 
-export class InMemoryCreditStore implements CreditStore {
+export class InMemoryCreditStore implements CreditStore, OutboxDeliveryStore {
   private state = createMemoryState();
   private transactionTail: Promise<void> = Promise.resolve();
 
@@ -190,6 +215,98 @@ export class InMemoryCreditStore implements CreditStore {
   listFundingTransactions(fundingIntentId?: string) {
     return reader(this.state).listFundingTransactions(fundingIntentId);
   }
+
+  claimOutboxEvents(input: ClaimOutboxEventsInput): Promise<CreditOutboxEvent[]> {
+    return this.transaction(async (tx) => {
+      const events = (await tx.listOutboxEvents({ projectId: input.projectId }))
+        .filter(
+          (event) =>
+            (event.status === 'pending' && event.nextAttemptAt <= input.now) ||
+            (event.status === 'processing' && (event.leaseExpiresAt ?? 0) <= input.now),
+        )
+        .sort((a, b) => a.nextAttemptAt - b.nextAttemptAt || a.createdAt - b.createdAt)
+        .slice(0, input.limit);
+      const claimed: CreditOutboxEvent[] = [];
+      for (const event of events) {
+        const value: CreditOutboxEvent = {
+          ...event,
+          status: 'processing',
+          attemptCount: event.attemptCount + 1,
+          leaseOwner: input.workerId,
+          leaseExpiresAt: input.now + input.leaseMs,
+          lastAttemptAt: input.now,
+        };
+        await tx.saveOutboxEvent(value);
+        claimed.push(value);
+      }
+      return claimed;
+    });
+  }
+
+  async completeOutboxEvent(eventId: string, workerId: string, deliveredAt: number): Promise<void> {
+    await this.transaction(async (tx) => {
+      const event = await requireClaimedEvent(tx, eventId, workerId);
+      await tx.saveOutboxEvent({
+        ...event,
+        status: 'delivered',
+        deliveredAt,
+        nextAttemptAt: deliveredAt,
+        leaseOwner: undefined,
+        leaseExpiresAt: undefined,
+        lastError: undefined,
+      });
+    });
+  }
+
+  async failOutboxEvent(input: FailOutboxEventInput): Promise<void> {
+    await this.transaction(async (tx) => {
+      const event = await requireClaimedEvent(tx, input.eventId, input.workerId);
+      await tx.saveOutboxEvent({
+        ...event,
+        status: input.deadLetter ? 'dead_letter' : 'pending',
+        nextAttemptAt: input.nextAttemptAt,
+        leaseOwner: undefined,
+        leaseExpiresAt: undefined,
+        lastError: input.error,
+      });
+    });
+  }
+
+  listDeadLetterEvents(projectId?: string): Promise<CreditOutboxEvent[]> {
+    return this.listOutboxEvents({ projectId, status: 'dead_letter' });
+  }
+
+  async requeueOutboxEvent(eventId: string, now: number): Promise<void> {
+    await this.transaction(async (tx) => {
+      const event = await tx.getOutboxEvent(eventId);
+      if (!event) throw new Error(`Outbox event not found: ${eventId}`);
+      if (event.status !== 'dead_letter') {
+        throw new Error(`Outbox event is not dead-lettered: ${eventId}`);
+      }
+      await tx.saveOutboxEvent({
+        ...event,
+        status: 'pending',
+        attemptCount: 0,
+        nextAttemptAt: now,
+        leaseOwner: undefined,
+        leaseExpiresAt: undefined,
+        lastError: undefined,
+      });
+    });
+  }
+}
+
+async function requireClaimedEvent(
+  tx: CreditStoreTransaction,
+  eventId: string,
+  workerId: string,
+): Promise<CreditOutboxEvent> {
+  const event = await tx.getOutboxEvent(eventId);
+  if (!event) throw new Error(`Outbox event not found: ${eventId}`);
+  if (event.status !== 'processing' || event.leaseOwner !== workerId) {
+    throw new Error(`Outbox event is not leased by worker ${workerId}: ${eventId}`);
+  }
+  return event;
 }
 
 class MemoryCreditTransaction implements CreditStoreTransaction {

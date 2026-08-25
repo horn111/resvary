@@ -1,6 +1,6 @@
 {
   "name": "resvary",
-  "version": "0.4.0-alpha.0",
+  "version": "0.5.0-alpha.0",
   "private": true,
   "description": "Open-source prepaid credits and usage billing for AI products",
   "repository": {
@@ -15,7 +15,7 @@
   ],
   "scripts": {
     "build": "npm run build:core && npm run build --workspace=create-resvary && npm run build --workspace=@resvary/demo",
-    "build:core": "npm run build --workspace=@resvary/sdk && npm run build --workspace=@resvary/sqlite && npm run build --workspace=@resvary/circle",
+    "build:core": "npm run build --workspace=@resvary/sdk && npm run build --workspace=@resvary/sqlite && npm run build --workspace=@resvary/circle && npm run build --workspace=@resvary/postgres && npm run build --workspace=@resvary/worker",
     "dev": "npm run dev --workspace=apps/demo",
     "typecheck": "tsc --noEmit --project packages/sdk/tsconfig.json",
     "test": "npm run build --workspace=@resvary/sdk && npm run test --workspaces --if-present",

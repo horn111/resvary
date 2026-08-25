@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 0.5 Alpha - Production persistence
+
+#### Added
+
+- `@resvary/postgres` with complete credit and receipt stores on direct `pg`.
+- Explicit advisory-lock schema migrations, health reporting, and offline SQLite import verification.
+- Serializable credit transactions with bounded retry for serialization, deadlock, and concurrent uniqueness conflicts.
+- `@resvary/worker` library and CLI with leased claims, signed HTTP delivery, exponential retry, dead-letter state, and manual requeue.
+- Postgres deployment option in `create-resvary`, a deployment example, PostgreSQL CI, and a design-partner runbook.
+
+#### Changed
+
+- Expanded outbox events with processing, delivery attempt, lease, retry, and failure state.
+- Migrated SQLite credits to schema v3 while retaining SQLite as the local and single-node backend.
+- Updated workspace packages to `0.5.0-alpha.0`.
+
+#### Security
+
+- Worker logs exclude webhook secrets and event payloads.
+- Migration and import commands remain explicit; store construction never changes a Postgres schema.
+
 ### 0.4 Alpha - Circle-native funding proof
 
 #### Added

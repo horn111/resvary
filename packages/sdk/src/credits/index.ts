@@ -38,6 +38,9 @@ export {
   type CreditStore,
   type CreditStoreReader,
   type CreditStoreTransaction,
+  type ClaimOutboxEventsInput,
+  type FailOutboxEventInput,
+  type OutboxDeliveryStore,
 } from './store.js';
 export { createCreditWebhookEvent, signCreditOutboxEvent } from './webhooks.js';
 export type {
@@ -62,6 +65,7 @@ export type {
   LedgerEntryType,
   MeterDefinition,
   OutboxEventFilter,
+  OutboxEventStatus,
   PriceRate,
   PriceRateInput,
   PriceVersion,

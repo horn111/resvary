@@ -2,12 +2,16 @@ import type { ProjectConfig } from '../prompts.js';
 
 export function nextTemplate(config: ProjectConfig): string {
   if (config.template === 'ai-credits') {
+    const persistence =
+      config.database === 'postgres'
+        ? `import { createPostgresCreditStore } from '@resvary/postgres';\n\nconst store = createPostgresCreditStore({\n  connectionString: process.env.DATABASE_URL!,\n  schema: process.env.RESVARY_POSTGRES_SCHEMA,\n});`
+        : `import { createSqliteCreditStore } from '@resvary/sqlite';\n\nconst store = createSqliteCreditStore({ path: '.resvary/resvary.sqlite' });`;
     return `import { CreditLedger } from '@resvary/sdk/credits';
-import { createSqliteCreditStore } from '@resvary/sqlite';
+${persistence}
 
 const ledger = new CreditLedger({
   projectId: 'my_ai_product',
-  store: createSqliteCreditStore({ path: '.resvary/resvary.sqlite' }),
+  store,
 });
 
 export async function POST(request: Request) {

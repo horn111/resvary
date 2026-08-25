@@ -54,16 +54,26 @@ export class PersistentReceiptLedger {
 
     const invoice = await this.requireInvoice(invoiceId);
     const observedInvoice = await this.updateInvoice(invoice.id, { status: 'observed' });
-    await this.saveWebhookEvent(createWebhookEvent('invoice.observed', {
-      invoice: observedInvoice,
-      payment,
-    }));
+    await this.saveWebhookEvent(
+      createWebhookEvent('invoice.observed', {
+        invoice: observedInvoice,
+        payment,
+      }),
+    );
 
     const receipt = createReceipt(observedInvoice, payment);
     await this.store.saveReceipt(receipt);
+    const persistedReceipt = payment.txHash
+      ? ((await this.store.getReceiptByTxHash(payment.txHash, invoice.id)) ?? receipt)
+      : receipt;
     const paidInvoice = await this.updateInvoice(invoice.id, { status: 'paid' });
-    await this.saveWebhookEvent(createWebhookEvent('invoice.paid', { invoice: paidInvoice, receipt }));
-    return receipt;
+    await this.saveWebhookEvent(
+      createWebhookEvent('invoice.paid', {
+        invoice: paidInvoice,
+        receipt: persistedReceipt,
+      }),
+    );
+    return persistedReceipt;
   }
 
   async markExpired(invoiceId: string, now = Date.now()): Promise<PaymentInvoice> {
@@ -83,8 +93,7 @@ export class PersistentReceiptLedger {
     refund: { txHash?: `0x${string}`; refundedAt?: number } = {},
   ): Promise<PaymentReceipt> {
     const invoice = await this.requireInvoice(invoiceId);
-    const receipt = (await this.store.listReceipts())
-      .find((item) => item.invoiceId === invoiceId);
+    const receipt = (await this.store.listReceipts()).find((item) => item.invoiceId === invoiceId);
 
     if (!receipt) {
       throw new Error(`Cannot refund invoice without a paid receipt: ${invoiceId}`);
@@ -100,10 +109,12 @@ export class PersistentReceiptLedger {
 
     await this.store.saveReceipt(refundedReceipt);
     const refundedInvoice = await this.updateInvoice(invoice.id, { status: 'refunded' });
-    await this.saveWebhookEvent(createWebhookEvent('invoice.refunded', {
-      invoice: refundedInvoice,
-      receipt: refundedReceipt,
-    }));
+    await this.saveWebhookEvent(
+      createWebhookEvent('invoice.refunded', {
+        invoice: refundedInvoice,
+        receipt: refundedReceipt,
+      }),
+    );
     return refundedReceipt;
   }
 
