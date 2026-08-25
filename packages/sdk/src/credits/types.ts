@@ -20,6 +20,8 @@ export type CreditEventType =
   | 'funding.reconciliation_required'
   | 'funding.failed';
 
+export type OutboxEventStatus = 'pending' | 'processing' | 'delivered' | 'dead_letter';
+
 export interface FundingEvidence {
   authorizationHash?: `0x${string}`;
   nonce?: `0x${string}`;
@@ -192,8 +194,14 @@ export interface CreditOutboxEvent<TData = unknown> {
   projectId: string;
   type: CreditEventType;
   data: TData;
-  status: 'pending' | 'delivered';
+  status: OutboxEventStatus;
   createdAt: number;
+  attemptCount: number;
+  nextAttemptAt: number;
+  leaseOwner?: string;
+  leaseExpiresAt?: number;
+  lastAttemptAt?: number;
+  lastError?: string;
   deliveredAt?: number;
 }
 

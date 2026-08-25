@@ -12,7 +12,12 @@ AI application
       ├─ transactional outbox
       └─ CreditStore
           ├─ InMemoryCreditStore
-          └─ SqliteCreditStore
+          ├─ SqliteCreditStore
+          └─ PostgresCreditStore
+
+Credit outbox
+  └─ lease / retry / dead letter
+      └─ OutboxWorker -> signed HTTP webhook
 
 Optional funding
   Direct Arc transfer -> Memo proof -> payment receipt --+
@@ -38,7 +43,9 @@ validate idempotency
 → commit
 ```
 
-SQLite uses `BEGIN IMMEDIATE` so concurrent writers cannot reserve the same available credits. The in-memory implementation serializes transactions and commits a cloned state only after the handler succeeds.
+SQLite uses `BEGIN IMMEDIATE` so concurrent writers cannot reserve the same available credits. Postgres uses `SERIALIZABLE` transactions with bounded retry so independent application processes preserve the same invariant. The in-memory implementation serializes transactions and commits a cloned state only after the handler succeeds.
+
+Postgres outbox workers claim due rows with `FOR UPDATE SKIP LOCKED`. A claim has a lease; a stopped worker's events become eligible after the lease expires. Delivery is at least once, so webhook consumers deduplicate by event ID.
 
 ## Balance model
 

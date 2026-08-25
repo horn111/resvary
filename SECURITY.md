@@ -4,17 +4,21 @@
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.1.x   | :white_check_mark: |
+| 0.5.x   | :white_check_mark: |
+| < 0.5   | :x:                |
 
 ## Prepaid credits alpha
 
-The `0.4.0-alpha.0` credit engine is intended for evaluation and design-partner deployments. SQLite is a local or single-node backend, not a multi-node production datastore.
+The `0.5.0-alpha.0` credit engine is intended for evaluation and design-partner deployments. SQLite is a local or single-node backend. Postgres supports multi-process deployments but does not carry a production SLA or compliance certification.
 
 - Authorize `customerId`, grants, adjustments, price IDs, and project scope on the server.
 - Never expose admin grant or adjustment operations directly to an untrusted client.
 - Keep API keys, sensitive prompts, and personal information out of metadata.
 - Use stable idempotency keys for all retries.
 - Treat closed-loop credits separately from transferable funds, custody, tax invoices, and redemption.
+- Run Postgres migrations with a separate least-privilege deployment role.
+- Keep database URLs and webhook secrets in a secret manager and rotate them after suspected exposure.
+- Verify `x-resvary-signature` and deduplicate `x-resvary-event-id` before processing webhook side effects.
 
 See [docs/credit-security-model.md](docs/credit-security-model.md) for the full model.
 

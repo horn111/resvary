@@ -4,6 +4,7 @@ export interface ProjectConfig {
   projectName: string;
   framework: 'express' | 'next';
   template: 'ai-credits' | 'paid-api';
+  database: 'sqlite' | 'postgres';
   pricing: 'request' | 'second' | 'job';
   payTo: string;
 }
@@ -40,6 +41,16 @@ export async function runPrompts(initialProjectName?: string): Promise<ProjectCo
         ],
       },
       {
+        type: (_previous, values) => (values.template === 'ai-credits' ? 'select' : null),
+        name: 'database',
+        message: 'Persistence:',
+        choices: [
+          { title: 'SQLite — local', value: 'sqlite' },
+          { title: 'Postgres — deployment', value: 'postgres' },
+        ],
+        initial: 0,
+      },
+      {
         type: (_previous, values) => (values.template === 'paid-api' ? 'select' : null),
         name: 'pricing',
         message: 'Pricing model:',
@@ -63,6 +74,7 @@ export async function runPrompts(initialProjectName?: string): Promise<ProjectCo
     projectName: initialProjectName || response.projectName,
     framework: response.framework,
     template: response.template,
+    database: response.database ?? 'sqlite',
     pricing: response.pricing ?? 'request',
     payTo: response.payTo ?? '0x0000000000000000000000000000000000000000',
   };

@@ -8,7 +8,7 @@ All public website copy should be in English.
 
 **Product name:** Resvary
 
-**Current version:** 0.4 alpha
+**Current version:** 0.5 design-partner alpha
 
 **Primary category:** Prepaid credits and usage billing infrastructure for AI products
 
@@ -69,7 +69,7 @@ Primary navigation CTA:
 
 ### Status label
 
-> Open source · 0.4 alpha
+> Open source · 0.5 design-partner alpha
 
 ### Hero
 
@@ -95,7 +95,7 @@ Link: https://github.com/horn111/resvary
 
 **Supporting line:**
 
-> Apache-2.0 · TypeScript · Embedded SDK · SQLite alpha backend
+> Apache-2.0 · TypeScript · Embedded SDK · Postgres deployment backend
 
 ### Problem section
 
@@ -191,7 +191,7 @@ Link: https://github.com/horn111/resvary
 
 **Heading:**
 
-> Included in the 0.4 alpha
+> Included in the 0.5 alpha
 
 - Closed-loop USD product credit accounts
 - Six-decimal integer credit arithmetic
@@ -372,9 +372,9 @@ Link: https://resvary.vercel.app
 
 > The SQLite store uses `BEGIN IMMEDIATE` to serialize competing writers. It stores balances, reservations, receipts, idempotency results, and outbox events across restarts.
 
-**Alpha boundary:**
+**Persistence boundary:**
 
-> SQLite supports local, single-node, and design-partner deployments in the current alpha. Multi-process production deployments should use a custom `CreditStore` with equivalent transaction isolation or wait for the planned Postgres adapter.
+> SQLite supports local and single-node use. The Postgres adapter uses serializable transactions for multi-process design-partner deployments, with an explicit migration step and no production SLA.
 
 ### Circle-native funding
 
@@ -401,7 +401,7 @@ Link: https://resvary.vercel.app
 
 **Testnet disclosure:**
 
-> Both external funding integrations are Testnet-only in 0.4. The Gateway demo uses a clearly labelled local facilitator until a real public Testnet payment is attached to the evidence page. The website must not describe either path as production mainnet settlement.
+> Both external funding integrations remain Testnet-only in 0.5. The website must not describe either path as production mainnet settlement.
 
 ### Open-source section
 
@@ -418,6 +418,8 @@ Link: https://resvary.vercel.app
 - `@resvary/sdk/credits`: accounts, grants, reservations, usage receipts, ledger, idempotency, and outbox
 - `@resvary/sdk/pricing`: meters, immutable price versions, and integer usage rating
 - `@resvary/sdk/funding/arc`: backward-compatible direct Arc funding adapter
+- `@resvary/postgres`: multi-process credit and receipt persistence, migrations, health, and SQLite import
+- `@resvary/worker`: leased outbox delivery, retry, dead-letter recovery, and signed HTTP webhooks
 - `@resvary/circle`: Arc worker, Gateway Nanopayment adapter, and HTTP handlers
 - `@resvary/sqlite`: persistent credit and payment receipt stores
 - `@resvary/sdk/receipts`: stablecoin invoices, proofs, payment receipts, and signed webhooks
@@ -442,7 +444,7 @@ Link: https://github.com/horn111/resvary/blob/main/docs/architecture.md
 
 > A balance column records a number. Resvary records the lifecycle.
 
-| Capability                      | Balance column            | Resvary 0.4 alpha            |
+| Capability                      | Balance column            | Resvary 0.5 alpha            |
 | ------------------------------- | ------------------------- | ---------------------------- |
 | Available balance snapshot      | Yes                       | Yes                          |
 | Atomic pre-request reservation  | Custom work               | Included                     |
@@ -462,7 +464,7 @@ Link: https://github.com/horn111/resvary/blob/main/docs/architecture.md
 
 **Body:**
 
-> Resvary 0.4 validates the embedded credit domain, SQLite persistence, direct Arc Testnet funding, and Circle Gateway Nanopayment funding. It does not claim to provide a hosted billing service, mainnet settlement, or a complete financial stack.
+> Resvary 0.5 adds self-hosted Postgres persistence and durable webhook delivery to the embedded credit domain. It remains a design-partner alpha and does not claim hosted billing, mainnet settlement, an enterprise SLA, or a complete financial stack.
 
 **Supported product boundary:**
 
@@ -475,8 +477,6 @@ Link: https://github.com/horn111/resvary/blob/main/docs/architecture.md
 **Not included in the current alpha:**
 
 - Hosted dashboard or managed API
-- Postgres adapter
-- Multi-node deployment support
 - Subscription management
 - Checkout UI
 - Tax calculation or tax invoices
@@ -487,7 +487,6 @@ Link: https://github.com/horn111/resvary/blob/main/docs/architecture.md
 
 **Planned direction:**
 
-- Postgres persistence
 - Self-hosted HTTP service
 - Hosted operations and delivery tooling
 - Access control and operator workflows
@@ -531,7 +530,7 @@ Planned items must use words such as "planned," "future," or "roadmap." Do not p
 
 **Is SQLite production-ready?**
 
-> The current SQLite adapter targets local, single-node, and design-partner deployments. Multi-process production deployments need a store with equivalent transaction isolation. A Postgres adapter is planned.
+> SQLite targets local and single-node deployments. Use the explicit-migration Postgres adapter for multi-process design-partner deployments.
 
 **Are credits transferable or redeemable?**
 
@@ -635,7 +634,7 @@ Link: https://github.com/horn111/resvary
 
 **Status line:**
 
-> Resvary 0.4 alpha · Apache-2.0
+> Resvary 0.5 design-partner alpha · Apache-2.0
 
 **Footer links:**
 

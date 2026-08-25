@@ -18,12 +18,7 @@ export async function generateProject(config: ProjectConfig): Promise<string[]> 
   await write(targetDir, 'package.json', packageTemplate(config), filesCreated);
   await write(targetDir, 'tsconfig.json', tsconfigTemplate(config), filesCreated);
   await write(targetDir, '.env', envTemplate(config), filesCreated);
-  await write(
-    targetDir,
-    '.gitignore',
-    'node_modules\n.env\ndist\n.next\n.resvary\n',
-    filesCreated,
-  );
+  await write(targetDir, '.gitignore', 'node_modules\n.env\ndist\n.next\n.resvary\n', filesCreated);
 
   // Generate framework specific files
   if (config.framework === 'express') {
@@ -51,7 +46,7 @@ export async function generateProject(config: ProjectConfig): Promise<string[]> 
       await write(
         targetDir,
         'next.config.mjs',
-        "export default { serverExternalPackages: ['@resvary/sqlite'] };\n",
+        `export default { serverExternalPackages: ['@resvary/${config.database}'] };\n`,
         filesCreated,
       );
     }

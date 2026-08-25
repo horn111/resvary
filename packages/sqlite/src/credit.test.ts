@@ -161,7 +161,7 @@ describe('SqliteCreditStore', () => {
           version: number;
         }
       ).version,
-    ).toBe(2);
+    ).toBe(3);
     migrated.close();
   });
 

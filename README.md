@@ -17,7 +17,7 @@ grant or top up credits
 → issue an auditable usage receipt
 ```
 
-The credit engine is payment-rail agnostic. Resvary 0.4 provides two Circle-native Testnet top-up paths: verified direct Arc USDC transfers and Circle Gateway Nanopayments. Both create exactly one grant in the same prepaid credit ledger.
+The credit engine is payment-rail agnostic. Resvary 0.5 adds Postgres persistence and durable webhook delivery to the two Circle-native Testnet top-up paths introduced in 0.4.
 
 ## Why Resvary
 
@@ -31,7 +31,8 @@ Resvary provides:
 - idempotency for grants, reservations, charges, and funding confirmations;
 - immutable ledger entries and per-charge usage receipts;
 - transactional outbox events using the existing `x-resvary-signature` format;
-- in-memory and SQLite stores;
+- in-memory, SQLite, and Postgres stores;
+- a lease-based outbox worker with retry and dead-letter recovery;
 - direct Arc Testnet USDC top-ups with durable watcher recovery;
 - Circle Gateway Nanopayment top-ups through the official batching facilitator;
 - an interactive Next.js demo and Express/Next.js starter generator.
@@ -101,6 +102,15 @@ console.log(result.balance.availableAmount);
 
 If the provider throws, `runMetered` releases the full reservation. If provider execution succeeds but commit fails, the reservation stays open so the same operation can be retried safely.
 
+For a multi-process deployment, install Postgres persistence and apply migrations before the application starts:
+
+```bash
+npm install @resvary/postgres @resvary/worker
+DATABASE_URL=postgres://... npx resvary-postgres migrate
+```
+
+See the production persistence guide before moving an existing SQLite database.
+
 ## Circle-native Testnet funding
 
 Install the optional adapter when credits should be funded by direct Arc USDC or a Circle Gateway Nanopayment:
@@ -155,6 +165,8 @@ The old payment operations APIs remain under `/api/receipts`, `/api/receipts/pro
 | `@resvary/sdk/funding`     | Durable Arc funding worker                                                  |
 | `@resvary/circle`          | Circle Gateway Nanopayments and HTTP handlers                               |
 | `@resvary/sqlite`          | Persistent credit and payment receipt stores                                |
+| `@resvary/postgres`        | Multi-process stores, schema migrations, health and SQLite import           |
+| `@resvary/worker`          | Lease-based signed webhook delivery, retry, dead letter and worker CLI      |
 | `@resvary/sdk/receipts`    | Stablecoin invoices, proofs, payment receipts, signed webhooks              |
 | `@resvary/sdk/middleware`  | Compatible legacy x402 Express and Next.js paywalls                         |
 
@@ -166,7 +178,9 @@ The old payment operations APIs remain under `/api/receipts`, `/api/receipts/pro
 - A project/customer account cannot have a negative available balance.
 - SQLite mutations use `BEGIN IMMEDIATE` and store the balance change, receipt, idempotency result, and outbox event together.
 - Credits are closed-loop product credits. Resvary does not support user-to-user transfer, cash-out, redemption, custody, tax invoices, subscriptions, or marketplace balances.
-- SQLite is intended for local, single-node, and design-partner deployments. Postgres and a self-hosted HTTP service are later milestones.
+- SQLite remains a local and single-node backend. Postgres is the 0.5 design-partner deployment backend.
+- Outbox delivery is at least once. Webhook consumers must deduplicate by `x-resvary-event-id`.
+- Postgres migrations are explicit deployment steps and never run when a store is constructed.
 - Direct Arc and Gateway funding are Testnet-only and are not production money-flow claims.
 - Resvary stores authorization hashes and normalized evidence, never buyer private keys or full Gateway signatures.
 
@@ -175,7 +189,9 @@ The old payment operations APIs remain under `/api/receipts`, `/api/receipts/pro
 - [Prepaid credits](docs/prepaid-credits.md)
 - [Usage rating](docs/usage-rating.md)
 - [Architecture](docs/architecture.md)
-- [SQLite persistence](docs/persistence.md)
+- [Persistence](docs/persistence.md)
+- [Production persistence deployment](docs/production-persistence.md)
+- [Migrate from 0.4 to 0.5](docs/migration-0.5.md)
 - [Direct Arc credit funding](docs/arc-credit-funding.md)
 - [Circle Gateway funding](docs/circle-gateway-funding.md)
 - [Funding recovery](docs/funding-recovery.md)

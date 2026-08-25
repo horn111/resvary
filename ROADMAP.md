@@ -20,13 +20,15 @@ Resvary is an embedded, open-source prepaid credit ledger and usage billing SDK 
 
 The final checkbox requires an external Arc Testnet transaction and Circle Gateway settlement. It cannot be satisfied by local tests or fabricated IDs.
 
-## Next: production persistence
+## 0.5 design-partner alpha: production persistence
 
-- [ ] Postgres `CreditStore` and receipt store
-- [ ] Cross-process concurrency and isolation tests
-- [ ] Durable outbox delivery worker with retries and dead-letter state
-- [ ] Structured logs, health checks, and migration CLI
-- [ ] Design-partner deployment guide
+- [x] Postgres `CreditStore` and receipt store
+- [x] Serializable transactions and cross-process concurrency tests
+- [x] Durable outbox delivery worker with retries, leases, and dead-letter state
+- [x] Structured logs, liveness/readiness checks, and migration CLI
+- [x] Offline SQLite import with count and balance verification
+- [x] SQLite schema v3 compatibility for the expanded outbox lifecycle
+- [x] Design-partner deployment and cutover guide
 
 ## Later
 

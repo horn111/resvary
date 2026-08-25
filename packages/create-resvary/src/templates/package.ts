@@ -2,9 +2,18 @@ import type { ProjectConfig } from '../prompts.js';
 
 export function packageTemplate(config: ProjectConfig): string {
   const isExpress = config.framework === 'express';
-  const sqliteDependency =
-    config.template === 'ai-credits' ? `,\n    "@resvary/sqlite": "^0.4.0-alpha.0"` : '';
-  const minimumNode = config.template === 'ai-credits' ? '24' : '20';
+  const persistenceDependency =
+    config.template === 'ai-credits'
+      ? config.database === 'postgres'
+        ? `,\n    "@resvary/postgres": "^0.5.0-alpha.0"`
+        : `,\n    "@resvary/sqlite": "^0.5.0-alpha.0"`
+      : '';
+  const minimumNode =
+    config.template === 'ai-credits' && config.database === 'sqlite' ? '24' : '20';
+  const migrationScript =
+    config.template === 'ai-credits' && config.database === 'postgres'
+      ? `,\n    "resvary:migrate": "resvary-postgres migrate"`
+      : '';
 
   return `{
   "name": "${config.projectName}",
@@ -15,12 +24,12 @@ export function packageTemplate(config: ProjectConfig): string {
   "scripts": {
     ${
       isExpress
-        ? `"dev": "tsx watch src/index.ts",\n    "build": "tsc",\n    "start": "node dist/index.js"`
-        : `"dev": "next dev",\n    "build": "next build",\n    "start": "next start"`
+        ? `"dev": "tsx watch src/index.ts",\n    "build": "tsc",\n    "start": "node dist/index.js"${migrationScript}`
+        : `"dev": "next dev",\n    "build": "next build",\n    "start": "next start"${migrationScript}`
     }
   },
   "dependencies": {
-    "@resvary/sdk": "^0.4.0-alpha.0"${sqliteDependency},
+    "@resvary/sdk": "^0.5.0-alpha.0"${persistenceDependency},
     ${
       isExpress
         ? `"express": "^4.18.2"`

@@ -17,6 +17,9 @@ import type {
   LedgerEntry,
   MeterDefinition,
   OutboxEventFilter,
+  OutboxDeliveryStore,
+  ClaimOutboxEventsInput,
+  FailOutboxEventInput,
   PriceVersion,
   UsageEvent,
   UsageReceipt,
@@ -30,7 +33,7 @@ export interface SqliteCreditStoreConfig {
 
 type PayloadRow = { payload: string };
 
-export class SqliteCreditStore implements CreditStore {
+export class SqliteCreditStore implements CreditStore, OutboxDeliveryStore {
   private readonly db: DatabaseSyncType;
   private transactionTail: Promise<void> = Promise.resolve();
 
@@ -138,6 +141,85 @@ export class SqliteCreditStore implements CreditStore {
   }
   listFundingTransactions(fundingIntentId?: string) {
     return reader(this.db).listFundingTransactions(fundingIntentId);
+  }
+
+  claimOutboxEvents(input: ClaimOutboxEventsInput): Promise<CreditOutboxEvent[]> {
+    return this.transaction(async (tx) => {
+      const events = (await tx.listOutboxEvents({ projectId: input.projectId }))
+        .filter(
+          (event) =>
+            (event.status === 'pending' && event.nextAttemptAt <= input.now) ||
+            (event.status === 'processing' && (event.leaseExpiresAt ?? 0) <= input.now),
+        )
+        .sort((a, b) => a.nextAttemptAt - b.nextAttemptAt || a.createdAt - b.createdAt)
+        .slice(0, input.limit);
+      const claimed: CreditOutboxEvent[] = [];
+      for (const event of events) {
+        const value: CreditOutboxEvent = {
+          ...event,
+          status: 'processing',
+          attemptCount: event.attemptCount + 1,
+          leaseOwner: input.workerId,
+          leaseExpiresAt: input.now + input.leaseMs,
+          lastAttemptAt: input.now,
+        };
+        await tx.saveOutboxEvent(value);
+        claimed.push(value);
+      }
+      return claimed;
+    });
+  }
+
+  async completeOutboxEvent(eventId: string, workerId: string, deliveredAt: number): Promise<void> {
+    await this.transaction(async (tx) => {
+      const event = await requireClaimedEvent(tx, eventId, workerId);
+      await tx.saveOutboxEvent({
+        ...event,
+        status: 'delivered',
+        deliveredAt,
+        nextAttemptAt: deliveredAt,
+        leaseOwner: undefined,
+        leaseExpiresAt: undefined,
+        lastError: undefined,
+      });
+    });
+  }
+
+  async failOutboxEvent(input: FailOutboxEventInput): Promise<void> {
+    await this.transaction(async (tx) => {
+      const event = await requireClaimedEvent(tx, input.eventId, input.workerId);
+      await tx.saveOutboxEvent({
+        ...event,
+        status: input.deadLetter ? 'dead_letter' : 'pending',
+        nextAttemptAt: input.nextAttemptAt,
+        leaseOwner: undefined,
+        leaseExpiresAt: undefined,
+        lastError: input.error,
+      });
+    });
+  }
+
+  listDeadLetterEvents(projectId?: string): Promise<CreditOutboxEvent[]> {
+    return this.listOutboxEvents({ projectId, status: 'dead_letter' });
+  }
+
+  async requeueOutboxEvent(eventId: string, now: number): Promise<void> {
+    await this.transaction(async (tx) => {
+      const event = await tx.getOutboxEvent(eventId);
+      if (!event) throw new Error(`Outbox event not found: ${eventId}`);
+      if (event.status !== 'dead_letter') {
+        throw new Error(`Outbox event is not dead-lettered: ${eventId}`);
+      }
+      await tx.saveOutboxEvent({
+        ...event,
+        status: 'pending',
+        attemptCount: 0,
+        nextAttemptAt: now,
+        leaseOwner: undefined,
+        leaseExpiresAt: undefined,
+        lastError: undefined,
+      });
+    });
   }
 
   close(): void {
@@ -269,6 +351,7 @@ export class SqliteCreditStore implements CreditStore {
         VALUES (1, CAST(strftime('%s', 'now') AS INTEGER) * 1000);
     `);
     this.migrateFundingV2();
+    this.migrateOutboxV3();
   }
 
   private migrateFundingV2(): void {
@@ -376,6 +459,58 @@ export class SqliteCreditStore implements CreditStore {
 
       this.db
         .prepare('INSERT INTO resvary_schema_migrations(version, applied_at) VALUES (2, ?)')
+        .run(Date.now());
+      this.db.exec('COMMIT;');
+    } catch (error) {
+      this.db.exec('ROLLBACK;');
+      throw error;
+    }
+  }
+
+  private migrateOutboxV3(): void {
+    const row = this.db
+      .prepare('SELECT MAX(version) AS version FROM resvary_schema_migrations')
+      .get() as { version?: number | null } | undefined;
+    if ((row?.version ?? 0) >= 3) return;
+
+    this.db.exec('BEGIN IMMEDIATE;');
+    try {
+      this.db.exec(`
+        ALTER TABLE resvary_outbox_events ADD COLUMN attempt_count INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE resvary_outbox_events ADD COLUMN next_attempt_at INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE resvary_outbox_events ADD COLUMN lease_owner TEXT;
+        ALTER TABLE resvary_outbox_events ADD COLUMN lease_expires_at INTEGER;
+        DROP INDEX IF EXISTS resvary_outbox_events_pending;
+        CREATE INDEX resvary_outbox_events_due
+          ON resvary_outbox_events(project_id, status, next_attempt_at, created_at);
+      `);
+      const rows = this.db
+        .prepare('SELECT id, created_at, payload FROM resvary_outbox_events')
+        .all() as Array<{ id: string; created_at: number; payload: string }>;
+      for (const item of rows) {
+        const event = parseReceiptStoreValue<CreditOutboxEvent>(item.payload);
+        const migrated: CreditOutboxEvent = {
+          ...event,
+          attemptCount: event.attemptCount ?? 0,
+          nextAttemptAt: event.nextAttemptAt ?? item.created_at,
+        };
+        this.db
+          .prepare(
+            `UPDATE resvary_outbox_events
+             SET attempt_count = ?, next_attempt_at = ?, lease_owner = ?, lease_expires_at = ?, payload = ?
+             WHERE id = ?`,
+          )
+          .run(
+            migrated.attemptCount,
+            migrated.nextAttemptAt,
+            migrated.leaseOwner ?? null,
+            migrated.leaseExpiresAt ?? null,
+            serializeReceiptStoreValue(migrated),
+            item.id,
+          );
+      }
+      this.db
+        .prepare('INSERT INTO resvary_schema_migrations(version, applied_at) VALUES (3, ?)')
         .run(Date.now());
       this.db.exec('COMMIT;');
     } catch (error) {
@@ -548,8 +683,28 @@ class SqliteCreditTransaction implements CreditStoreTransaction {
     upsert(
       this.db,
       'resvary_outbox_events',
-      ['id', 'project_id', 'type', 'status', 'created_at'],
-      [value.id, value.projectId, value.type, value.status, value.createdAt],
+      [
+        'id',
+        'project_id',
+        'type',
+        'status',
+        'created_at',
+        'attempt_count',
+        'next_attempt_at',
+        'lease_owner',
+        'lease_expires_at',
+      ],
+      [
+        value.id,
+        value.projectId,
+        value.type,
+        value.status,
+        value.createdAt,
+        value.attemptCount,
+        value.nextAttemptAt,
+        value.leaseOwner ?? null,
+        value.leaseExpiresAt ?? null,
+      ],
       value,
     );
   }
@@ -845,4 +1000,17 @@ function matchesBalanceFilter(
 
 export function createSqliteCreditStore(config: SqliteCreditStoreConfig): SqliteCreditStore {
   return new SqliteCreditStore(config);
+}
+
+async function requireClaimedEvent(
+  tx: CreditStoreTransaction,
+  eventId: string,
+  workerId: string,
+): Promise<CreditOutboxEvent> {
+  const event = await tx.getOutboxEvent(eventId);
+  if (!event) throw new Error(`Outbox event not found: ${eventId}`);
+  if (event.status !== 'processing' || event.leaseOwner !== workerId) {
+    throw new Error(`Outbox event is not leased by worker ${workerId}: ${eventId}`);
+  }
+  return event;
 }

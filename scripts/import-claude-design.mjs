@@ -119,7 +119,7 @@ const copyReplacements = [
   ],
   [
     'Resvary 0.3 validates the embedded credit domain, SQLite persistence, starter integration, and Arc Testnet funding path. It does not claim to provide a hosted billing service or a complete financial stack.',
-    'Resvary 0.4 includes the embedded credit domain, SQLite persistence, direct Arc Testnet funding, and Gateway Nanopayment funding. Hosted billing, Postgres, mainnet settlement, and multi-node deployment remain planned work.',
+    'Resvary 0.5 includes the embedded credit domain, Postgres persistence, durable self-hosted delivery, and the existing Testnet funding rails. Hosted billing, mainnet settlement, and managed operations remain planned work.',
   ],
   [
     'Resvary ships as an Apache-2.0 TypeScript monorepo. You can inspect the balance rules, run the test suite, use the embedded store interface, and extend funding without sending usage data to a hosted billing vendor.',
@@ -176,7 +176,12 @@ for (const [currentCopy, improvedCopy] of copyReplacements) {
   markup = markup.replaceAll(currentCopy, improvedCopy);
 }
 
-markup = markup.replaceAll('0.3 alpha', '0.4 alpha');
+markup = markup
+  .replaceAll('0.3 alpha', '0.5 design-partner alpha')
+  .replaceAll('SQLite alpha backend', 'Postgres deployment backend')
+  .replaceAll('SQLite today; a Postgres adapter is planned', 'SQLite locally; Postgres for multi-process deployments')
+  .replaceAll('Postgres adapter', 'Hosted Postgres service')
+  .replaceAll('Multi-node deployment support', 'Managed multi-node deployment');
 
 markup = markup
   .replaceAll('href="https://resvary.vercel.app"', 'href="#interactive-demo"')
