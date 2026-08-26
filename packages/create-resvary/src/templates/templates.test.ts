@@ -23,8 +23,8 @@ describe('starter templates', () => {
     };
     expect(ai.type).toBe('module');
     expect(ai.engines.node).toBe('>=24');
-    expect(ai.dependencies['@resvary/sdk']).toBe('^0.5.0-alpha.1');
-    expect(ai.dependencies['@resvary/sqlite']).toBe('^0.5.0-alpha.1');
+    expect(ai.dependencies['@resvary/sdk']).toBe('^0.5.0-alpha.2');
+    expect(ai.dependencies['@resvary/sqlite']).toBe('^0.5.0-alpha.2');
 
     const legacy = JSON.parse(packageTemplate({ ...base, template: 'paid-api' })) as {
       engines: { node: string };
@@ -49,7 +49,7 @@ describe('starter templates', () => {
     const postgres = { ...base, database: 'postgres' as const };
     expect(nextTemplate(postgres)).toContain('createPostgresCreditStore');
     expect(JSON.parse(packageTemplate(postgres)).dependencies['@resvary/postgres']).toBe(
-      '^0.5.0-alpha.1',
+      '^0.5.0-alpha.2',
     );
     expect(JSON.parse(packageTemplate(postgres)).scripts['resvary:migrate']).toBe(
       'resvary-postgres migrate',

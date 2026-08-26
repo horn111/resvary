@@ -1,6 +1,6 @@
 {
   "name": "@resvary/sdk",
-  "version": "0.5.0-alpha.1",
+  "version": "0.5.0-alpha.2",
   "description": "Prepaid credits and usage billing SDK for AI products",
   "type": "module",
   "main": "./dist/index.js",
@@ -86,7 +86,7 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/horn111/resvary.git",
+    "url": "git+https://github.com/horn111/resvary.git",
     "directory": "packages/sdk"
   },
   "homepage": "https://github.com/horn111/resvary#readme",
