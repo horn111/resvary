@@ -46,6 +46,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
+    site: '@resvaryAI',
+    creator: '@resvaryAI',
     title: 'Resvary: Prepaid Credits for AI Products',
     description:
       'Reserve spend before an AI request, charge actual usage, and release the remainder.',

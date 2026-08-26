@@ -38,6 +38,7 @@ All public website copy should be in English.
 
 - Website and live demo: https://resvary.vercel.app
 - GitHub repository: https://github.com/horn111/resvary
+- X / Twitter: https://x.com/resvaryAI
 - README: https://github.com/horn111/resvary#readme
 - Getting started: https://github.com/horn111/resvary/blob/main/docs/getting-started.md
 - Prepaid credits: https://github.com/horn111/resvary/blob/main/docs/prepaid-credits.md
@@ -644,6 +645,7 @@ Link: https://github.com/horn111/resvary
 - License
 - Security
 - Issues
+- X / Twitter
 
 **Legal boundary line:**
 
