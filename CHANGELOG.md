@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Expanded outbox events with processing, delivery attempt, lease, retry, and failure state.
 - Migrated SQLite credits to schema v3 while retaining SQLite as the local and single-node backend.
-- Published workspace packages as `0.5.0-alpha.1` under the npm `alpha` dist-tag with explicit public access and exact internal dependency versions.
+- Published workspace packages as `0.5.0-alpha.2` under the npm `alpha` dist-tag with explicit public access, exact internal dependency versions, and installable CLI entrypoints.
 
 #### Security
 

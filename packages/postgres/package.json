@@ -1,12 +1,12 @@
 {
   "name": "@resvary/postgres",
-  "version": "0.5.0-alpha.1",
+  "version": "0.5.0-alpha.2",
   "description": "Postgres persistence and migration tooling for Resvary",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "resvary-postgres": "./dist/cli.js"
+    "resvary-postgres": "dist/cli.js"
   },
   "exports": {
     ".": {
@@ -37,7 +37,7 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@resvary/sdk": "0.5.0-alpha.1",
+    "@resvary/sdk": "0.5.0-alpha.2",
     "pg": "^8.16.3"
   },
   "devDependencies": {
