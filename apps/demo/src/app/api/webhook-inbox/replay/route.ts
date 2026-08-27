@@ -12,10 +12,16 @@ export async function POST(request: Request) {
   const body = (await request.json()) as ReplayRequest;
 
   if (!body.event) {
-    return Response.json(
-      { error: 'Missing webhook event' },
-      { status: 400 },
-    );
+    return Response.json({ error: 'Missing webhook event' }, { status: 400 });
+  }
+  if (
+    typeof body.event.id !== 'string' ||
+    typeof body.event.type !== 'string' ||
+    typeof body.event.createdAt !== 'number' ||
+    !Number.isFinite(body.event.createdAt) ||
+    !('data' in body.event)
+  ) {
+    return Response.json({ error: 'Invalid webhook event' }, { status: 400 });
   }
 
   const inbox = await getDemoWebhookInbox();

@@ -36,7 +36,7 @@ All public website copy should be in English.
 
 ## 2. Canonical links
 
-- Website and live demo: https://resvary.vercel.app
+- Website and live demo: https://www.resvary.xyz
 - GitHub repository: https://github.com/horn111/resvary
 - X / Twitter: https://x.com/resvaryAI
 - README: https://github.com/horn111/resvary#readme
@@ -86,7 +86,7 @@ Primary navigation CTA:
 
 > Explore the live demo
 
-Link: https://resvary.vercel.app
+Link: https://www.resvary.xyz
 
 **Secondary CTA:**
 
@@ -325,7 +325,7 @@ console.log(result.receipt.releasedAmount);
 
 > Open the interactive demo
 
-Link: https://resvary.vercel.app
+Link: https://www.resvary.xyz
 
 ### Use cases
 
@@ -563,7 +563,7 @@ Planned items must use words such as "planned," "future," or "roadmap." Do not p
 
 > Explore the live demo
 
-Link: https://resvary.vercel.app
+Link: https://www.resvary.xyz
 
 **Secondary CTA:**
 

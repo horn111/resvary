@@ -52,6 +52,16 @@ export class OutboxWorker {
     this.now = config.now ?? Date.now;
     this.random = config.random ?? Math.random;
     this.logger = config.logger ?? (() => undefined);
+    if (!this.workerId.trim()) throw new Error('workerId must not be empty');
+    requirePositiveInteger(this.batchSize, 'batchSize');
+    requirePositiveNumber(this.leaseMs, 'leaseMs');
+    requirePositiveNumber(this.pollIntervalMs, 'pollIntervalMs');
+    requirePositiveInteger(this.maxAttempts, 'maxAttempts');
+    requirePositiveNumber(this.baseRetryMs, 'baseRetryMs');
+    requirePositiveNumber(this.maxRetryMs, 'maxRetryMs');
+    if (this.maxRetryMs < this.baseRetryMs) {
+      throw new Error('maxRetryMs must be greater than or equal to baseRetryMs');
+    }
   }
 
   async runOnce(signal: AbortSignal = new AbortController().signal): Promise<number> {
@@ -98,7 +108,12 @@ export class OutboxWorker {
       };
     }
     if (result.delivered) {
-      await this.config.store.completeOutboxEvent(event.id, this.workerId, this.now());
+      await this.config.store.completeOutboxEvent(
+        event.id,
+        this.workerId,
+        this.now(),
+        event.attemptCount,
+      );
       this.log({
         level: 'info',
         message: 'outbox_event_delivered',
@@ -110,7 +125,11 @@ export class OutboxWorker {
       return;
     }
     const deadLetter = !result.retryable || event.attemptCount >= this.maxAttempts;
-    const nextAttemptAt = this.now() + (result.retryAfterMs ?? this.retryDelay(event.attemptCount));
+    const retryAfterMs =
+      result.retryAfterMs === undefined
+        ? this.retryDelay(event.attemptCount)
+        : Math.min(Math.max(0, result.retryAfterMs), this.maxRetryMs);
+    const nextAttemptAt = this.now() + retryAfterMs;
     const error = (result.error ?? 'Webhook delivery failed').slice(0, 1_024);
     await this.config.store.failOutboxEvent({
       eventId: event.id,
@@ -119,6 +138,7 @@ export class OutboxWorker {
       error,
       nextAttemptAt,
       deadLetter,
+      attemptCount: event.attemptCount,
     });
     this.log({
       level: deadLetter ? 'error' : 'warn',
@@ -139,6 +159,15 @@ export class OutboxWorker {
   private log(entry: Omit<OutboxWorkerLog, 'workerId'>): void {
     this.logger({ ...entry, workerId: this.workerId });
   }
+}
+
+function requirePositiveNumber(value: number, name: string): void {
+  if (!Number.isFinite(value) || value <= 0) throw new Error(`${name} must be a positive number`);
+}
+
+function requirePositiveInteger(value: number, name: string): void {
+  requirePositiveNumber(value, name);
+  if (!Number.isInteger(value)) throw new Error(`${name} must be an integer`);
 }
 
 function wait(ms: number, signal: AbortSignal): Promise<void> {

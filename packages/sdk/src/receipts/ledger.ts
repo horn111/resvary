@@ -57,10 +57,13 @@ export class ReceiptLedger {
   }
 
   recordPayment(invoiceId: string, payment: ObservedPayment): PaymentReceipt {
-    const existingReceipt = payment.txHash
-      ? this.getReceiptByTxHash(payment.txHash, invoiceId)
-      : undefined;
+    const existingReceipt = payment.txHash ? this.getReceiptByTxHash(payment.txHash) : undefined;
     if (existingReceipt) {
+      if (existingReceipt.invoiceId !== invoiceId) {
+        throw new Error(
+          `Payment transaction ${payment.txHash} is already assigned to invoice ${existingReceipt.invoiceId}`,
+        );
+      }
       return existingReceipt;
     }
 
@@ -87,9 +90,31 @@ export class ReceiptLedger {
     return expiredInvoice;
   }
 
-  markRefunded(invoiceId: string, refund: { txHash?: `0x${string}`; refundedAt?: number } = {}): PaymentReceipt {
+  markRefunded(
+    invoiceId: string,
+    refund: { txHash?: `0x${string}`; refundedAt?: number } = {},
+  ): PaymentReceipt {
     const invoice = this.requireInvoice(invoiceId);
-    const receipt = [...this.receipts.values()].find((item) => item.invoiceId === invoiceId);
+    const invoiceReceipts = [...this.receipts.values()].filter(
+      (item) => item.invoiceId === invoiceId,
+    );
+    const existingRefund = invoiceReceipts.find((item) => item.status === 'refunded');
+    if (invoice.status === 'refunded' && existingRefund) return existingRefund;
+    if (refund.txHash) {
+      const transactionReceipt = this.getReceiptByTxHash(refund.txHash);
+      if (transactionReceipt) {
+        if (
+          transactionReceipt.invoiceId === invoiceId &&
+          transactionReceipt.status === 'refunded'
+        ) {
+          return transactionReceipt;
+        }
+        throw new Error(
+          `Refund transaction ${refund.txHash} is already assigned to receipt ${transactionReceipt.id}`,
+        );
+      }
+    }
+    const receipt = invoiceReceipts.find((item) => item.status === 'paid');
 
     if (!receipt) {
       throw new Error(`Cannot refund invoice without a paid receipt: ${invoiceId}`);
@@ -99,16 +124,18 @@ export class ReceiptLedger {
       ...receipt,
       id: `rfnd_${receipt.id}`,
       status: 'refunded',
-      txHash: refund.txHash ?? receipt.txHash,
+      txHash: refund.txHash,
       createdAt: refund.refundedAt ?? Date.now(),
     };
 
     this.receipts.set(refundedReceipt.id, refundedReceipt);
     const refundedInvoice = this.updateInvoice(invoice.id, { status: 'refunded' });
-    this.events.push(createWebhookEvent('invoice.refunded', {
-      invoice: refundedInvoice,
-      receipt: refundedReceipt,
-    }));
+    this.events.push(
+      createWebhookEvent('invoice.refunded', {
+        invoice: refundedInvoice,
+        receipt: refundedReceipt,
+      }),
+    );
     return refundedReceipt;
   }
 
@@ -117,10 +144,11 @@ export class ReceiptLedger {
   }
 
   getReceiptByTxHash(txHash: `0x${string}`, invoiceId?: string): PaymentReceipt | undefined {
-    return [...this.receipts.values()].find((receipt) => (
-      receipt.txHash?.toLowerCase() === txHash.toLowerCase()
-      && (invoiceId === undefined || receipt.invoiceId === invoiceId)
-    ));
+    return [...this.receipts.values()].find(
+      (receipt) =>
+        receipt.txHash?.toLowerCase() === txHash.toLowerCase() &&
+        (invoiceId === undefined || receipt.invoiceId === invoiceId),
+    );
   }
 
   listReceipts(): PaymentReceipt[] {

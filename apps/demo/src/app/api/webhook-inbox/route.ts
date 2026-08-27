@@ -7,10 +7,7 @@ export async function POST(request: Request) {
   const header = request.headers.get('x-resvary-signature');
 
   if (!header) {
-    return Response.json(
-      { error: 'Missing x-resvary-signature header' },
-      { status: 400 },
-    );
+    return Response.json({ error: 'Missing x-resvary-signature header' }, { status: 400 });
   }
 
   const inbox = await getDemoWebhookInbox();

@@ -20,16 +20,20 @@ export async function checkPostgresHealth(
   try {
     await handle.pool.query('SELECT 1');
     const version = await handle.pool.query<{ version: number }>(
-      `SELECT COALESCE(MAX(version), 0)::int AS version FROM ${table(handle, 'resvary_schema_migrations')}`,
+      `SELECT version FROM ${table(handle, 'resvary_schema_migrations')} ORDER BY version ASC`,
     );
     const outbox = await handle.pool.query<{ status: string; count: string }>(
       `SELECT status, COUNT(*)::text AS count FROM ${table(handle, 'resvary_outbox_events')}
        WHERE status IN ('pending', 'dead_letter') GROUP BY status`,
     );
     const counts = new Map(outbox.rows.map((row) => [row.status, Number(row.count)]));
-    const schemaVersion = version.rows[0]?.version ?? 0;
+    const appliedVersions = version.rows.map((row) => row.version);
+    const schemaVersion = appliedVersions.at(-1) ?? 0;
+    const migrationHistoryValid = appliedVersions.every(
+      (appliedVersion, index) => appliedVersion === index + 1,
+    );
     return {
-      ok: schemaVersion === POSTGRES_SCHEMA_VERSION,
+      ok: migrationHistoryValid && schemaVersion === POSTGRES_SCHEMA_VERSION,
       latencyMs: Date.now() - startedAt,
       schema: handle.schema,
       schemaVersion,

@@ -6,10 +6,10 @@ const FOOTER_ISSUES_LINK =
   '<a href="https://github.com/horn111/resvary/issues" style="transition:color .2s">Issues</a>';
 const FOOTER_X_LINK =
   '<a href="https://x.com/resvaryAI" rel="me" style="transition:color .2s">X / Twitter</a>';
-const SITE_HTML = CLAUDE_DESIGN_HTML.replace(
-  FOOTER_ISSUES_LINK,
-  `${FOOTER_ISSUES_LINK}\n        ${FOOTER_X_LINK}`,
-);
+const SITE_HTML = CLAUDE_DESIGN_HTML.replaceAll(
+  'Hosted Postgres service',
+  'Postgres deployment backend',
+).replace(FOOTER_ISSUES_LINK, `${FOOTER_ISSUES_LINK}\n        ${FOOTER_X_LINK}`);
 
 export function ClaudeDesignPage() {
   return (

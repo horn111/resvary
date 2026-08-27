@@ -28,10 +28,7 @@ export type NextRouteHandler = (request: Request) => Promise<Response> | Respons
  * @param handler - The route handler to protect
  * @returns A new route handler that enforces payment
  */
-export function nextPaywall(
-  config: PaywallConfig,
-  handler: NextRouteHandler,
-): NextRouteHandler {
+export function nextPaywall(config: PaywallConfig, handler: NextRouteHandler): NextRouteHandler {
   const paywall = createPaywallMiddleware(config);
 
   return async (request: NextRequest): Promise<Response> => {

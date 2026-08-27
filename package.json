@@ -11,15 +11,17 @@
   "license": "Apache-2.0",
   "workspaces": [
     "packages/*",
-    "apps/*"
+    "apps/demo"
   ],
   "scripts": {
     "build": "npm run build:core && npm run build --workspace=create-resvary && npm run build --workspace=@resvary/demo",
     "build:core": "npm run build --workspace=@resvary/sdk && npm run build --workspace=@resvary/sqlite && npm run build --workspace=@resvary/circle && npm run build --workspace=@resvary/postgres && npm run build --workspace=@resvary/worker",
     "dev": "npm run dev --workspace=apps/demo",
-    "typecheck": "tsc --noEmit --project packages/sdk/tsconfig.json",
+    "typecheck": "npm run build:core && npm run build --workspace=create-resvary && tsc --noEmit --project apps/demo/tsconfig.json",
     "test": "npm run build --workspace=@resvary/sdk && npm run test --workspaces --if-present",
-    "clean": "npm run clean --workspaces --if-present && rm -rf node_modules",
+    "test:exports": "node scripts/test-package-exports.mjs",
+    "test:starters": "npm run build --workspace=create-resvary && node scripts/test-starters.mjs",
+    "clean": "npm run clean --workspaces --if-present && node -e \"require('node:fs').rmSync('node_modules',{recursive:true,force:true})\"",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "design:check": "node scripts/check-claude-design.mjs",

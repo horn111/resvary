@@ -2,11 +2,7 @@
  * Helpers for Arc Memo-wrapped USDC invoice payments.
  */
 
-import {
-  encodeFunctionData,
-  keccak256,
-  type Abi,
-} from 'viem';
+import { encodeFunctionData, keccak256, type Abi } from 'viem';
 import { ARC_TESTNET_CONTRACTS } from '../constants.js';
 import { createInvoiceMemoData, createInvoiceMemoId } from './memo.js';
 import type { PaymentInvoice, MemoPaymentRequest } from './types.js';

@@ -7,7 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### 0.5 Alpha - Production persistence
+### Fixed
+
+- Prevented one funding transaction or payment receipt transaction hash from granting or paying more than one record.
+- Made receipt state changes and their webhook events atomic on transactional stores.
+- Added attempt fencing so an expired outbox lease cannot acknowledge or fail a newer delivery attempt.
+- Hardened generated starters, worker configuration, health checks, SQLite import verification, and CLI argument parsing.
+
+### Changed
+
+- Added Postgres schema v2 constraints and a tested sequential v1-to-v2 migration.
+- Expanded CI to build all generated SQLite/Postgres starters and test PostgreSQL 16, 17, and 18.
+
+## [0.5.0-alpha.2] - 2026-08-27
+
+### Production persistence
 
 #### Added
 
@@ -20,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Changed
 
 - Expanded outbox events with processing, delivery attempt, lease, retry, and failure state.
-- Migrated SQLite credits to schema v3 while retaining SQLite as the local and single-node backend.
+- Migrated SQLite credits through schema v4 while retaining SQLite as the local and single-node backend.
 - Published workspace packages as `0.5.0-alpha.2` under the npm `alpha` dist-tag with explicit public access, exact internal dependency versions, and installable CLI entrypoints.
 
 #### Security

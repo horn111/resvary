@@ -10,17 +10,11 @@ export function proofErrorResponse(
   fallbackReason: string,
 ): Response {
   if (error instanceof MemoPaymentProofError) {
-    return Response.json(
-      { error: error.message, reason: error.reason },
-      { status: 422 },
-    );
+    return Response.json({ error: error.message, reason: error.reason }, { status: 422 });
   }
 
   const message = error instanceof Error ? error.message : fallbackMessage;
-  return Response.json(
-    { error: message, reason: fallbackReason },
-    { status: 500 },
-  );
+  return Response.json({ error: message, reason: fallbackReason }, { status: 500 });
 }
 
 function toJsonSafeValue(value: unknown): unknown {

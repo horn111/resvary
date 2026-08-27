@@ -58,9 +58,19 @@ app.post('/api/generate', async (req, res, next) => {
   }
 });
 
-app.listen(process.env.PORT || 3000, () => {
+const server = app.listen(process.env.PORT || 3000, () => {
   console.log('Resvary AI credits API is running on http://localhost:3000');
 });
+
+async function shutdown() {
+  server.close(async () => {
+    await store.close();
+    process.exit(0);
+  });
+}
+
+process.once('SIGINT', shutdown);
+process.once('SIGTERM', shutdown);
 `;
   }
 

@@ -17,16 +17,19 @@ resvary-postgres migrate
 ```
 
 Store constructors fail against missing tables; they never migrate automatically.
+Postgres schema v2 adds domain checks, relational constraints, and global payment transaction-hash uniqueness. A migration stops if existing data violates a new invariant; reconcile the reported rows before retrying.
 
 ## Application and workers
 
 Run at least one application process and one `resvary-worker run` process. Additional workers coordinate through leased outbox claims.
+Set a stable, unique `RESVARY_WORKER_ID` for every replica. The worker CLI shares one Postgres pool between delivery and readiness checks, so `/ready` does not open a new pool per request.
 
 ```dotenv
 DATABASE_URL=postgres://...
 RESVARY_POSTGRES_SCHEMA=public
 RESVARY_WEBHOOK_URL=https://merchant.example/webhooks/resvary
 RESVARY_WEBHOOK_SECRET=...
+RESVARY_WORKER_ID=resvary-worker-1
 RESVARY_HEALTH_PORT=8081
 ```
 

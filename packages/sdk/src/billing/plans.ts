@@ -96,10 +96,7 @@ export function createBillingPlan(config: {
         }
 
         case 'per-second': {
-          const seconds = Math.max(
-            usage.seconds ?? 1,
-            pricing.minimumSeconds ?? 1,
-          );
+          const seconds = Math.max(usage.seconds ?? 1, pricing.minimumSeconds ?? 1);
           return (seconds * parseFloat(pricing.pricePerSecond)).toFixed(6);
         }
 
@@ -121,9 +118,7 @@ export function createBillingPlan(config: {
         case 'per-request':
           return pricing.pricePerRequest;
         case 'per-second':
-          return (
-            parseFloat(pricing.pricePerSecond) * (pricing.minimumSeconds ?? 1)
-          ).toFixed(6);
+          return (parseFloat(pricing.pricePerSecond) * (pricing.minimumSeconds ?? 1)).toFixed(6);
         case 'per-job':
           return pricing.basePrice;
         default:

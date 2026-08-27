@@ -19,8 +19,15 @@ export function createPostgresHandle(config: PostgresConnectionConfig): Postgres
   if (config.pool && config.connectionString) {
     throw new Error('Provide either pool or connectionString, not both');
   }
+  if (config.pool && config.poolConfig) {
+    throw new Error('poolConfig cannot be used with an existing pool');
+  }
   if (!config.pool && !config.connectionString) {
     throw new Error('Postgres connectionString or pool is required');
+  }
+  const maxTransactionRetries = config.maxTransactionRetries ?? 5;
+  if (!Number.isInteger(maxTransactionRetries) || maxTransactionRetries < 0) {
+    throw new Error('maxTransactionRetries must be a non-negative integer');
   }
   const schema = config.schema ?? 'public';
   if (!/^[a-z_][a-z0-9_]*$/i.test(schema)) {
@@ -31,7 +38,7 @@ export function createPostgresHandle(config: PostgresConnectionConfig): Postgres
       config.pool ?? new Pool({ ...config.poolConfig, connectionString: config.connectionString }),
     schema,
     ownsPool: !config.pool,
-    maxTransactionRetries: config.maxTransactionRetries ?? 5,
+    maxTransactionRetries,
   };
 }
 

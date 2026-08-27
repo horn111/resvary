@@ -5,5 +5,11 @@
   "printWidth": 100,
   "tabWidth": 2,
   "arrowParens": "always",
-  "endOfLine": "lf"
+  "endOfLine": "auto",
+  "overrides": [
+    {
+      "files": "apps/demo/next-env.d.ts",
+      "options": { "singleQuote": false }
+    }
+  ]
 }

@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  isAmountAtLeast,
-  stablecoinUnitsToString,
-  toStablecoinUnits,
-} from './amount.js';
+import { isAmountAtLeast, stablecoinUnitsToString, toStablecoinUnits } from './amount.js';
 
 describe('stablecoin amount helpers', () => {
   it('converts human-readable stablecoin amounts to 6-decimal units', () => {

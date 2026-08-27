@@ -26,9 +26,9 @@ export function parseReceiptStoreValue<T>(value: string): T {
 
 function isSerializedBigInt(value: unknown): value is SerializedBigInt {
   return Boolean(
-    value
-      && typeof value === 'object'
-      && BIGINT_MARKER in value
-      && typeof (value as SerializedBigInt)[BIGINT_MARKER] === 'string',
+    value &&
+    typeof value === 'object' &&
+    BIGINT_MARKER in value &&
+    typeof (value as SerializedBigInt)[BIGINT_MARKER] === 'string',
   );
 }

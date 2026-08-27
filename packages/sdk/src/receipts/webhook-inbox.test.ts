@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { WebhookInbox } from './webhook-inbox.js';
-import {
-  createWebhookEvent,
-  serializeWebhookPayload,
-  signWebhookEvent,
-} from './webhooks.js';
+import { createWebhookEvent, serializeWebhookPayload, signWebhookEvent } from './webhooks.js';
 
 describe('WebhookInbox', () => {
   it('records a verified delivery for a valid signed webhook', () => {
@@ -89,7 +85,11 @@ describe('WebhookInbox', () => {
   it('filters delivery attempts by event id and status', () => {
     const inbox = new WebhookInbox();
     const paid = createWebhookEvent('invoice.paid', { invoiceId: 'inv_paid' }, 1_700_000_000_000);
-    const expired = createWebhookEvent('invoice.expired', { invoiceId: 'inv_expired' }, 1_700_000_000_000);
+    const expired = createWebhookEvent(
+      'invoice.expired',
+      { invoiceId: 'inv_expired' },
+      1_700_000_000_000,
+    );
 
     inbox.receive({
       payload: paid,

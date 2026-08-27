@@ -24,7 +24,14 @@
 import { type Account } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import type { PaymentRequirements, PaymentPayload } from '../types.js';
-import { ARC_TESTNET, DEFAULTS, HTTP_402, USDC_DECIMALS, X402_HEADER, PAYMENT_REQUIRED_HEADER } from '../constants.js';
+import {
+  ARC_TESTNET,
+  DEFAULTS,
+  HTTP_402,
+  USDC_DECIMALS,
+  X402_HEADER,
+  PAYMENT_REQUIRED_HEADER,
+} from '../constants.js';
 
 /** Configuration for the BuyerClient */
 export interface BuyerClientConfig {
@@ -86,16 +93,13 @@ export class BuyerClient {
    * @param init - Optional fetch init options
    * @returns Response with data and payment info
    */
-  async request<T = unknown>(
-    url: string,
-    init?: RequestInit,
-  ): Promise<PaidResponse<T>> {
+  async request<T = unknown>(url: string, init?: RequestInit): Promise<PaidResponse<T>> {
     // Initial request
     const initialResponse = await this.fetchFn(url, init);
 
     // If not 402, return directly
     if (initialResponse.status !== HTTP_402) {
-      const data = await initialResponse.json() as T;
+      const data = (await initialResponse.json()) as T;
       return {
         data,
         status: initialResponse.status,
@@ -125,7 +129,7 @@ export class BuyerClient {
       },
     });
 
-    const data = await paidResponse.json() as T;
+    const data = (await paidResponse.json()) as T;
 
     return {
       data,
@@ -154,7 +158,7 @@ export class BuyerClient {
       }
 
       // Fallback: try to get from response body
-      const body = await response.json() as { requirements?: PaymentRequirements };
+      const body = (await response.json()) as { requirements?: PaymentRequirements };
       return body.requirements ?? null;
     } catch {
       return null;
@@ -164,11 +168,10 @@ export class BuyerClient {
   /**
    * Sign a payment authorization using EIP-3009.
    */
-  private async signPayment(
-    requirements: PaymentRequirements,
-  ): Promise<PaymentPayload> {
+  private async signPayment(requirements: PaymentRequirements): Promise<PaymentPayload> {
     const now = Math.floor(Date.now() / 1000);
-    const nonce = `0x${Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('hex')}` as `0x${string}`;
+    const nonce =
+      `0x${Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('hex')}` as `0x${string}`;
 
     const authorization = {
       from: this.account.address,

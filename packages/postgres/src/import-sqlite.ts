@@ -23,6 +23,7 @@ export interface SqliteImportReport {
   dryRun: boolean;
   committed: boolean;
   counts: Record<string, number>;
+  contentMismatches: string[];
   balanceMismatches: string[];
   ledgerMismatches: string[];
   sourceOpenReservations: number;
@@ -207,12 +208,15 @@ export async function importSqliteDatabase(
   config: SqliteImportConfig,
 ): Promise<SqliteImportReport> {
   const source = new DatabaseSync(config.sqlitePath, { readOnly: true });
+  source.exec('BEGIN');
   const handle = createPostgresHandle(config);
   const client = await handle.pool.connect();
   try {
     const sqliteSchemaVersion = readSqliteSchemaVersion(source);
-    if (sqliteSchemaVersion < 2 || sqliteSchemaVersion > 3) {
-      throw new Error(`Unsupported SQLite schema version ${sqliteSchemaVersion}; expected 2 or 3`);
+    if (sqliteSchemaVersion < 2 || sqliteSchemaVersion > 4) {
+      throw new Error(
+        `Unsupported SQLite schema version ${sqliteSchemaVersion}; expected 2, 3, or 4`,
+      );
     }
     const postgresSchemaVersion = await readPostgresSchemaVersion(client, handle.schema);
     if (postgresSchemaVersion !== POSTGRES_SCHEMA_VERSION) {
@@ -250,9 +254,17 @@ export async function importSqliteDatabase(
       counts,
       Boolean(config.dryRun),
     );
-    if (report.balanceMismatches.length > 0 || report.ledgerMismatches.length > 0) {
+    if (
+      report.contentMismatches.length > 0 ||
+      report.balanceMismatches.length > 0 ||
+      report.ledgerMismatches.length > 0
+    ) {
       throw new Error(
-        `Financial verification failed: ${[...report.balanceMismatches, ...report.ledgerMismatches].join(', ')}`,
+        `Import verification failed: ${[
+          ...report.contentMismatches.map((name) => `content:${name}`),
+          ...report.balanceMismatches.map((id) => `balance:${id}`),
+          ...report.ledgerMismatches.map((key) => `ledger:${key}`),
+        ].join(', ')}`,
       );
     }
     if (report.sourceOpenReservations !== report.targetOpenReservations) {
@@ -267,6 +279,7 @@ export async function importSqliteDatabase(
     await rollback(client);
     throw error;
   } finally {
+    source.exec('ROLLBACK');
     source.close();
     client.release();
     if (handle.ownsPool) await handle.pool.end();
@@ -275,11 +288,22 @@ export async function importSqliteDatabase(
 
 export async function verifySqliteImport(config: SqliteImportConfig): Promise<SqliteImportReport> {
   const source = new DatabaseSync(config.sqlitePath, { readOnly: true });
+  source.exec('BEGIN');
   const handle = createPostgresHandle(config);
   const client = await handle.pool.connect();
   try {
     const sqliteSchemaVersion = readSqliteSchemaVersion(source);
     const postgresSchemaVersion = await readPostgresSchemaVersion(client, handle.schema);
+    if (sqliteSchemaVersion < 2 || sqliteSchemaVersion > 4) {
+      throw new Error(
+        `Unsupported SQLite schema version ${sqliteSchemaVersion}; expected 2, 3, or 4`,
+      );
+    }
+    if (postgresSchemaVersion !== POSTGRES_SCHEMA_VERSION) {
+      throw new Error(
+        `Postgres schema version ${postgresSchemaVersion}; run resvary-postgres migrate first`,
+      );
+    }
     const available = sourceTables(source);
     const counts: Record<string, number> = {};
     for (const definition of TABLES) {
@@ -301,6 +325,7 @@ export async function verifySqliteImport(config: SqliteImportConfig): Promise<Sq
       false,
     );
   } finally {
+    source.exec('ROLLBACK');
     source.close();
     client.release();
     if (handle.ownsPool) await handle.pool.end();
@@ -324,9 +349,17 @@ function readSqliteSchemaVersion(db: DatabaseSync): number {
 
 async function readPostgresSchemaVersion(client: PoolClient, schema: string): Promise<number> {
   const result = await client.query<{ version: number }>(
-    `SELECT COALESCE(MAX(version), 0)::int AS version FROM ${table({ schema }, 'resvary_schema_migrations')}`,
+    `SELECT version FROM ${table({ schema }, 'resvary_schema_migrations')} ORDER BY version ASC`,
   );
-  return result.rows[0]?.version ?? 0;
+  const versions = result.rows.map((row) => row.version);
+  for (let index = 0; index < versions.length; index += 1) {
+    if (versions[index] !== index + 1) {
+      throw new Error(
+        `Invalid Postgres migration history: expected version ${index + 1}, found ${versions[index]}`,
+      );
+    }
+  }
+  return versions.at(-1) ?? 0;
 }
 
 function sourceTables(db: DatabaseSync): Set<string> {
@@ -357,6 +390,7 @@ async function buildReport(
   sourceCounts: Record<string, number>,
   dryRun: boolean,
 ): Promise<SqliteImportReport> {
+  const contentMismatches: string[] = [];
   for (const definition of TABLES) {
     const result = await client.query<{ count: number }>(
       `SELECT COUNT(*)::int AS count FROM ${table({ schema }, definition.name)}`,
@@ -365,6 +399,24 @@ async function buildReport(
       throw new Error(
         `Count mismatch for ${definition.name}: source=${sourceCounts[definition.name]} target=${result.rows[0]?.count ?? 0}`,
       );
+    }
+    const sourcePayloads = sourceTables(source).has(definition.name)
+      ? (source.prepare(`SELECT payload FROM ${definition.name}`).all() as SourceRow[]).map((row) =>
+          canonicalPayload(row.payload),
+        )
+      : [];
+    const targetPayloads = (
+      await client.query<{ payload: string }>(
+        `SELECT payload::text AS payload FROM ${table({ schema }, definition.name)}`,
+      )
+    ).rows.map((row) => canonicalPayload(row.payload));
+    sourcePayloads.sort();
+    targetPayloads.sort();
+    if (
+      sourcePayloads.length !== targetPayloads.length ||
+      sourcePayloads.some((payload, index) => payload !== targetPayloads[index])
+    ) {
+      contentMismatches.push(definition.name);
     }
   }
   const balanceMismatches: string[] = [];
@@ -430,9 +482,27 @@ async function buildReport(
     dryRun,
     committed: false,
     counts: sourceCounts,
+    contentMismatches,
     balanceMismatches,
     ledgerMismatches,
     sourceOpenReservations,
     targetOpenReservations,
   };
+}
+
+function canonicalPayload(payload: string): string {
+  return JSON.stringify(canonicalize(parseReceiptStoreValue<unknown>(payload)));
+}
+
+function canonicalize(value: unknown): unknown {
+  if (typeof value === 'bigint') return { $bigint: value.toString() };
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, item]) => [key, canonicalize(item)]),
+    );
+  }
+  return value;
 }

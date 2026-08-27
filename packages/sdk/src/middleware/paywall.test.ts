@@ -1,6 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createPaywallMiddleware } from './paywall.js';
-import { DEFAULTS, HTTP_402, USDC_DECIMALS, X402_HEADER, PAYMENT_REQUIRED_HEADER } from '../constants.js';
+import {
+  DEFAULTS,
+  HTTP_402,
+  USDC_DECIMALS,
+  X402_HEADER,
+  PAYMENT_REQUIRED_HEADER,
+} from '../constants.js';
 
 describe('createPaywallMiddleware', () => {
   const sellerAddress = '0x1111111111111111111111111111111111111111' as const;
@@ -15,9 +21,13 @@ describe('createPaywallMiddleware', () => {
 
   describe('getPaymentRequirements', () => {
     it('returns correct structure with price, network, payTo, expiry', () => {
-      const paywall = createPaywallMiddleware({ price: '0.005', payTo: sellerAddress, network: 'arc-testnet' });
+      const paywall = createPaywallMiddleware({
+        price: '0.005',
+        payTo: sellerAddress,
+        network: 'arc-testnet',
+      });
       const req = paywall.getPaymentRequirements();
-      
+
       expect(req.maxAmountRequired).toBe('0.005');
       expect(req.payTo).toBe(sellerAddress);
       expect(req.network).toBe('arc-testnet');
@@ -48,19 +58,20 @@ describe('createPaywallMiddleware', () => {
 
   describe('verifyPayment', () => {
     const paywall = createPaywallMiddleware({ price: '0.001', payTo: sellerAddress });
-    
-    const createPayload = (overrides: any = {}) => ({
-      payload: {
-        signature: '0xabc',
-        authorization: {
-          from: buyerAddress,
-          to: sellerAddress,
-          value: '1000', // 0.001 USDC
-          validBefore: Math.floor(Date.now() / 1000) + 3600,
-          ...overrides
-        }
-      }
-    } as any);
+
+    const createPayload = (overrides: any = {}) =>
+      ({
+        payload: {
+          signature: '0xabc',
+          authorization: {
+            from: buyerAddress,
+            to: sellerAddress,
+            value: '1000', // 0.001 USDC
+            validBefore: Math.floor(Date.now() / 1000) + 3600,
+            ...overrides,
+          },
+        },
+      }) as any;
 
     it('rejects missing signature or authorization', async () => {
       expect(await paywall.verifyPayment({} as any)).toBe(false);
@@ -87,12 +98,16 @@ describe('createPaywallMiddleware', () => {
       const payload = createPayload();
       expect(await paywall.verifyPayment(payload)).toBe(true);
     });
-    
+
     it('uses custom verifyPayment if provided', async () => {
       const customVerify = vi.fn().mockResolvedValue({ success: true });
-      const customPaywall = createPaywallMiddleware({ price: '0.001', payTo: sellerAddress, verifyPayment: customVerify });
+      const customPaywall = createPaywallMiddleware({
+        price: '0.001',
+        payTo: sellerAddress,
+        verifyPayment: customVerify,
+      });
       const payload = createPayload();
-      
+
       expect(await customPaywall.verifyPayment(payload)).toBe(true);
       expect(customVerify).toHaveBeenCalledWith(payload);
     });

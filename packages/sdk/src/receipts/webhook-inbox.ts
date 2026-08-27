@@ -99,8 +99,11 @@ export class WebhookInbox {
     return this.deliveries.find((delivery) => delivery.id === id);
   }
 
-  private createDelivery(input: Omit<WebhookDeliveryAttempt, 'id' | 'attempt'>): WebhookDeliveryAttempt {
-    const attempt = this.deliveries.filter((delivery) => delivery.eventId === input.eventId).length + 1;
+  private createDelivery(
+    input: Omit<WebhookDeliveryAttempt, 'id' | 'attempt'>,
+  ): WebhookDeliveryAttempt {
+    const attempt =
+      this.deliveries.filter((delivery) => delivery.eventId === input.eventId).length + 1;
 
     return {
       id: `dlv_${randomBytes(12).toString('hex')}`,
@@ -114,9 +117,7 @@ function parseWebhookPayload(payload: WebhookEvent | string): {
   eventId: string;
   eventType: WebhookEventType | 'unknown';
 } {
-  const event = typeof payload === 'string'
-    ? parseJson(payload)
-    : payload;
+  const event = typeof payload === 'string' ? parseJson(payload) : payload;
 
   if (!isWebhookEventLike(event)) {
     return {
@@ -145,8 +146,10 @@ function isWebhookEventLike(value: unknown): value is WebhookEvent {
   }
 
   const event = value as Partial<WebhookEvent>;
-  return typeof event.id === 'string'
-    && typeof event.type === 'string'
-    && typeof event.createdAt === 'number'
-    && 'data' in event;
+  return (
+    typeof event.id === 'string' &&
+    typeof event.type === 'string' &&
+    typeof event.createdAt === 'number' &&
+    'data' in event
+  );
 }

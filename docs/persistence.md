@@ -10,9 +10,11 @@ const store = createSqliteCreditStore({ path: '.resvary/resvary.sqlite' });
 const credits = new CreditLedger({ projectId: 'my_ai_product', store });
 ```
 
-The credit schema stores accounts, grants, meters, price versions, reservations, usage events, usage receipts, ledger entries, funding records, idempotency records, and outbox events. SQLite schema v3 adds retry, lease, and dead-letter state.
+The credit schema stores accounts, grants, meters, price versions, reservations, usage events, usage receipts, ledger entries, funding records, idempotency records, and outbox events. SQLite schema v3 adds retry, lease, and dead-letter state. Schema v4 enforces one funding grant per network transaction hash across every funding rail.
 
 SQLite writes use WAL mode, a five-second busy timeout, and `BEGIN IMMEDIATE`. A failed command rolls back all balance, receipt, outbox, and idempotency writes.
+
+Receipt operations use the optional `TransactionalReceiptStore` contract when a backend provides it. The bundled in-memory, SQLite, and Postgres stores commit invoice state, receipts, and webhook events atomically. Third-party `ReceiptStore` implementations remain source-compatible, but must implement that optional contract to receive the same atomicity guarantee.
 
 The existing `createSqliteReceiptStore` remains available for invoices, payment receipts, webhook delivery attempts, and watcher cursors. No old table is renamed or removed.
 

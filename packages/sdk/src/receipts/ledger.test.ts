@@ -43,7 +43,8 @@ describe('ReceiptLedger', () => {
     expect(ledger.markExpired(expired.id, 1_001).status).toBe('expired');
 
     const invoice = ledger.createInvoice({ id: 'inv_refund', amount: '1', payTo: seller });
-    ledger.recordPayment(invoice.id, {
+    const paidReceipt = ledger.recordPayment(invoice.id, {
+      txHash: '0xpayment',
       from: buyer,
       to: seller,
       amount: '1',
@@ -52,7 +53,23 @@ describe('ReceiptLedger', () => {
 
     const refund = ledger.markRefunded(invoice.id, { refundedAt: 2_000 });
     expect(refund.status).toBe('refunded');
+    expect(refund.txHash).toBeUndefined();
     expect(ledger.getInvoice(invoice.id)?.status).toBe('refunded');
+    expect(ledger.markRefunded(invoice.id)).toBe(refund);
+    expect(
+      ledger.listWebhookEvents().filter((event) => event.type === 'invoice.refunded'),
+    ).toHaveLength(1);
+
+    const other = ledger.createInvoice({ id: 'inv_refund_tx', amount: '1', payTo: seller });
+    ledger.recordPayment(other.id, {
+      from: buyer,
+      to: seller,
+      amount: '1',
+      memo: other.memo,
+    });
+    expect(() => ledger.markRefunded(other.id, { txHash: paidReceipt.txHash })).toThrow(
+      'already assigned',
+    );
   });
   it('returns the existing receipt for duplicate invoice tx records', () => {
     const ledger = new ReceiptLedger();
@@ -75,5 +92,31 @@ describe('ReceiptLedger', () => {
       'invoice.observed',
       'invoice.paid',
     ]);
+  });
+
+  it('rejects reusing one payment transaction for another invoice', () => {
+    const ledger = new ReceiptLedger();
+    const first = ledger.createInvoice({ id: 'inv_tx_first', amount: '1', payTo: seller });
+    const second = ledger.createInvoice({ id: 'inv_tx_second', amount: '1', payTo: seller });
+    const txHash = '0xabc' as `0x${string}`;
+
+    ledger.recordPayment(first.id, {
+      txHash,
+      from: buyer,
+      to: seller,
+      amount: '1',
+      memo: first.memo,
+    });
+
+    expect(() =>
+      ledger.recordPayment(second.id, {
+        txHash,
+        from: buyer,
+        to: seller,
+        amount: '1',
+        memo: second.memo,
+      }),
+    ).toThrow('already assigned');
+    expect(ledger.getInvoice(second.id)?.status).toBe('open');
   });
 });

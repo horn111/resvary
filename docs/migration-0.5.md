@@ -27,4 +27,4 @@ The target entity tables must be empty. Import preserves IDs, timestamps, idempo
 
 Before the first Postgres write, rollback means pointing the application back to the backed-up SQLite file. After Postgres accepts new writes there is no automatic reverse synchronization. Stop writes and reconcile explicitly instead of switching back to stale SQLite data.
 
-SQLite remains supported for local and single-node use. Opening a 0.4 credit database with `@resvary/sqlite` 0.5 applies schema v3 for durable outbox state.
+SQLite remains supported for local and single-node use. Opening a 0.4 credit database with `@resvary/sqlite` 0.5 applies schema v3 for durable outbox state and schema v4 for transaction-hash funding uniqueness. If an existing database contains duplicate funding transaction hashes on the same network, reconcile those records before opening it with the new version.

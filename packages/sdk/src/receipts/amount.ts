@@ -16,8 +16,7 @@ export function toStablecoinUnits(amount: string, decimals = STABLECOIN_DECIMALS
     throw new Error(`Stablecoin amount exceeds ${decimals} decimals: ${amount}`);
   }
 
-  return BigInt(whole) * 10n ** BigInt(decimals)
-    + BigInt(fraction.padEnd(decimals, '0'));
+  return BigInt(whole) * 10n ** BigInt(decimals) + BigInt(fraction.padEnd(decimals, '0'));
 }
 
 export function stablecoinUnitsToString(units: bigint, decimals = STABLECOIN_DECIMALS): string {
