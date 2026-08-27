@@ -9,7 +9,7 @@
 
 ## Prepaid credits alpha
 
-The `0.5.0-alpha.2` credit engine is intended for evaluation and design-partner deployments. SQLite is a local or single-node backend. Postgres supports multi-process deployments but does not carry a production SLA or compliance certification.
+The `0.5.0-alpha.3` credit engine is intended for evaluation and design-partner deployments. SQLite is a local or single-node backend. Postgres supports multi-process deployments but does not carry a production SLA or compliance certification.
 
 - Authorize `customerId`, grants, adjustments, price IDs, and project scope on the server.
 - Never expose admin grant or adjustment operations directly to an untrusted client.

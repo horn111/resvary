@@ -16,9 +16,9 @@ Resvary is an embedded, open-source prepaid credit ledger and usage billing SDK 
 - [x] Framework-neutral, Next.js, and Express HTTP handlers
 - [x] Dual-rail interactive demo
 - [x] Recovery, migration, threat-boundary, video, and evidence documentation
-- [ ] Publish two real public evidence records and release tag
+- [x] Publish two real public evidence records and release tag
 
-The final checkbox requires an external Arc Testnet transaction and Circle Gateway settlement. It cannot be satisfied by local tests or fabricated IDs.
+The published evidence is pinned to `v0.4.0-alpha.0` and records an external Arc Testnet transaction, a Circle Gateway settlement, replay checks, and the shared credit lifecycle.
 
 ## 0.5 design-partner alpha: production persistence
 

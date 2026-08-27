@@ -1,21 +1,23 @@
 # Resvary 0.4 Circle Funding Evidence
 
-This page is a release checklist. Replace every `PENDING` value with a reproducible public record before publishing the release or posting a grant update. Do not fabricate transaction or settlement references.
+This page records the reproducible public evidence for the 0.4 Circle funding release. The source JSON records are pinned to the release tag so later documentation changes cannot alter the published proof.
 
 The proof runners generate the machine-readable source records:
 
 - `npm run proof:arc` -> `docs/evidence/arc-testnet-proof.json`
 - `npm run proof:gateway` -> `docs/evidence/gateway-nanopayment-proof.json`
 
-Review both JSON files for accuracy and secrets before replacing the fields below.
+Both published JSON files were reviewed for accuracy and secrets before the release metadata below was completed.
 
 ## Release
 
 - Tag: `v0.4.0-alpha.0`
-- Commit: `PENDING`
-- Released at: `PENDING`
+- Commit: [`667cb3df10681ac63749fdb54b5d2ec1f387f239`](https://github.com/horn111/resvary/commit/667cb3df10681ac63749fdb54b5d2ec1f387f239)
+- Released at: `2026-08-24T19:12:29Z`
 - Test command and count: `npm test` — 109 tests
-- Live demo: `PENDING`
+- Live demo: [resvary.xyz](https://www.resvary.xyz)
+- Direct Arc evidence: [`arc-testnet-proof.json`](https://github.com/horn111/resvary/blob/v0.4.0-alpha.0/docs/evidence/arc-testnet-proof.json)
+- Gateway evidence: [`gateway-nanopayment-proof.json`](https://github.com/horn111/resvary/blob/v0.4.0-alpha.0/docs/evidence/gateway-nanopayment-proof.json)
 
 ## Proof A: direct Arc Testnet USDC
 
@@ -73,11 +75,11 @@ external payment
 
 Post only after both proof sections are complete:
 
-> Resvary v0.4.0-alpha.0 is available: RELEASE_LINK.
+> Resvary v0.4.0-alpha.0 is available: https://github.com/horn111/resvary/releases/tag/v0.4.0-alpha.0.
 >
 > The release implements two Circle-native Testnet funding paths into one prepaid credit ledger: a verified direct Arc USDC transfer and a Circle Gateway Nanopayment. Both produce exactly one credit grant, then use the same reserve, AI usage, commit/release, and usage receipt lifecycle.
 >
-> Evidence: LIVE_DEMO, ARC_PROOF, GATEWAY_PROOF. The repository passes TEST_COUNT automated tests.
+> Evidence: https://www.resvary.xyz, https://github.com/horn111/resvary/blob/v0.4.0-alpha.0/docs/evidence/arc-testnet-proof.json, https://github.com/horn111/resvary/blob/v0.4.0-alpha.0/docs/evidence/gateway-nanopayment-proof.json. The release passed 109 automated tests.
 >
 > Milestone 1: direct Arc payment request, proof validation, durable watcher recovery, and exactly-once credit grant. Milestone 2: official Circle batching SDK, facilitator verify/settle, replay-safe Gateway top-up, and linked ledger evidence.
 >

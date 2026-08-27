@@ -1,15 +1,23 @@
 import { spawn } from 'node:child_process';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { access, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+const repositoryRoot = resolve(import.meta.dirname, '..');
 const generatorUrl = pathToFileURL(
-  resolve(import.meta.dirname, '../packages/create-resvary/dist/generator.js'),
+  resolve(repositoryRoot, 'packages/create-resvary/dist/generator.js'),
 ).href;
 const { generateProject } = await import(generatorUrl);
 const root = await mkdtemp(join(tmpdir(), 'resvary-starters-'));
 const originalDirectory = process.cwd();
+const workspacePackageDirectories = {
+  '@resvary/sdk': 'packages/sdk',
+  '@resvary/sqlite': 'packages/sqlite',
+  '@resvary/postgres': 'packages/postgres',
+  '@resvary/worker': 'packages/worker',
+};
+const workspaceArchives = {};
 const variants = [
   { projectName: 'express-sqlite', framework: 'express', database: 'sqlite' },
   { projectName: 'express-postgres', framework: 'express', database: 'postgres' },
@@ -18,6 +26,7 @@ const variants = [
 ];
 
 try {
+  await packWorkspacePackages();
   process.chdir(root);
   for (const variant of variants) {
     await generateProject({
@@ -32,6 +41,7 @@ try {
   const results = await Promise.allSettled(
     variants.map(async ({ projectName }) => {
       const projectDirectory = join(root, projectName);
+      await useLocalWorkspacePackages(projectDirectory);
       await runNpm(['install', '--no-audit', '--no-fund'], projectDirectory);
       await runNpm(['run', 'build'], projectDirectory);
       process.stdout.write(`Starter build passed: ${projectName}\n`);
@@ -47,6 +57,34 @@ try {
 } finally {
   process.chdir(originalDirectory);
   await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+}
+
+async function useLocalWorkspacePackages(projectDirectory) {
+  const manifestPath = join(projectDirectory, 'package.json');
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+  for (const [name, archivePath] of Object.entries(workspaceArchives)) {
+    if (!(name in manifest.dependencies)) continue;
+    const localPath = relative(projectDirectory, archivePath).replaceAll('\\', '/');
+    manifest.dependencies[name] = `file:${localPath}`;
+  }
+  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
+}
+
+async function packWorkspacePackages() {
+  for (const [name, packageDirectory] of Object.entries(workspacePackageDirectories)) {
+    const absolutePackageDirectory = resolve(repositoryRoot, packageDirectory);
+    const manifest = JSON.parse(
+      await readFile(join(absolutePackageDirectory, 'package.json'), 'utf8'),
+    );
+    const archiveName = `${name.slice(1).replace('/', '-')}-${manifest.version}.tgz`;
+    const archivePath = join(root, archiveName);
+    await runNpm(
+      ['pack', absolutePackageDirectory, '--pack-destination', root, '--ignore-scripts'],
+      repositoryRoot,
+    );
+    await access(archivePath);
+    workspaceArchives[name] = archivePath;
+  }
 }
 
 function runNpm(args, cwd) {
