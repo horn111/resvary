@@ -70,17 +70,3 @@ external payment
 
 - Arc: grant `grant_37d7a61dea227b0aca6623bc` -> reservation `rsv_38c0a8be38c00de6a865ab73` -> usage receipt `urcpt_7798555f04233fe127800af0`; charged `0.001`, released `0.001`, remaining `0.009` credits.
 - Gateway: grant `grant_635edf1266ec3e2809c21f19` -> reservation `rsv_f4d6557988974d0d718d5107` -> usage receipt `urcpt_a974d1fc2536168875460162`; charged `0.001`, released `0.001`, remaining `0.009` credits.
-
-## Grant Discussion comment
-
-Post only after both proof sections are complete:
-
-> Resvary v0.4.0-alpha.0 is available: https://github.com/horn111/resvary/releases/tag/v0.4.0-alpha.0.
->
-> The release implements two Circle-native Testnet funding paths into one prepaid credit ledger: a verified direct Arc USDC transfer and a Circle Gateway Nanopayment. Both produce exactly one credit grant, then use the same reserve, AI usage, commit/release, and usage receipt lifecycle.
->
-> Evidence: https://www.resvary.xyz, https://github.com/horn111/resvary/blob/v0.4.0-alpha.0/docs/evidence/arc-testnet-proof.json, https://github.com/horn111/resvary/blob/v0.4.0-alpha.0/docs/evidence/gateway-nanopayment-proof.json. The release passed 109 automated tests.
->
-> Milestone 1: direct Arc payment request, proof validation, durable watcher recovery, and exactly-once credit grant. Milestone 2: official Circle batching SDK, facilitator verify/settle, replay-safe Gateway top-up, and linked ledger evidence.
->
-> This remains an embedded, Testnet-only alpha. It does not claim custody, mainnet settlement, or production readiness.

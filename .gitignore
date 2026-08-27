@@ -42,22 +42,12 @@ npm-debug.log*
 .vercel/
 .resvary/
 
-# Private grant application working files
-docs/grant.md
-docs/grant-brand-update.md
-docs/grant-pivot-update.md
-docs/grant-application-current.md
-docs/grant-video-remotion-plan.md
-docs/investor-deck-plan.txt
-
-# Private investor deck production
-/tmp/investor-deck/
-/output/pdf/Resvary-Investor-Deck-Circle-2026.pdf
-/output/pdf/Resvary-Investor-Deck-Circle-2026.pptx
-/output/pdf/Resvary-Investor-Deck-Circle-2026.pptx.inspect.ndjson
-
-# Private Circle grant video production
-/apps/grant-video/
+# Local media and working output
+/assets/social/
+/docs/*social*brief*.md
+/motion-reference-*.png
+/output/
+/tmp/
 
 # Local product marketing context
 .agents/
