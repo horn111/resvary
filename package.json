@@ -1,6 +1,6 @@
 {
   "name": "resvary",
-  "version": "0.5.0-alpha.2",
+  "version": "0.5.0-alpha.3",
   "private": true,
   "description": "Open-source prepaid credits and usage billing for AI products",
   "repository": {
@@ -20,7 +20,7 @@
     "typecheck": "npm run build:core && npm run build --workspace=create-resvary && tsc --noEmit --project apps/demo/tsconfig.json",
     "test": "npm run build --workspace=@resvary/sdk && npm run test --workspaces --if-present",
     "test:exports": "node scripts/test-package-exports.mjs",
-    "test:starters": "npm run build --workspace=create-resvary && node scripts/test-starters.mjs",
+    "test:starters": "npm run build:core && npm run build --workspace=create-resvary && node scripts/test-starters.mjs",
     "clean": "npm run clean --workspaces --if-present && node -e \"require('node:fs').rmSync('node_modules',{recursive:true,force:true})\"",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",

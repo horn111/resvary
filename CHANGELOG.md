@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0-alpha.3] - 2026-08-27
+
 ### Fixed
 
 - Prevented one funding transaction or payment receipt transaction hash from granting or paying more than one record.
@@ -18,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added Postgres schema v2 constraints and a tested sequential v1-to-v2 migration.
 - Expanded CI to build all generated SQLite/Postgres starters and test PostgreSQL 16, 17, and 18.
+- Made starter smoke tests install locally packed release candidates so a new exact version is verified before npm publication.
+- Completed the public 0.4 funding evidence record with release metadata and tag-pinned Arc and Gateway proof files.
 
 ## [0.5.0-alpha.2] - 2026-08-27
 
@@ -122,5 +126,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI/CD pipeline with GitHub Actions
 - Security policy and contribution guidelines
 
-[unreleased]: https://github.com/horn111/resvary/compare/v0.1.0-alpha...HEAD
+[unreleased]: https://github.com/horn111/resvary/compare/v0.5.0-alpha.3...HEAD
+[0.5.0-alpha.3]: https://github.com/horn111/resvary/compare/v0.5.0-alpha.2...v0.5.0-alpha.3
+[0.5.0-alpha.2]: https://github.com/horn111/resvary/compare/v0.5.0-alpha.0...v0.5.0-alpha.2
 [0.1.0-alpha]: https://github.com/horn111/resvary/releases/tag/v0.1.0-alpha
