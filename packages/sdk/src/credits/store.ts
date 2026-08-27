@@ -87,11 +87,17 @@ export interface FailOutboxEventInput {
   error: string;
   nextAttemptAt: number;
   deadLetter: boolean;
+  attemptCount?: number;
 }
 
 export interface OutboxDeliveryStore {
   claimOutboxEvents(input: ClaimOutboxEventsInput): Promise<CreditOutboxEvent[]>;
-  completeOutboxEvent(eventId: string, workerId: string, deliveredAt: number): Promise<void>;
+  completeOutboxEvent(
+    eventId: string,
+    workerId: string,
+    deliveredAt: number,
+    attemptCount?: number,
+  ): Promise<void>;
   failOutboxEvent(input: FailOutboxEventInput): Promise<void>;
   listDeadLetterEvents(projectId?: string): Promise<CreditOutboxEvent[]>;
   requeueOutboxEvent(eventId: string, now: number): Promise<void>;
@@ -243,9 +249,14 @@ export class InMemoryCreditStore implements CreditStore, OutboxDeliveryStore {
     });
   }
 
-  async completeOutboxEvent(eventId: string, workerId: string, deliveredAt: number): Promise<void> {
+  async completeOutboxEvent(
+    eventId: string,
+    workerId: string,
+    deliveredAt: number,
+    attemptCount?: number,
+  ): Promise<void> {
     await this.transaction(async (tx) => {
-      const event = await requireClaimedEvent(tx, eventId, workerId);
+      const event = await requireClaimedEvent(tx, eventId, workerId, attemptCount);
       await tx.saveOutboxEvent({
         ...event,
         status: 'delivered',
@@ -260,7 +271,12 @@ export class InMemoryCreditStore implements CreditStore, OutboxDeliveryStore {
 
   async failOutboxEvent(input: FailOutboxEventInput): Promise<void> {
     await this.transaction(async (tx) => {
-      const event = await requireClaimedEvent(tx, input.eventId, input.workerId);
+      const event = await requireClaimedEvent(
+        tx,
+        input.eventId,
+        input.workerId,
+        input.attemptCount,
+      );
       await tx.saveOutboxEvent({
         ...event,
         status: input.deadLetter ? 'dead_letter' : 'pending',
@@ -300,11 +316,15 @@ async function requireClaimedEvent(
   tx: CreditStoreTransaction,
   eventId: string,
   workerId: string,
+  attemptCount?: number,
 ): Promise<CreditOutboxEvent> {
   const event = await tx.getOutboxEvent(eventId);
   if (!event) throw new Error(`Outbox event not found: ${eventId}`);
   if (event.status !== 'processing' || event.leaseOwner !== workerId) {
     throw new Error(`Outbox event is not leased by worker ${workerId}: ${eventId}`);
+  }
+  if (attemptCount !== undefined && event.attemptCount !== attemptCount) {
+    throw new Error(`Outbox lease attempt changed for event ${eventId}`);
   }
   return event;
 }

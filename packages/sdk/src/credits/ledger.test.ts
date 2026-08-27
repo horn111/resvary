@@ -64,6 +64,56 @@ describe('CreditLedger', () => {
     expect(result.fundingTransaction.settledAt).toBe(2_000);
   });
 
+  it('never credits the same network transaction through two funding rails', async () => {
+    const { ledger } = await createFixture();
+    const txHash = `0x${'ab'.repeat(32)}` as `0x${string}`;
+    const direct = await ledger.createFundingIntent({
+      customerId: 'cus_direct',
+      amount: '1',
+      rail: 'arc_direct',
+      network: 'arc-testnet',
+      invoiceId: 'direct-invoice',
+      idempotencyKey: 'direct-intent',
+    });
+    const gateway = await ledger.createFundingIntent({
+      customerId: 'cus_gateway',
+      amount: '1',
+      rail: 'circle_gateway_nanopayment',
+      network: 'arc-testnet',
+      invoiceId: 'gateway-invoice',
+      idempotencyKey: 'gateway-intent',
+    });
+
+    await ledger.confirmFunding({
+      fundingIntentId: direct.id,
+      rail: 'arc_direct',
+      network: 'arc-testnet',
+      externalPaymentId: txHash,
+      txHash,
+      amount: '1',
+      paymentReceiptId: 'direct-receipt',
+      idempotencyKey: 'direct-confirm',
+    });
+
+    await expect(
+      ledger.confirmFunding({
+        fundingIntentId: gateway.id,
+        rail: 'circle_gateway_nanopayment',
+        network: 'arc-testnet',
+        externalPaymentId: `gateway:${txHash}`,
+        txHash,
+        amount: '1',
+        paymentReceiptId: 'gateway-receipt',
+        requireExactAmount: true,
+        idempotencyKey: 'gateway-confirm',
+      }),
+    ).rejects.toThrow('already assigned');
+
+    expect((await ledger.getBalance('cus_direct')).postedAmount).toBe('1');
+    expect((await ledger.getBalance('cus_gateway')).postedAmount).toBe('0');
+    expect(await ledger.listFundingTransactions()).toHaveLength(1);
+  });
+
   it('grants, reserves, commits actual usage, and releases the remainder atomically', async () => {
     const { ledger, price } = await createFixture();
     await ledger.grantCredits({ customerId: 'cus_1', amount: '5', idempotencyKey: 'grant-1' });

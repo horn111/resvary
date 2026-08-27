@@ -26,8 +26,10 @@ The final checkbox requires an external Arc Testnet transaction and Circle Gatew
 - [x] Serializable transactions and cross-process concurrency tests
 - [x] Durable outbox delivery worker with retries, leases, and dead-letter state
 - [x] Structured logs, liveness/readiness checks, and migration CLI
-- [x] Offline SQLite import with count and balance verification
-- [x] SQLite schema v3 compatibility for the expanded outbox lifecycle
+- [x] Offline SQLite import with payload, count, balance, ledger, receipt, funding, and outbox verification
+- [x] SQLite schema v4 compatibility for outbox lifecycle and cross-rail transaction uniqueness
+- [x] Postgres schema constraints and sequential migration coverage
+- [x] SQLite/Postgres starter build coverage
 - [x] Design-partner deployment and cutover guide
 
 ## Later

@@ -71,6 +71,7 @@ export {
 } from './persistent-webhook-inbox.js';
 export {
   InMemoryReceiptStore,
+  type TransactionalReceiptStore,
   createWatcherCursorKey,
   type ReceiptStore,
   type ReceiptStoreDeliveryFilter,
@@ -79,10 +80,7 @@ export {
   type WatcherCursor,
   type WatcherCursorKeyInput,
 } from './store.js';
-export {
-  parseReceiptStoreValue,
-  serializeReceiptStoreValue,
-} from './serialization.js';
+export { parseReceiptStoreValue, serializeReceiptStoreValue } from './serialization.js';
 export {
   createWebhookRouteHandler,
   type WebhookRouteHandlerConfig,

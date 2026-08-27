@@ -36,7 +36,11 @@ export async function POST(request: Request) {
       paymentRequest: proofRequest.paymentRequest,
       fromBlock: parseOptionalBlock(proofRequest.fromBlock),
     });
-    await saveProofWatchCursor(proofRequest.invoice, proofRequest.paymentRequest, result.nextFromBlock);
+    await saveProofWatchCursor(
+      proofRequest.invoice,
+      proofRequest.paymentRequest,
+      result.nextFromBlock,
+    );
 
     if (result.status === 'pending') {
       return jsonSafeResponse(result);
@@ -45,11 +49,7 @@ export async function POST(request: Request) {
     const receipt = createProofReceipt(proofRequest.invoice, result);
     return jsonSafeResponse({ ...result, receipt });
   } catch (error) {
-    return proofErrorResponse(
-      error,
-      'Unknown proof polling error',
-      'proof_polling_failed',
-    );
+    return proofErrorResponse(error, 'Unknown proof polling error', 'proof_polling_failed');
   }
 }
 
@@ -91,7 +91,10 @@ function validateWatchProofRequest(body: WatchProofRequest): ValidWatchProofRequ
   };
 }
 
-function createProofReceipt(invoice: PaymentInvoice, result: Extract<FindMemoPaymentProofResult, { status: 'found' }>) {
+function createProofReceipt(
+  invoice: PaymentInvoice,
+  result: Extract<FindMemoPaymentProofResult, { status: 'found' }>,
+) {
   return createReceipt(invoice, {
     txHash: result.proof.txHash,
     from: result.proof.payer,

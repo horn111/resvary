@@ -14,12 +14,14 @@ describe('createWebhookRouteHandler', () => {
       toleranceSeconds: 600,
     });
 
-    const response = await handler(new Request('https://seller.app/webhooks/arc', {
-      method: 'POST',
-      headers: { 'x-resvary-signature': signature.header },
-      body: serializeWebhookPayload(event),
-    }));
-    const body = await response.json() as { ok: boolean };
+    const response = await handler(
+      new Request('https://seller.app/webhooks/arc', {
+        method: 'POST',
+        headers: { 'x-resvary-signature': signature.header },
+        body: serializeWebhookPayload(event),
+      }),
+    );
+    const body = (await response.json()) as { ok: boolean };
 
     expect(response.status).toBe(200);
     expect(body.ok).toBe(true);
@@ -29,11 +31,13 @@ describe('createWebhookRouteHandler', () => {
   it('returns a typed failure for missing signature', async () => {
     const handler = createWebhookRouteHandler({ secret: 'secret' });
 
-    const response = await handler(new Request('https://seller.app/webhooks/arc', {
-      method: 'POST',
-      body: '{}',
-    }));
-    const body = await response.json() as { ok: boolean; reason: string };
+    const response = await handler(
+      new Request('https://seller.app/webhooks/arc', {
+        method: 'POST',
+        body: '{}',
+      }),
+    );
+    const body = (await response.json()) as { ok: boolean; reason: string };
 
     expect(response.status).toBe(400);
     expect(body.ok).toBe(false);

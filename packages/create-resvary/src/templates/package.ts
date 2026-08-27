@@ -5,8 +5,8 @@ export function packageTemplate(config: ProjectConfig): string {
   const persistenceDependency =
     config.template === 'ai-credits'
       ? config.database === 'postgres'
-        ? `,\n    "@resvary/postgres": "^0.5.0-alpha.2"`
-        : `,\n    "@resvary/sqlite": "^0.5.0-alpha.2"`
+        ? `,\n    "@resvary/postgres": "0.5.0-alpha.2",\n    "@resvary/worker": "0.5.0-alpha.2"`
+        : `,\n    "@resvary/sqlite": "0.5.0-alpha.2"`
       : '';
   const minimumNode =
     config.template === 'ai-credits' && config.database === 'sqlite' ? '24' : '20';
@@ -14,9 +14,13 @@ export function packageTemplate(config: ProjectConfig): string {
     config.template === 'ai-credits' && config.database === 'postgres'
       ? `,\n    "resvary:migrate": "resvary-postgres migrate"`
       : '';
+  const workerScript =
+    config.template === 'ai-credits' && config.database === 'postgres'
+      ? `,\n    "resvary:worker": "resvary-worker run"`
+      : '';
 
   return `{
-  "name": "${config.projectName}",
+  "name": ${JSON.stringify(config.projectName)},
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -24,24 +28,24 @@ export function packageTemplate(config: ProjectConfig): string {
   "scripts": {
     ${
       isExpress
-        ? `"dev": "tsx watch src/index.ts",\n    "build": "tsc",\n    "start": "node dist/index.js"${migrationScript}`
-        : `"dev": "next dev",\n    "build": "next build",\n    "start": "next start"${migrationScript}`
+        ? `"dev": "tsx watch src/index.ts",\n    "build": "tsc",\n    "start": "node dist/index.js"${migrationScript}${workerScript}`
+        : `"dev": "next dev",\n    "build": "next build",\n    "start": "next start"${migrationScript}${workerScript}`
     }
   },
   "dependencies": {
-    "@resvary/sdk": "^0.5.0-alpha.2"${persistenceDependency},
+    "@resvary/sdk": "0.5.0-alpha.2"${persistenceDependency},
     ${
       isExpress
-        ? `"express": "^4.18.2"`
-        : `"next": "latest",\n    "react": "latest",\n    "react-dom": "latest"`
+        ? `"express": "^4.21.2"`
+        : `"next": "16.3.0",\n    "react": "19.2.8",\n    "react-dom": "19.2.8"`
     }
   },
   "devDependencies": {
-    "@types/node": "latest",
-    "typescript": "latest"${
+    "@types/node": "^22.19.19",
+    "typescript": "5.9.3"${
       isExpress
-        ? `,\n    "@types/express": "latest",\n    "tsx": "latest"`
-        : `,\n    "@types/react": "latest",\n    "@types/react-dom": "latest"`
+        ? `,\n    "@types/express": "^5.0.6",\n    "tsx": "^4.20.6"`
+        : `,\n    "@types/react": "^19.2.18",\n    "@types/react-dom": "^19.2.4"`
     }
   }
 }

@@ -363,15 +363,28 @@ export class CreditLedger {
       if (intent.expiresAt !== undefined && intent.expiresAt <= this.now())
         throw new InvalidCreditStateError(`Funding intent is expired: ${intent.id}`);
 
-      const existing = await tx.getFundingTransactionByExternalPayment(
+      const existingByExternalPayment = await tx.getFundingTransactionByExternalPayment(
         rail,
         input.network,
         externalPaymentId,
       );
+      const existingByTransactionHash = input.txHash
+        ? await tx.getFundingTransactionByTxHash(input.network, input.txHash)
+        : undefined;
+      if (
+        existingByExternalPayment &&
+        existingByTransactionHash &&
+        existingByExternalPayment.id !== existingByTransactionHash.id
+      ) {
+        throw new InvalidCreditStateError(
+          `Funding identifiers refer to different payments: ${externalPaymentId}`,
+        );
+      }
+      const existing = existingByExternalPayment ?? existingByTransactionHash;
       if (existing) {
         if (existing.fundingIntentId !== intent.id) {
           throw new InvalidCreditStateError(
-            `Funding payment is already assigned: ${externalPaymentId}`,
+            `Funding payment is already assigned: ${input.txHash ?? externalPaymentId}`,
           );
         }
         const account = await this.requireAccountById(tx, intent.accountId);

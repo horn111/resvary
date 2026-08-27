@@ -9,7 +9,7 @@
 
 ## Prepaid credits alpha
 
-The `0.5.0-alpha.0` credit engine is intended for evaluation and design-partner deployments. SQLite is a local or single-node backend. Postgres supports multi-process deployments but does not carry a production SLA or compliance certification.
+The `0.5.0-alpha.2` credit engine is intended for evaluation and design-partner deployments. SQLite is a local or single-node backend. Postgres supports multi-process deployments but does not carry a production SLA or compliance certification.
 
 - Authorize `customerId`, grants, adjustments, price IDs, and project scope on the server.
 - Never expose admin grant or adjustment operations directly to an untrusted client.
@@ -30,7 +30,7 @@ We take the security of Resvary seriously. If you believe you have found a secur
 
 ### How to Report
 
-Send a private message or direct email to the project maintainers with the following information:
+Use [GitHub private vulnerability reporting](https://github.com/horn111/resvary/security/advisories/new) to send the maintainers the following information. Do not include secrets, private keys, or customer payloads in the report.
 
 - Type of issue (e.g., buffer overflow, SQL injection, cross-site scripting, etc.)
 - Full paths of source file(s) related to the issue

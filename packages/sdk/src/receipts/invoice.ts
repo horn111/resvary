@@ -101,9 +101,9 @@ export function matchPaymentToInvoice(
   }
 
   if (
-    payment.memoId !== undefined
-    && invoice.memoId !== undefined
-    && payment.memoId.toLowerCase() !== invoice.memoId.toLowerCase()
+    payment.memoId !== undefined &&
+    invoice.memoId !== undefined &&
+    payment.memoId.toLowerCase() !== invoice.memoId.toLowerCase()
   ) {
     return { success: false, reason: 'wrong_memo_id' };
   }

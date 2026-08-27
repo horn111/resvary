@@ -1,7 +1,4 @@
-import {
-  createMemoPaymentRequest,
-  signWebhookEvent,
-} from '@resvary/sdk/receipts';
+import { createMemoPaymentRequest, signWebhookEvent } from '@resvary/sdk/receipts';
 import {
   DEMO_WEBHOOK_SECRET,
   DEMO_WEBHOOK_TARGET,
@@ -19,8 +16,9 @@ export async function GET() {
   const now = Date.now();
   const ledger = await getDemoReceiptLedger();
 
-  const invoice = await ledger.getInvoice('inv_resvary_receipts_demo')
-    ?? await ledger.createInvoice({
+  const invoice =
+    (await ledger.getInvoice('inv_resvary_receipts_demo')) ??
+    (await ledger.createInvoice({
       id: 'inv_resvary_receipts_demo',
       amount: '19.00',
       currency: 'USDC',
@@ -34,12 +32,13 @@ export async function GET() {
         product: 'Resvary Receipts',
         source: 'demo',
       },
-    });
+    }));
 
   const paymentRequest = createMemoPaymentRequest(invoice);
 
-  const receipt = await ledger.getReceiptByTxHash(DEMO_TX_HASH, invoice.id)
-    ?? await ledger.recordPayment(invoice.id, {
+  const receipt =
+    (await ledger.getReceiptByTxHash(DEMO_TX_HASH, invoice.id)) ??
+    (await ledger.recordPayment(invoice.id, {
       txHash: DEMO_TX_HASH,
       from: DEMO_PAYER,
       to: invoice.payTo,
@@ -55,11 +54,11 @@ export async function GET() {
         memoContract: paymentRequest.memoContract,
         memoIndex: '1842',
       },
-    });
+    }));
 
-  const paidEvent = (await ledger
-    .listWebhookEvents())
-    .find((event) => event.type === 'invoice.paid');
+  const paidEvent = (await ledger.listWebhookEvents()).find(
+    (event) => event.type === 'invoice.paid',
+  );
 
   if (!paidEvent) {
     return Response.json(

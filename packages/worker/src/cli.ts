@@ -1,13 +1,15 @@
 #!/usr/bin/env node
 import { createServer, type Server } from 'node:http';
 import { checkPostgresHealth, createPostgresCreditStore } from '@resvary/postgres';
+import { Pool } from 'pg';
 import { createHttpWebhookTransport, OutboxWorker, type OutboxWorkerLog } from './index.js';
 
 async function main(): Promise<void> {
   const [command = 'run', subcommand, eventId] = process.argv.slice(2);
   const connectionString = requireEnv('DATABASE_URL');
   const schema = process.env.RESVARY_POSTGRES_SCHEMA ?? 'public';
-  const store = createPostgresCreditStore({ connectionString, schema });
+  const pool = new Pool({ connectionString });
+  const store = createPostgresCreditStore({ pool, schema });
   try {
     if (command === 'dead-letter' && subcommand === 'list') {
       const events = await store.listDeadLetterEvents(process.env.RESVARY_PROJECT_ID);
@@ -40,21 +42,21 @@ async function main(): Promise<void> {
       store,
       projectId: process.env.RESVARY_PROJECT_ID,
       workerId: process.env.RESVARY_WORKER_ID,
-      batchSize: envNumber('RESVARY_WORKER_BATCH_SIZE', 25),
-      leaseMs: envNumber('RESVARY_WORKER_LEASE_MS', 30_000),
-      pollIntervalMs: envNumber('RESVARY_WORKER_POLL_MS', 1_000),
-      maxAttempts: envNumber('RESVARY_WORKER_MAX_ATTEMPTS', 8),
+      batchSize: envPositiveInteger('RESVARY_WORKER_BATCH_SIZE', 25),
+      leaseMs: envPositiveNumber('RESVARY_WORKER_LEASE_MS', 30_000),
+      pollIntervalMs: envPositiveNumber('RESVARY_WORKER_POLL_MS', 1_000),
+      maxAttempts: envPositiveInteger('RESVARY_WORKER_MAX_ATTEMPTS', 8),
       transport: createHttpWebhookTransport({
         url: requireEnv('RESVARY_WEBHOOK_URL'),
         secret: requireEnv('RESVARY_WEBHOOK_SECRET'),
-        timeoutMs: envNumber('RESVARY_WEBHOOK_TIMEOUT_MS', 10_000),
+        timeoutMs: envPositiveNumber('RESVARY_WEBHOOK_TIMEOUT_MS', 10_000),
       }),
       logger: jsonLogger,
     });
-    const healthPort = envNumber('RESVARY_HEALTH_PORT', 0);
+    const healthPort = envNumber('RESVARY_HEALTH_PORT', 0, 0);
     const healthServer =
       healthPort > 0
-        ? await startHealthServer(healthPort, connectionString, schema, controller.signal)
+        ? await startHealthServer(healthPort, pool, schema, controller.signal)
         : undefined;
     try {
       await worker.run(controller.signal);
@@ -65,12 +67,13 @@ async function main(): Promise<void> {
     }
   } finally {
     await store.close();
+    await pool.end();
   }
 }
 
 async function startHealthServer(
   port: number,
-  connectionString: string,
+  pool: Pool,
   schema: string,
   signal: AbortSignal,
 ): Promise<Server> {
@@ -81,9 +84,15 @@ async function startHealthServer(
       return;
     }
     if (request.url === '/ready') {
-      const health = await checkPostgresHealth({ connectionString, schema });
+      const health = await checkPostgresHealth({ pool, schema });
       response.writeHead(health.ok ? 200 : 503, { 'content-type': 'application/json' });
-      response.end(JSON.stringify(health));
+      response.end(
+        JSON.stringify(
+          health.ok
+            ? health
+            : { ...health, error: health.error ? 'postgres_not_ready' : undefined },
+        ),
+      );
       return;
     }
     response.writeHead(404).end();
@@ -111,12 +120,22 @@ function requireEnv(name: string): string {
   return value;
 }
 
-function envNumber(name: string, fallback: number): number {
+function envNumber(name: string, fallback: number, minimum: number): number {
   const raw = process.env[name];
   if (!raw) return fallback;
   const value = Number(raw);
-  if (!Number.isFinite(value) || value < 0)
-    throw new Error(`${name} must be a non-negative number`);
+  if (!Number.isFinite(value) || value < minimum)
+    throw new Error(`${name} must be at least ${minimum}`);
+  return value;
+}
+
+function envPositiveNumber(name: string, fallback: number): number {
+  return envNumber(name, fallback, Number.MIN_VALUE);
+}
+
+function envPositiveInteger(name: string, fallback: number): number {
+  const value = envPositiveNumber(name, fallback);
+  if (!Number.isInteger(value)) throw new Error(`${name} must be an integer`);
   return value;
 }
 

@@ -4,7 +4,7 @@ export function tsconfigTemplate(config: ProjectConfig): string {
   if (config.framework === 'next') {
     return `{
   "compilerOptions": {
-    "target": "es5",
+    "target": "es2022",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
@@ -13,7 +13,7 @@ export function tsconfigTemplate(config: ProjectConfig): string {
     "noEmit": true,
     "esModuleInterop": true,
     "module": "esnext",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "preserve",
@@ -42,7 +42,8 @@ export function tsconfigTemplate(config: ProjectConfig): string {
     "forceConsistentCasingInFileNames": true,
     "strict": true,
     "skipLibCheck": true,
-    "outDir": "./dist"
+    "outDir": "./dist",
+    "rootDir": "./src"
   },
   "include": ["src/**/*"]
 }

@@ -180,7 +180,8 @@ markup = markup
   .replaceAll('0.3 alpha', '0.5 design-partner alpha')
   .replaceAll('SQLite alpha backend', 'Postgres deployment backend')
   .replaceAll('SQLite today; a Postgres adapter is planned', 'SQLite locally; Postgres for multi-process deployments')
-  .replaceAll('Postgres adapter', 'Hosted Postgres service')
+  .replaceAll('Postgres adapter', 'Postgres deployment backend')
+  .replaceAll('Hosted Postgres service', 'Postgres deployment backend')
   .replaceAll('Multi-node deployment support', 'Managed multi-node deployment');
 
 markup = markup

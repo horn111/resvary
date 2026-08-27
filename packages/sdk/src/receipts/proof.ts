@@ -2,14 +2,7 @@
  * Read-only Arc Testnet proof verification for Memo-wrapped receipt payments.
  */
 
-import {
-  createPublicClient,
-  getAddress,
-  http,
-  parseAbiItem,
-  parseEventLogs,
-  type Log,
-} from 'viem';
+import { createPublicClient, getAddress, http, parseAbiItem, parseEventLogs, type Log } from 'viem';
 import { ARC_TESTNET } from '../constants.js';
 import { ARC_MEMO_ABI, ERC20_TRANSFER_ABI } from './memo-payment.js';
 import type { ReceiptOnchainProof, MemoPaymentRequest } from './types.js';
@@ -26,7 +19,9 @@ export type ProofMemoLog = {
 };
 
 export type ProofClient = {
-  getTransactionReceipt: (params: { hash: `0x${string}` }) => Promise<ProofTransactionReceipt | null>;
+  getTransactionReceipt: (params: {
+    hash: `0x${string}`;
+  }) => Promise<ProofTransactionReceipt | null>;
 };
 
 export type ProofPollingClient = ProofClient & {
@@ -128,9 +123,11 @@ type MemoProofCandidateResult =
 export async function verifyMemoPaymentProof(
   input: VerifyMemoPaymentProofInput,
 ): Promise<ReceiptOnchainProof> {
-  const client = input.publicClient ?? createPublicClient({
-    transport: http(input.rpcUrl ?? ARC_TESTNET.rpcUrl),
-  });
+  const client =
+    input.publicClient ??
+    createPublicClient({
+      transport: http(input.rpcUrl ?? ARC_TESTNET.rpcUrl),
+    });
 
   let txReceipt: ProofTransactionReceipt | null;
   try {
@@ -160,9 +157,10 @@ export async function verifyMemoPaymentProof(
 export async function findMemoPaymentProof(
   input: FindMemoPaymentProofInput,
 ): Promise<FindMemoPaymentProofResult> {
-  const client = (input.publicClient ?? createPublicClient({
-    transport: http(input.rpcUrl ?? ARC_TESTNET.rpcUrl),
-  })) as ProofPollingClient;
+  const client = (input.publicClient ??
+    createPublicClient({
+      transport: http(input.rpcUrl ?? ARC_TESTNET.rpcUrl),
+    })) as ProofPollingClient;
   const { fromBlock, toBlock } = await resolveProofSearchRange(input, client);
 
   if (fromBlock > toBlock) {
@@ -208,11 +206,12 @@ async function resolveProofSearchRange(
   client: ProofPollingClient,
 ): Promise<ProofSearchRange> {
   const confirmations = BigInt(input.confirmations ?? 1);
-  const latestBlock = input.toBlock ?? await client.getBlockNumber();
+  const latestBlock = input.toBlock ?? (await client.getBlockNumber());
   const toBlock = latestBlock > confirmations ? latestBlock - confirmations : 0n;
-  const lookbackBlocks = input.lookbackBlocks === undefined
-    ? DEFAULT_PROOF_LOOKBACK_BLOCKS
-    : BigInt(input.lookbackBlocks);
+  const lookbackBlocks =
+    input.lookbackBlocks === undefined
+      ? DEFAULT_PROOF_LOOKBACK_BLOCKS
+      : BigInt(input.lookbackBlocks);
 
   return {
     fromBlock: input.fromBlock ?? defaultProofFromBlock(toBlock, lookbackBlocks),
@@ -294,13 +293,12 @@ export function createMemoPaymentProofFromReceipt(params: {
   const { paymentRequest, txHash, txReceipt } = params;
 
   if (txReceipt.status !== 'success') {
-    throw new MemoPaymentProofError(
-      'tx_reverted',
-      `Transaction ${txHash} did not succeed`,
-    );
+    throw new MemoPaymentProofError('tx_reverted', `Transaction ${txHash} did not succeed`);
   }
 
-  const memoLogs = txReceipt.logs.filter((log) => sameAddress(log.address, paymentRequest.memoContract));
+  const memoLogs = txReceipt.logs.filter((log) =>
+    sameAddress(log.address, paymentRequest.memoContract),
+  );
   if (memoLogs.length === 0) {
     throw new MemoPaymentProofError(
       'wrong_memo_contract',
@@ -365,7 +363,9 @@ export function createMemoPaymentProofFromReceipt(params: {
     );
   }
 
-  const transferLogs = txReceipt.logs.filter((log) => sameAddress(log.address, paymentRequest.target));
+  const transferLogs = txReceipt.logs.filter((log) =>
+    sameAddress(log.address, paymentRequest.target),
+  );
   const parsedTransferLogs = parseEventLogs({
     abi: ERC20_TRANSFER_ABI,
     eventName: 'Transfer',

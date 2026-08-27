@@ -39,8 +39,9 @@ export function createWebhookRouteHandler(config: WebhookRouteHandlerConfig) {
       );
     }
 
-    const inbox = config.inbox
-      ?? (config.store ? new PersistentWebhookInbox({ store: config.store }) : new WebhookInbox());
+    const inbox =
+      config.inbox ??
+      (config.store ? new PersistentWebhookInbox({ store: config.store }) : new WebhookInbox());
     const delivery = await inbox.receive({
       payload,
       header,

@@ -161,7 +161,7 @@ describe('SqliteCreditStore', () => {
           version: number;
         }
       ).version,
-    ).toBe(3);
+    ).toBe(4);
     migrated.close();
   });
 
@@ -224,7 +224,7 @@ describe('SqliteCreditStore', () => {
     store.close();
   });
 
-  it('keys funding uniqueness by rail, network, and external payment id', async () => {
+  it('rejects a transaction hash already credited through another funding rail', async () => {
     const store = createSqliteCreditStore({ path: tempDatabasePath() });
     const ledger = new CreditLedger({ projectId: 'project_funding', store });
     const externalPaymentId = `0x${'aa'.repeat(32)}`;
@@ -256,19 +256,21 @@ describe('SqliteCreditStore', () => {
       paymentReceiptId: 'receipt_direct',
       idempotencyKey: 'confirm_direct',
     });
-    await ledger.confirmFunding({
-      fundingIntentId: gateway.id,
-      rail: 'circle_gateway_nanopayment',
-      network: 'arc-testnet',
-      externalPaymentId,
-      txHash: externalPaymentId as `0x${string}`,
-      amount: '1',
-      paymentReceiptId: 'receipt_gateway',
-      requireExactAmount: true,
-      idempotencyKey: 'confirm_gateway',
-    });
+    await expect(
+      ledger.confirmFunding({
+        fundingIntentId: gateway.id,
+        rail: 'circle_gateway_nanopayment',
+        network: 'arc-testnet',
+        externalPaymentId,
+        txHash: externalPaymentId as `0x${string}`,
+        amount: '1',
+        paymentReceiptId: 'receipt_gateway',
+        requireExactAmount: true,
+        idempotencyKey: 'confirm_gateway',
+      }),
+    ).rejects.toThrow('already assigned');
 
-    expect(await ledger.listFundingTransactions()).toHaveLength(2);
+    expect(await ledger.listFundingTransactions()).toHaveLength(1);
 
     const duplicate = await ledger.createFundingIntent({
       customerId: 'cus_duplicate',
@@ -283,7 +285,8 @@ describe('SqliteCreditStore', () => {
         fundingIntentId: duplicate.id,
         rail: 'circle_gateway_nanopayment',
         network: 'arc-testnet',
-        externalPaymentId,
+        externalPaymentId: `gateway:${externalPaymentId}`,
+        txHash: externalPaymentId as `0x${string}`,
         amount: '1',
         paymentReceiptId: 'receipt_duplicate',
         requireExactAmount: true,

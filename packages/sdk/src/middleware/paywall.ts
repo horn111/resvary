@@ -17,9 +17,7 @@ export interface PaywallConfig extends EndpointConfig {
 }
 
 /** Generic middleware function type */
-export type PaywallMiddleware = (
-  config: PaywallConfig,
-) => {
+export type PaywallMiddleware = (config: PaywallConfig) => {
   /** Generate payment requirements for a 402 response */
   getPaymentRequirements: () => PaymentRequirements;
   /** Parse payment payload from request headers */
@@ -125,9 +123,7 @@ export function createPaywallMiddleware(config: PaywallConfig) {
       }
 
       // Verify payment is addressed to seller
-      if (
-        payload.payload.authorization.to.toLowerCase() !== sellerAddress.toLowerCase()
-      ) {
+      if (payload.payload.authorization.to.toLowerCase() !== sellerAddress.toLowerCase()) {
         logger.error('Payment not addressed to seller');
         return false;
       }

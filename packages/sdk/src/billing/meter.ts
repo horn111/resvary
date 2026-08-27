@@ -76,7 +76,11 @@ export class UsageMeter {
   /**
    * Record a usage event.
    */
-  record(params: { buyer: `0x${string}`; amount: string; metadata?: Record<string, unknown> }): UsageRecord {
+  record(params: {
+    buyer: `0x${string}`;
+    amount: string;
+    metadata?: Record<string, unknown>;
+  }): UsageRecord {
     const record: UsageRecord = {
       buyer: params.buyer,
       amount: params.amount,
@@ -100,9 +104,7 @@ export class UsageMeter {
    * Get usage summary for a specific buyer.
    */
   getSummary(buyer: `0x${string}`): UsageSummary {
-    const buyerRecords = this.records.filter(
-      (r) => r.buyer.toLowerCase() === buyer.toLowerCase(),
-    );
+    const buyerRecords = this.records.filter((r) => r.buyer.toLowerCase() === buyer.toLowerCase());
 
     if (buyerRecords.length === 0) {
       return {
@@ -115,10 +117,7 @@ export class UsageMeter {
       };
     }
 
-    const totalSpent = buyerRecords.reduce(
-      (sum, r) => sum + parseFloat(r.amount),
-      0,
-    );
+    const totalSpent = buyerRecords.reduce((sum, r) => sum + parseFloat(r.amount), 0);
 
     return {
       buyer,
@@ -141,9 +140,7 @@ export class UsageMeter {
     let filtered = [...this.records];
 
     if (filter?.buyer) {
-      filtered = filtered.filter(
-        (r) => r.buyer.toLowerCase() === filter.buyer!.toLowerCase(),
-      );
+      filtered = filtered.filter((r) => r.buyer.toLowerCase() === filter.buyer!.toLowerCase());
     }
 
     if (filter?.since) {
@@ -166,10 +163,7 @@ export class UsageMeter {
     uniqueBuyers: number;
     avgRevenuePerRequest: string;
   } {
-    const totalRevenue = this.records.reduce(
-      (sum, r) => sum + parseFloat(r.amount),
-      0,
-    );
+    const totalRevenue = this.records.reduce((sum, r) => sum + parseFloat(r.amount), 0);
     const uniqueBuyers = new Set(this.records.map((r) => r.buyer.toLowerCase())).size;
 
     return {
@@ -177,9 +171,7 @@ export class UsageMeter {
       totalRequests: this.records.length,
       uniqueBuyers,
       avgRevenuePerRequest:
-        this.records.length > 0
-          ? (totalRevenue / this.records.length).toFixed(6)
-          : '0',
+        this.records.length > 0 ? (totalRevenue / this.records.length).toFixed(6) : '0',
     };
   }
 }

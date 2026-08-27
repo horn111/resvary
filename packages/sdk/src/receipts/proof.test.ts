@@ -1,9 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import {
-  encodeAbiParameters,
-  encodeEventTopics,
-  parseAbiItem,
-} from 'viem';
+import { encodeAbiParameters, encodeEventTopics, parseAbiItem } from 'viem';
 import { ARC_TESTNET, ARC_TESTNET_CONTRACTS } from '../constants.js';
 import { createInvoice } from './invoice.js';
 import { ARC_MEMO_ABI, createMemoPaymentRequest } from './memo-payment.js';
@@ -19,7 +15,9 @@ const buyer = '0x2222222222222222222222222222222222222222' as const;
 const other = '0x3333333333333333333333333333333333333333' as const;
 const txHash = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' as const;
 const blockHash = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' as const;
-const transferEvent = parseAbiItem('event Transfer(address indexed from,address indexed to,uint256 value)');
+const transferEvent = parseAbiItem(
+  'event Transfer(address indexed from,address indexed to,uint256 value)',
+);
 const memoEvent = ARC_MEMO_ABI.find((item) => item.type === 'event' && item.name === 'Memo');
 
 describe('verifyMemoPaymentProof', () => {
@@ -27,10 +25,7 @@ describe('verifyMemoPaymentProof', () => {
     const invoice = createInvoice({ id: 'inv_proof', amount: '19.00', payTo: seller });
     const request = createMemoPaymentRequest(invoice);
     const client = createMockClient({
-      logs: [
-        transferLog({ to: seller, value: 19_000_000n }),
-        memoReceiptLog(request),
-      ],
+      logs: [transferLog({ to: seller, value: 19_000_000n }), memoReceiptLog(request)],
     });
 
     const proof = await verifyMemoPaymentProof({
@@ -127,10 +122,7 @@ describe('verifyMemoPaymentProof', () => {
     const invoice = createInvoice({ id: 'inv_wrong_recipient', amount: '19.00', payTo: seller });
     const request = createMemoPaymentRequest(invoice);
     const client = createMockClient({
-      logs: [
-        memoReceiptLog(request),
-        transferLog({ to: other, value: 19_000_000n }),
-      ],
+      logs: [memoReceiptLog(request), transferLog({ to: other, value: 19_000_000n })],
     });
 
     await expectProofFailure(
@@ -143,10 +135,7 @@ describe('verifyMemoPaymentProof', () => {
     const invoice = createInvoice({ id: 'inv_wrong_amount', amount: '19.00', payTo: seller });
     const request = createMemoPaymentRequest(invoice);
     const client = createMockClient({
-      logs: [
-        memoReceiptLog(request),
-        transferLog({ to: seller, value: 18_000_000n }),
-      ],
+      logs: [memoReceiptLog(request), transferLog({ to: seller, value: 18_000_000n })],
     });
 
     await expectProofFailure(
@@ -184,10 +173,7 @@ describe('findMemoPaymentProof', () => {
     const request = createMemoPaymentRequest(invoice);
     const client = createPollingMockClient({
       memoLogs: [{ transactionHash: txHash }],
-      receiptLogs: [
-        memoReceiptLog(request),
-        transferLog({ to: seller, value: 19_000_000n }),
-      ],
+      receiptLogs: [memoReceiptLog(request), transferLog({ to: seller, value: 19_000_000n })],
     });
 
     const result = await findMemoPaymentProof({

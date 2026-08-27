@@ -6,7 +6,11 @@ import type {
   ObservedPayment,
   WebhookEvent,
 } from './types.js';
-import type { ReceiptStore, ReceiptStoreInvoiceFilter } from './store.js';
+import type {
+  ReceiptStore,
+  ReceiptStoreInvoiceFilter,
+  TransactionalReceiptStore,
+} from './store.js';
 import { createWebhookEvent } from './webhooks.js';
 
 export interface PersistentReceiptLedgerConfig {
@@ -22,18 +26,15 @@ export class PersistentReceiptLedger {
 
   async createInvoice(input: CreateInvoiceInput): Promise<PaymentInvoice> {
     const invoice = createInvoice(input);
-    await this.addInvoice(invoice);
-    await this.saveWebhookEvent(createWebhookEvent('invoice.created', { invoice }));
-    return invoice;
+    return this.withTransaction(async (store) => {
+      await this.addInvoiceToStore(store, invoice);
+      await store.saveWebhookEvent(createWebhookEvent('invoice.created', { invoice }));
+      return invoice;
+    });
   }
 
   async addInvoice(invoice: PaymentInvoice): Promise<void> {
-    const existing = await this.store.getInvoice(invoice.id);
-    if (existing) {
-      throw new Error(`Invoice already exists: ${invoice.id}`);
-    }
-
-    await this.store.saveInvoice(invoice);
+    await this.withTransaction((store) => this.addInvoiceToStore(store, invoice));
   }
 
   async getInvoice(id: string): Promise<PaymentInvoice | undefined> {
@@ -45,16 +46,31 @@ export class PersistentReceiptLedger {
   }
 
   async recordPayment(invoiceId: string, payment: ObservedPayment): Promise<PaymentReceipt> {
+    return this.withTransaction((store) => this.recordPaymentInStore(store, invoiceId, payment));
+  }
+
+  private async recordPaymentInStore(
+    store: ReceiptStore,
+    invoiceId: string,
+    payment: ObservedPayment,
+  ): Promise<PaymentReceipt> {
     const existingReceipt = payment.txHash
-      ? await this.getReceiptByTxHash(payment.txHash, invoiceId)
+      ? await store.getReceiptByTxHash(payment.txHash)
       : undefined;
     if (existingReceipt) {
+      if (existingReceipt.invoiceId !== invoiceId) {
+        throw new Error(
+          `Payment transaction ${payment.txHash} is already assigned to invoice ${existingReceipt.invoiceId}`,
+        );
+      }
       return existingReceipt;
     }
 
-    const invoice = await this.requireInvoice(invoiceId);
-    const observedInvoice = await this.updateInvoice(invoice.id, { status: 'observed' });
-    await this.saveWebhookEvent(
+    const invoice = await this.requireInvoiceFromStore(store, invoiceId);
+    const observedInvoice = await this.updateInvoiceInStore(store, invoice.id, {
+      status: 'observed',
+    });
+    await store.saveWebhookEvent(
       createWebhookEvent('invoice.observed', {
         invoice: observedInvoice,
         payment,
@@ -62,12 +78,17 @@ export class PersistentReceiptLedger {
     );
 
     const receipt = createReceipt(observedInvoice, payment);
-    await this.store.saveReceipt(receipt);
+    await store.saveReceipt(receipt);
     const persistedReceipt = payment.txHash
-      ? ((await this.store.getReceiptByTxHash(payment.txHash, invoice.id)) ?? receipt)
+      ? ((await store.getReceiptByTxHash(payment.txHash)) ?? receipt)
       : receipt;
-    const paidInvoice = await this.updateInvoice(invoice.id, { status: 'paid' });
-    await this.saveWebhookEvent(
+    if (persistedReceipt.invoiceId !== invoice.id) {
+      throw new Error(
+        `Payment transaction ${payment.txHash} is already assigned to invoice ${persistedReceipt.invoiceId}`,
+      );
+    }
+    const paidInvoice = await this.updateInvoiceInStore(store, invoice.id, { status: 'paid' });
+    await store.saveWebhookEvent(
       createWebhookEvent('invoice.paid', {
         invoice: paidInvoice,
         receipt: persistedReceipt,
@@ -77,45 +98,69 @@ export class PersistentReceiptLedger {
   }
 
   async markExpired(invoiceId: string, now = Date.now()): Promise<PaymentInvoice> {
-    const invoice = await this.requireInvoice(invoiceId);
-
-    if (!isInvoiceExpired(invoice, now)) {
-      throw new Error(`Invoice is not expired: ${invoiceId}`);
-    }
-
-    const expiredInvoice = await this.updateInvoice(invoiceId, { status: 'expired' });
-    await this.saveWebhookEvent(createWebhookEvent('invoice.expired', { invoice: expiredInvoice }));
-    return expiredInvoice;
+    return this.withTransaction(async (store) => {
+      const invoice = await this.requireInvoiceFromStore(store, invoiceId);
+      if (!isInvoiceExpired(invoice, now)) {
+        throw new Error(`Invoice is not expired: ${invoiceId}`);
+      }
+      const expiredInvoice = await this.updateInvoiceInStore(store, invoiceId, {
+        status: 'expired',
+      });
+      await store.saveWebhookEvent(
+        createWebhookEvent('invoice.expired', { invoice: expiredInvoice }),
+      );
+      return expiredInvoice;
+    });
   }
 
   async markRefunded(
     invoiceId: string,
     refund: { txHash?: `0x${string}`; refundedAt?: number } = {},
   ): Promise<PaymentReceipt> {
-    const invoice = await this.requireInvoice(invoiceId);
-    const receipt = (await this.store.listReceipts()).find((item) => item.invoiceId === invoiceId);
-
-    if (!receipt) {
-      throw new Error(`Cannot refund invoice without a paid receipt: ${invoiceId}`);
-    }
-
-    const refundedReceipt: PaymentReceipt = {
-      ...receipt,
-      id: `rfnd_${receipt.id}`,
-      status: 'refunded',
-      txHash: refund.txHash ?? receipt.txHash,
-      createdAt: refund.refundedAt ?? Date.now(),
-    };
-
-    await this.store.saveReceipt(refundedReceipt);
-    const refundedInvoice = await this.updateInvoice(invoice.id, { status: 'refunded' });
-    await this.saveWebhookEvent(
-      createWebhookEvent('invoice.refunded', {
-        invoice: refundedInvoice,
-        receipt: refundedReceipt,
-      }),
-    );
-    return refundedReceipt;
+    return this.withTransaction(async (store) => {
+      const invoice = await this.requireInvoiceFromStore(store, invoiceId);
+      const invoiceReceipts = (await store.listReceipts()).filter(
+        (item) => item.invoiceId === invoiceId,
+      );
+      const existingRefund = invoiceReceipts.find((item) => item.status === 'refunded');
+      if (invoice.status === 'refunded' && existingRefund) return existingRefund;
+      if (refund.txHash) {
+        const transactionReceipt = await store.getReceiptByTxHash(refund.txHash);
+        if (transactionReceipt) {
+          if (
+            transactionReceipt.invoiceId === invoiceId &&
+            transactionReceipt.status === 'refunded'
+          ) {
+            return transactionReceipt;
+          }
+          throw new Error(
+            `Refund transaction ${refund.txHash} is already assigned to receipt ${transactionReceipt.id}`,
+          );
+        }
+      }
+      const receipt = invoiceReceipts.find((item) => item.status === 'paid');
+      if (!receipt) {
+        throw new Error(`Cannot refund invoice without a paid receipt: ${invoiceId}`);
+      }
+      const refundedReceipt: PaymentReceipt = {
+        ...receipt,
+        id: `rfnd_${receipt.id}`,
+        status: 'refunded',
+        txHash: refund.txHash,
+        createdAt: refund.refundedAt ?? Date.now(),
+      };
+      await store.saveReceipt(refundedReceipt);
+      const refundedInvoice = await this.updateInvoiceInStore(store, invoice.id, {
+        status: 'refunded',
+      });
+      await store.saveWebhookEvent(
+        createWebhookEvent('invoice.refunded', {
+          invoice: refundedInvoice,
+          receipt: refundedReceipt,
+        }),
+      );
+      return refundedReceipt;
+    });
   }
 
   async getReceipt(id: string): Promise<PaymentReceipt | undefined> {
@@ -137,12 +182,14 @@ export class PersistentReceiptLedger {
     return this.store.listWebhookEvents();
   }
 
-  private async saveWebhookEvent(event: WebhookEvent): Promise<void> {
-    await this.store.saveWebhookEvent(event);
+  private async addInvoiceToStore(store: ReceiptStore, invoice: PaymentInvoice): Promise<void> {
+    const existing = await store.getInvoice(invoice.id);
+    if (existing) throw new Error(`Invoice already exists: ${invoice.id}`);
+    await store.saveInvoice(invoice);
   }
 
-  private async requireInvoice(id: string): Promise<PaymentInvoice> {
-    const invoice = await this.store.getInvoice(id);
+  private async requireInvoiceFromStore(store: ReceiptStore, id: string): Promise<PaymentInvoice> {
+    const invoice = await store.getInvoice(id);
     if (!invoice) {
       throw new Error(`Invoice not found: ${id}`);
     }
@@ -150,10 +197,21 @@ export class PersistentReceiptLedger {
     return invoice;
   }
 
-  private async updateInvoice(id: string, patch: Partial<PaymentInvoice>): Promise<PaymentInvoice> {
-    const invoice = await this.requireInvoice(id);
+  private async updateInvoiceInStore(
+    store: ReceiptStore,
+    id: string,
+    patch: Partial<PaymentInvoice>,
+  ): Promise<PaymentInvoice> {
+    const invoice = await this.requireInvoiceFromStore(store, id);
     const next = { ...invoice, ...patch };
-    await this.store.saveInvoice(next);
+    await store.saveInvoice(next);
     return next;
+  }
+
+  private withTransaction<T>(handler: (store: ReceiptStore) => Promise<T>): Promise<T> {
+    const store = this.store as ReceiptStore & Partial<TransactionalReceiptStore>;
+    return typeof store.transaction === 'function'
+      ? store.transaction(handler)
+      : handler(this.store);
   }
 }

@@ -58,9 +58,8 @@ export function verifyWebhookSignature(params: {
     return false;
   }
 
-  const payload = typeof params.payload === 'string'
-    ? params.payload
-    : serializeWebhookPayload(params.payload);
+  const payload =
+    typeof params.payload === 'string' ? params.payload : serializeWebhookPayload(params.payload);
   const expected = createWebhookSignature(payload, params.secret, parsed.timestamp);
 
   return timingSafeStringEqual(expected, parsed.signature);
@@ -71,12 +70,12 @@ export function serializeWebhookPayload(event: WebhookEvent): string {
 }
 
 function createWebhookSignature(payload: string, secret: string, timestamp: number): string {
-  return createHmac('sha256', secret)
-    .update(`${timestamp}.${payload}`)
-    .digest('hex');
+  return createHmac('sha256', secret).update(`${timestamp}.${payload}`).digest('hex');
 }
 
-function parseWebhookSignatureHeader(header: string): { timestamp: number; signature: string } | null {
+function parseWebhookSignatureHeader(
+  header: string,
+): { timestamp: number; signature: string } | null {
   const parts = Object.fromEntries(
     header.split(',').map((part) => {
       const [key, value] = part.split('=');

@@ -8,10 +8,15 @@ import { tsconfigTemplate } from './templates/tsconfig.js';
 import { envTemplate } from './templates/env.js';
 
 export async function generateProject(config: ProjectConfig): Promise<string[]> {
-  const targetDir = path.resolve(process.cwd(), config.projectName);
+  validateProjectName(config.projectName);
+  const baseDir = path.resolve(process.cwd());
+  const targetDir = path.resolve(baseDir, config.projectName);
+  if (path.dirname(targetDir) !== baseDir) {
+    throw new Error('Project directory must be a direct child of the current directory');
+  }
   const filesCreated: string[] = [];
 
-  // Create directory
+  await assertEmptyOrMissingDirectory(targetDir);
   await fs.mkdir(targetDir, { recursive: true });
 
   // Generate common files
@@ -57,6 +62,34 @@ export async function generateProject(config: ProjectConfig): Promise<string[]> 
 
 async function write(dir: string, file: string, content: string, tracking: string[]) {
   const filePath = path.join(dir, file);
-  await fs.writeFile(filePath, content, 'utf-8');
+  await fs.writeFile(filePath, content, { encoding: 'utf-8', flag: 'wx' });
   tracking.push(file);
+}
+
+function validateProjectName(projectName: string): void {
+  if (
+    projectName.length === 0 ||
+    projectName.length > 214 ||
+    projectName === '.' ||
+    projectName === '..' ||
+    !/^[a-z0-9][a-z0-9._-]*$/.test(projectName)
+  ) {
+    throw new Error('Project name must be a lowercase npm-compatible name without path separators');
+  }
+}
+
+async function assertEmptyOrMissingDirectory(targetDir: string): Promise<void> {
+  try {
+    const entries = await fs.readdir(targetDir);
+    if (entries.length > 0) {
+      throw new Error(`Target directory is not empty: ${targetDir}`);
+    }
+  } catch (error) {
+    if (isMissingPathError(error)) return;
+    throw error;
+  }
+}
+
+function isMissingPathError(error: unknown): boolean {
+  return Boolean(error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT');
 }

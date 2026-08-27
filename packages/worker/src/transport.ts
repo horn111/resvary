@@ -32,9 +32,17 @@ export interface HttpWebhookTransportConfig {
 }
 
 export function createHttpWebhookTransport(config: HttpWebhookTransportConfig): OutboxTransport {
+  const url = new URL(config.url);
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new Error('Webhook URL must use http or https');
+  }
+  if (!config.secret.trim()) throw new Error('Webhook secret is required');
   const fetcher = config.fetch ?? globalThis.fetch;
   if (!fetcher) throw new Error('A Fetch API implementation is required');
   const timeoutMs = config.timeoutMs ?? 10_000;
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    throw new Error('Webhook timeoutMs must be a positive number');
+  }
   return {
     async deliver(event, context) {
       const controller = new AbortController();
@@ -43,17 +51,18 @@ export function createHttpWebhookTransport(config: HttpWebhookTransportConfig): 
         timeoutMs,
       );
       const abort = () => controller.abort(context.signal.reason);
-      context.signal.addEventListener('abort', abort, { once: true });
+      if (context.signal.aborted) abort();
+      else context.signal.addEventListener('abort', abort, { once: true });
       try {
         const webhook = createCreditWebhookEvent(event);
         const signature = signCreditOutboxEvent(event, config.secret);
         const response = await fetcher(config.url, {
           method: 'POST',
           headers: {
+            ...config.headers,
             'content-type': 'application/json',
             'x-resvary-signature': signature.header,
             'x-resvary-event-id': event.id,
-            ...config.headers,
           },
           body: serializeWebhookPayload(webhook),
           signal: controller.signal,

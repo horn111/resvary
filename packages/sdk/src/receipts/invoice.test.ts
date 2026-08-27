@@ -40,23 +40,29 @@ describe('Arc invoices and receipts', () => {
   it('rejects payments with the wrong recipient, memo, or amount', () => {
     const invoice = createInvoice({ id: 'inv_reject', amount: '19', payTo: seller });
 
-    expect(matchPaymentToInvoice(invoice, {
-      to: '0x3333333333333333333333333333333333333333',
-      amount: '19',
-      memo: invoice.memo,
-    })).toEqual({ success: false, reason: 'wrong_recipient' });
+    expect(
+      matchPaymentToInvoice(invoice, {
+        to: '0x3333333333333333333333333333333333333333',
+        amount: '19',
+        memo: invoice.memo,
+      }),
+    ).toEqual({ success: false, reason: 'wrong_recipient' });
 
-    expect(matchPaymentToInvoice(invoice, {
-      to: seller,
-      amount: '19',
-      memo: 'different',
-    })).toEqual({ success: false, reason: 'wrong_memo' });
+    expect(
+      matchPaymentToInvoice(invoice, {
+        to: seller,
+        amount: '19',
+        memo: 'different',
+      }),
+    ).toEqual({ success: false, reason: 'wrong_memo' });
 
-    expect(matchPaymentToInvoice(invoice, {
-      to: seller,
-      amount: '18.99',
-      memo: invoice.memo,
-    })).toEqual({ success: false, reason: 'insufficient_amount' });
+    expect(
+      matchPaymentToInvoice(invoice, {
+        to: seller,
+        amount: '18.99',
+        memo: invoice.memo,
+      }),
+    ).toEqual({ success: false, reason: 'insufficient_amount' });
   });
 
   it('creates a receipt from a matching payment', () => {
@@ -66,14 +72,18 @@ describe('Arc invoices and receipts', () => {
       payTo: seller,
       metadata: { plan: 'pro' },
     });
-    const receipt = createReceipt(invoice, {
-      txHash: '0xabc' as `0x${string}`,
-      from: buyer,
-      to: seller,
-      amount: '19',
-      memo: invoice.memo,
-      metadata: { source: 'test' },
-    }, 1_700_000_000_000);
+    const receipt = createReceipt(
+      invoice,
+      {
+        txHash: '0xabc' as `0x${string}`,
+        from: buyer,
+        to: seller,
+        amount: '19',
+        memo: invoice.memo,
+        metadata: { source: 'test' },
+      },
+      1_700_000_000_000,
+    );
 
     expect(receipt.invoiceId).toBe(invoice.id);
     expect(receipt.status).toBe('paid');
@@ -90,10 +100,16 @@ describe('Arc invoices and receipts', () => {
     });
 
     expect(isInvoiceExpired(invoice, 1_001)).toBe(true);
-    expect(matchPaymentToInvoice(invoice, {
-      to: seller,
-      amount: '19',
-      memo: invoice.memo,
-    }, 1_001)).toEqual({ success: false, reason: 'invoice_expired' });
+    expect(
+      matchPaymentToInvoice(
+        invoice,
+        {
+          to: seller,
+          amount: '19',
+          memo: invoice.memo,
+        },
+        1_001,
+      ),
+    ).toEqual({ success: false, reason: 'invoice_expired' });
   });
 });

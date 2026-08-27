@@ -39,13 +39,7 @@ export function createInvoiceMemoData(memo: string): `0x${string}` {
 export function parseInvoiceMemo(memo: string): ParsedInvoiceMemo | null {
   const [namespace, kind, version, invoiceId, ...extra] = memo.split(':');
 
-  if (
-    !namespace
-    || kind !== 'invoice'
-    || version !== 'v1'
-    || !invoiceId
-    || extra.length > 0
-  ) {
+  if (!namespace || kind !== 'invoice' || version !== 'v1' || !invoiceId || extra.length > 0) {
     return null;
   }
 

@@ -66,7 +66,11 @@ describe('SqliteReceiptStore', () => {
   it('enforces duplicate tx idempotency through PersistentReceiptLedger', async () => {
     const store = createSqliteReceiptStore({ path: tempDatabasePath() });
     const ledger = new PersistentReceiptLedger({ store });
-    const invoice = await ledger.createInvoice({ id: 'inv_sqlite_dupe', amount: '1', payTo: seller });
+    const invoice = await ledger.createInvoice({
+      id: 'inv_sqlite_dupe',
+      amount: '1',
+      payTo: seller,
+    });
     const payment = {
       txHash,
       from: buyer,
@@ -80,6 +84,40 @@ describe('SqliteReceiptStore', () => {
 
     expect(second.id).toBe(first.id);
     expect(await ledger.listReceipts()).toHaveLength(1);
+    store.close();
+  });
+
+  it('rejects assigning one transaction hash to different invoices', async () => {
+    const store = createSqliteReceiptStore({ path: tempDatabasePath() });
+    const ledger = new PersistentReceiptLedger({ store });
+    const first = await ledger.createInvoice({
+      id: 'inv_sqlite_first',
+      amount: '1',
+      payTo: seller,
+    });
+    const second = await ledger.createInvoice({
+      id: 'inv_sqlite_second',
+      amount: '1',
+      payTo: seller,
+    });
+    await ledger.recordPayment(first.id, {
+      txHash,
+      from: buyer,
+      to: seller,
+      amount: '1',
+      memo: first.memo,
+    });
+
+    await expect(
+      ledger.recordPayment(second.id, {
+        txHash,
+        from: buyer,
+        to: seller,
+        amount: '1',
+        memo: second.memo,
+      }),
+    ).rejects.toThrow('already assigned');
+    await expect(ledger.getInvoice(second.id)).resolves.toMatchObject({ status: 'open' });
     store.close();
   });
 });

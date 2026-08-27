@@ -1,9 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import type {
-  WebhookDeliveryAttempt,
-  WebhookEvent,
-  WebhookEventType,
-} from './types.js';
+import type { WebhookDeliveryAttempt, WebhookEvent, WebhookEventType } from './types.js';
 import type { ReceiptStore, ReceiptStoreDeliveryFilter } from './store.js';
 import { signWebhookEvent, verifyWebhookSignature } from './webhooks.js';
 
@@ -105,9 +101,7 @@ function parseWebhookPayload(payload: WebhookEvent | string): {
   eventId: string;
   eventType: WebhookEventType | 'unknown';
 } {
-  const event = typeof payload === 'string'
-    ? parseJson(payload)
-    : payload;
+  const event = typeof payload === 'string' ? parseJson(payload) : payload;
 
   if (!isWebhookEventLike(event)) {
     return {
@@ -136,8 +130,10 @@ function isWebhookEventLike(value: unknown): value is WebhookEvent {
   }
 
   const event = value as Partial<WebhookEvent>;
-  return typeof event.id === 'string'
-    && typeof event.type === 'string'
-    && typeof event.createdAt === 'number'
-    && 'data' in event;
+  return (
+    typeof event.id === 'string' &&
+    typeof event.type === 'string' &&
+    typeof event.createdAt === 'number' &&
+    'data' in event
+  );
 }

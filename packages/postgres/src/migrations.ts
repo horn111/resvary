@@ -1,7 +1,7 @@
 import type { PoolClient } from 'pg';
 import { createPostgresHandle, table, type PostgresConnectionConfig } from './connection.js';
 
-export const POSTGRES_SCHEMA_VERSION = 1;
+export const POSTGRES_SCHEMA_VERSION = 2;
 const MIGRATION_LOCK_ID = 7_226_519_918;
 
 export interface PostgresMigrationStatus {
@@ -26,9 +26,9 @@ export async function getPostgresMigrationStatus(
     let currentVersion = 0;
     if (exists.rows[0]?.exists) {
       const result = await handle.pool.query<{ version: number }>(
-        `SELECT COALESCE(MAX(version), 0)::int AS version FROM ${table(handle, 'resvary_schema_migrations')}`,
+        `SELECT version FROM ${table(handle, 'resvary_schema_migrations')} ORDER BY version ASC`,
       );
-      currentVersion = result.rows[0]?.version ?? 0;
+      currentVersion = assertMigrationHistory(result.rows.map((row) => row.version));
     }
     return {
       schema: handle.schema,
@@ -59,9 +59,11 @@ export async function migratePostgres(
       )
     `);
     const current = await client.query<{ version: number }>(
-      `SELECT COALESCE(MAX(version), 0)::int AS version FROM ${table(handle, 'resvary_schema_migrations')}`,
+      `SELECT version FROM ${table(handle, 'resvary_schema_migrations')} ORDER BY version ASC`,
     );
-    if ((current.rows[0]?.version ?? 0) < 1) await applyV1(client, handle.schema);
+    const currentVersion = assertMigrationHistory(current.rows.map((row) => row.version));
+    if (currentVersion < 1) await applyV1(client, handle.schema);
+    if (currentVersion < 2) await applyV2(client, handle.schema);
   } finally {
     await client.query('SELECT pg_advisory_unlock($1)', [MIGRATION_LOCK_ID]).catch(() => undefined);
     client.release();
@@ -70,7 +72,26 @@ export async function migratePostgres(
   return getPostgresMigrationStatus(config);
 }
 
-async function applyV1(client: PoolClient, schema: string): Promise<void> {
+function assertMigrationHistory(versions: number[]): number {
+  for (let index = 0; index < versions.length; index += 1) {
+    const expected = index + 1;
+    if (versions[index] !== expected) {
+      throw new Error(
+        `Invalid Postgres migration history: expected version ${expected}, found ${versions[index]}`,
+      );
+    }
+  }
+  const currentVersion = versions.at(-1) ?? 0;
+  if (currentVersion > POSTGRES_SCHEMA_VERSION) {
+    throw new Error(
+      `Postgres schema version ${currentVersion} is newer than supported version ${POSTGRES_SCHEMA_VERSION}`,
+    );
+  }
+  return currentVersion;
+}
+
+/** @internal Exported for sequential-migration verification. */
+export async function applyV1(client: PoolClient, schema: string): Promise<void> {
   const t = (name: string) => table({ schema }, name);
   await client.query('BEGIN');
   try {
@@ -172,6 +193,100 @@ async function applyV1(client: PoolClient, schema: string): Promise<void> {
     `);
     await client.query(
       `INSERT INTO ${t('resvary_schema_migrations')}(version, applied_at) VALUES (1, $1)`,
+      [Date.now()],
+    );
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  }
+}
+
+async function applyV2(client: PoolClient, schema: string): Promise<void> {
+  const t = (name: string) => table({ schema }, name);
+  await client.query('BEGIN');
+  try {
+    const duplicateReceipt = await client.query<{ tx_hash_norm: string; count: string }>(
+      `SELECT tx_hash_norm, COUNT(*)::text AS count
+       FROM ${t('resvary_receipts')}
+       WHERE tx_hash_norm IS NOT NULL
+       GROUP BY tx_hash_norm
+       HAVING COUNT(*) > 1
+       LIMIT 1`,
+    );
+    if (duplicateReceipt.rows[0]) {
+      throw new Error(
+        `Cannot enforce receipt transaction uniqueness: ${duplicateReceipt.rows[0].count} receipts use ${duplicateReceipt.rows[0].tx_hash_norm}`,
+      );
+    }
+
+    await client.query(`
+      DROP INDEX IF EXISTS "${schema}".resvary_receipts_invoice_tx_hash;
+      CREATE UNIQUE INDEX resvary_receipts_tx_hash
+        ON ${t('resvary_receipts')}(tx_hash_norm)
+        WHERE tx_hash_norm IS NOT NULL;
+
+      ALTER TABLE ${t('resvary_credit_accounts')}
+        ADD CONSTRAINT resvary_credit_accounts_nonnegative
+        CHECK (posted_units >= 0 AND reserved_units >= 0 AND reserved_units <= posted_units);
+      ALTER TABLE ${t('resvary_credit_grants')}
+        ADD CONSTRAINT resvary_credit_grants_amount_positive CHECK (amount_units > 0),
+        ADD CONSTRAINT resvary_credit_grants_account_fk FOREIGN KEY (account_id)
+          REFERENCES ${t('resvary_credit_accounts')}(id);
+      ALTER TABLE ${t('resvary_price_versions')}
+        ADD CONSTRAINT resvary_price_versions_version_positive CHECK (version > 0),
+        ADD CONSTRAINT resvary_price_versions_meter_fk FOREIGN KEY (meter_id)
+          REFERENCES ${t('resvary_meters')}(id);
+      ALTER TABLE ${t('resvary_credit_reservations')}
+        ADD CONSTRAINT resvary_credit_reservations_status
+          CHECK (status IN ('open', 'committed', 'released', 'expired')),
+        ADD CONSTRAINT resvary_credit_reservations_units_nonnegative CHECK (reserved_units >= 0),
+        ADD CONSTRAINT resvary_credit_reservations_account_fk FOREIGN KEY (account_id)
+          REFERENCES ${t('resvary_credit_accounts')}(id);
+      ALTER TABLE ${t('resvary_usage_events')}
+        ADD CONSTRAINT resvary_usage_events_account_fk FOREIGN KEY (account_id)
+          REFERENCES ${t('resvary_credit_accounts')}(id);
+      ALTER TABLE ${t('resvary_usage_receipts')}
+        ADD CONSTRAINT resvary_usage_receipts_units_nonnegative CHECK (charged_units >= 0),
+        ADD CONSTRAINT resvary_usage_receipts_account_fk FOREIGN KEY (account_id)
+          REFERENCES ${t('resvary_credit_accounts')}(id),
+        ADD CONSTRAINT resvary_usage_receipts_reservation_fk FOREIGN KEY (reservation_id)
+          REFERENCES ${t('resvary_credit_reservations')}(id),
+        ADD CONSTRAINT resvary_usage_receipts_usage_event_fk FOREIGN KEY (usage_event_id)
+          REFERENCES ${t('resvary_usage_events')}(id);
+      ALTER TABLE ${t('resvary_ledger_entries')}
+        ADD CONSTRAINT resvary_ledger_entries_balance_nonnegative CHECK (balance_after_units >= 0),
+        ADD CONSTRAINT resvary_ledger_entries_account_fk FOREIGN KEY (account_id)
+          REFERENCES ${t('resvary_credit_accounts')}(id);
+      ALTER TABLE ${t('resvary_funding_intents')}
+        ADD CONSTRAINT resvary_funding_intents_status
+          CHECK (status IN ('pending', 'confirmed', 'failed')),
+        ADD CONSTRAINT resvary_funding_intents_units_positive CHECK (requested_units > 0);
+      ALTER TABLE ${t('resvary_funding_transactions')}
+        ADD CONSTRAINT resvary_funding_transactions_units_positive CHECK (amount_units > 0),
+        ADD CONSTRAINT resvary_funding_transactions_intent_fk FOREIGN KEY (funding_intent_id)
+          REFERENCES ${t('resvary_funding_intents')}(id);
+      ALTER TABLE ${t('resvary_outbox_events')}
+        ADD CONSTRAINT resvary_outbox_events_status
+          CHECK (status IN ('pending', 'processing', 'delivered', 'dead_letter')),
+        ADD CONSTRAINT resvary_outbox_events_attempt_nonnegative CHECK (attempt_count >= 0);
+      ALTER TABLE ${t('resvary_invoices')}
+        ADD CONSTRAINT resvary_invoices_status
+          CHECK (status IN ('open', 'observed', 'paid', 'expired', 'refunded', 'void')),
+        ADD CONSTRAINT resvary_invoices_amount_positive CHECK (amount_units > 0);
+      ALTER TABLE ${t('resvary_receipts')}
+        ADD CONSTRAINT resvary_receipts_status CHECK (status IN ('paid', 'refunded')),
+        ADD CONSTRAINT resvary_receipts_amount_positive CHECK (amount_units > 0),
+        ADD CONSTRAINT resvary_receipts_invoice_fk FOREIGN KEY (invoice_id)
+          REFERENCES ${t('resvary_invoices')}(id);
+      ALTER TABLE ${t('arc_webhook_deliveries')}
+        ADD CONSTRAINT arc_webhook_deliveries_status CHECK (status IN ('verified', 'failed')),
+        ADD CONSTRAINT arc_webhook_deliveries_attempt_positive CHECK (attempt > 0);
+      ALTER TABLE ${t('arc_watcher_cursors')}
+        ADD CONSTRAINT arc_watcher_cursors_block_nonnegative CHECK (next_from_block >= 0);
+    `);
+    await client.query(
+      `INSERT INTO ${t('resvary_schema_migrations')}(version, applied_at) VALUES (2, $1)`,
       [Date.now()],
     );
     await client.query('COMMIT');

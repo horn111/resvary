@@ -22,7 +22,7 @@ describe('UsageMeter', () => {
   it('calculates getSummary totals correctly', () => {
     meter.record({ buyer: buyer1, amount: '0.01' });
     meter.record({ buyer: buyer1, amount: '0.02' });
-    
+
     const summary = meter.getSummary(buyer1);
     expect(summary.totalRequests).toBe(2);
     expect(summary.totalSpent).toBe('0.030000');
@@ -38,7 +38,7 @@ describe('UsageMeter', () => {
   it('filters records by buyer and status in getRecords', () => {
     const r1 = meter.record({ buyer: buyer1, amount: '0.01' });
     const r2 = meter.record({ buyer: buyer2, amount: '0.02' });
-    
+
     // Manual mutate status for testing
     r1.status = 'settled';
 

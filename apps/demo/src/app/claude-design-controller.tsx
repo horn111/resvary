@@ -461,7 +461,7 @@ function wordDots(text: string, width: number, height: number, gap: number, font
       cells.map((cell) => [`${cell.column}:${cell.row}`, cell] as const),
     );
     const visited = new Set<string>();
-    const components: typeof cells[] = [];
+    const components: (typeof cells)[] = [];
 
     for (const cell of cells) {
       const startKey = `${cell.column}:${cell.row}`;
@@ -495,9 +495,7 @@ function wordDots(text: string, width: number, height: number, gap: number, font
     const rowCounts = new Map<number, number>();
     for (const cell of cleaned) rowCounts.set(cell.row, (rowCounts.get(cell.row) ?? 0) + 1);
     const stableTopRow = Math.min(
-      ...[...rowCounts.entries()]
-        .filter(([, count]) => count >= 3)
-        .map(([row]) => row),
+      ...[...rowCounts.entries()].filter(([, count]) => count >= 3).map(([row]) => row),
     );
     cleaned = cleaned.filter((cell) => cell.row >= stableTopRow);
     for (const cell of cleaned) {

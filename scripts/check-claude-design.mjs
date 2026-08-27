@@ -1,16 +1,18 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { runInNewContext } from 'node:vm';
 
 const generatedPath = resolve(
   import.meta.dirname,
   '../apps/demo/src/app/claude-design.generated.ts',
 );
 const generated = readFileSync(generatedPath, 'utf8');
-const match = generated.match(/export const CLAUDE_DESIGN_HTML = ("[\s\S]*");\s*$/);
+const match = generated.match(/export const CLAUDE_DESIGN_HTML =\s*([\s\S]*);\s*$/);
 
 if (!match) throw new Error('Generated Claude Design HTML constant was not found');
 
-const html = JSON.parse(match[1]);
+const html = runInNewContext(match[1], Object.create(null), { timeout: 1_000 });
+if (typeof html !== 'string') throw new Error('Generated Claude Design HTML must be a string');
 const assertions = [
   ['one main landmark', (html.match(/<main\b/g) ?? []).length === 1],
   ['interactive demo mount', html.includes('data-claude-demo-root="true"')],

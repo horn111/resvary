@@ -44,7 +44,10 @@ export interface ReceiptStore {
 
   saveReceipt(receipt: PaymentReceipt): Promise<void>;
   getReceipt(id: string): Promise<PaymentReceipt | undefined>;
-  getReceiptByTxHash(txHash: `0x${string}`, invoiceId?: string): Promise<PaymentReceipt | undefined>;
+  getReceiptByTxHash(
+    txHash: `0x${string}`,
+    invoiceId?: string,
+  ): Promise<PaymentReceipt | undefined>;
   listReceipts(): Promise<PaymentReceipt[]>;
 
   saveWebhookEvent(event: WebhookEvent): Promise<void>;
@@ -60,12 +63,47 @@ export interface ReceiptStore {
   deleteWatcherCursor(key: string): Promise<void>;
 }
 
-export class InMemoryReceiptStore implements ReceiptStore {
+export interface TransactionalReceiptStore extends ReceiptStore {
+  transaction<T>(handler: (store: ReceiptStore) => Promise<T>): Promise<T>;
+}
+
+export class InMemoryReceiptStore implements TransactionalReceiptStore {
   private readonly invoices = new Map<string, PaymentInvoice>();
   private readonly receipts = new Map<string, PaymentReceipt>();
   private readonly events = new Map<string, WebhookEvent>();
   private readonly deliveries = new Map<string, WebhookDeliveryAttempt>();
   private readonly cursors = new Map<string, WatcherCursor>();
+  private transactionTail: Promise<void> = Promise.resolve();
+
+  async transaction<T>(handler: (store: ReceiptStore) => Promise<T>): Promise<T> {
+    let release!: () => void;
+    const current = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const previous = this.transactionTail;
+    this.transactionTail = previous.then(() => current);
+    await previous;
+
+    const snapshot = {
+      invoices: new Map(this.invoices),
+      receipts: new Map(this.receipts),
+      events: new Map(this.events),
+      deliveries: new Map(this.deliveries),
+      cursors: new Map(this.cursors),
+    };
+    try {
+      return await handler(this);
+    } catch (error) {
+      restoreMap(this.invoices, snapshot.invoices);
+      restoreMap(this.receipts, snapshot.receipts);
+      restoreMap(this.events, snapshot.events);
+      restoreMap(this.deliveries, snapshot.deliveries);
+      restoreMap(this.cursors, snapshot.cursors);
+      throw error;
+    } finally {
+      release();
+    }
+  }
 
   async saveInvoice(invoice: PaymentInvoice): Promise<void> {
     this.invoices.set(invoice.id, invoice);
@@ -101,10 +139,11 @@ export class InMemoryReceiptStore implements ReceiptStore {
     txHash: `0x${string}`,
     invoiceId?: string,
   ): Promise<PaymentReceipt | undefined> {
-    return [...this.receipts.values()].find((receipt) => (
-      receipt.txHash?.toLowerCase() === txHash.toLowerCase()
-      && (invoiceId === undefined || receipt.invoiceId === invoiceId)
-    ));
+    return [...this.receipts.values()].find(
+      (receipt) =>
+        receipt.txHash?.toLowerCase() === txHash.toLowerCase() &&
+        (invoiceId === undefined || receipt.invoiceId === invoiceId),
+    );
   }
 
   async listReceipts(): Promise<PaymentReceipt[]> {
@@ -166,10 +205,11 @@ export class InMemoryReceiptStore implements ReceiptStore {
   }
 }
 
+function restoreMap<K, V>(target: Map<K, V>, source: Map<K, V>): void {
+  target.clear();
+  for (const [key, value] of source) target.set(key, value);
+}
+
 export function createWatcherCursorKey(input: WatcherCursorKeyInput): string {
-  return [
-    input.network,
-    input.invoiceId,
-    input.memoId?.toLowerCase() ?? 'no-memo-id',
-  ].join(':');
+  return [input.network, input.invoiceId, input.memoId?.toLowerCase() ?? 'no-memo-id'].join(':');
 }

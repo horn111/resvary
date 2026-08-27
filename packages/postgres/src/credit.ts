@@ -186,13 +186,19 @@ export class PostgresCreditStore implements CreditStore, OutboxDeliveryStore {
     return result.rows.map(parseOutboxRow);
   }
 
-  async completeOutboxEvent(eventId: string, workerId: string, deliveredAt: number): Promise<void> {
+  async completeOutboxEvent(
+    eventId: string,
+    workerId: string,
+    deliveredAt: number,
+    attemptCount?: number,
+  ): Promise<void> {
     const result = await this.handle.pool.query(
       `UPDATE ${table(this.handle, 'resvary_outbox_events')}
        SET status = 'delivered', delivered_at = $3, next_attempt_at = $3,
            lease_owner = NULL, lease_expires_at = NULL, last_error = NULL
-       WHERE id = $1 AND status = 'processing' AND lease_owner = $2`,
-      [eventId, workerId, deliveredAt],
+       WHERE id = $1 AND status = 'processing' AND lease_owner = $2
+         AND ($4::integer IS NULL OR attempt_count = $4)`,
+      [eventId, workerId, deliveredAt, attemptCount ?? null],
     );
     if (result.rowCount !== 1) throw new Error(`Outbox lease lost for event ${eventId}`);
   }
@@ -202,13 +208,15 @@ export class PostgresCreditStore implements CreditStore, OutboxDeliveryStore {
       `UPDATE ${table(this.handle, 'resvary_outbox_events')}
        SET status = $4, next_attempt_at = $5, lease_owner = NULL,
            lease_expires_at = NULL, last_error = $3
-       WHERE id = $1 AND status = 'processing' AND lease_owner = $2`,
+        WHERE id = $1 AND status = 'processing' AND lease_owner = $2
+          AND ($6::integer IS NULL OR attempt_count = $6)`,
       [
         input.eventId,
         input.workerId,
         input.error,
         input.deadLetter ? 'dead_letter' : 'pending',
         input.nextAttemptAt,
+        input.attemptCount ?? null,
       ],
     );
     if (result.rowCount !== 1) throw new Error(`Outbox lease lost for event ${input.eventId}`);

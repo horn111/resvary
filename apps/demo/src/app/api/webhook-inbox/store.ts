@@ -41,8 +41,9 @@ export async function getDemoReceiptStore(): Promise<ReceiptStore> {
   if (mode === 'sqlite') {
     const { createSqliteReceiptStore } = await importOptionalSqliteStore();
     const store = createSqliteReceiptStore({
-      path: process.env.RESVARY_RECEIPTS_SQLITE_PATH
-        ?? join(process.cwd(), '.resvary', 'receipts.sqlite'),
+      path:
+        process.env.RESVARY_RECEIPTS_SQLITE_PATH ??
+        join(process.cwd(), '.resvary', 'receipts.sqlite'),
     });
     globalWebhookInbox.__resvaryReceiptStore = store;
     return store;
