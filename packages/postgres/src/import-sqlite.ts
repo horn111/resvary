@@ -315,7 +315,7 @@ export async function verifySqliteImport(config: SqliteImportConfig): Promise<Sq
           ).count
         : 0;
     }
-    return buildReport(
+    const report = await buildReport(
       source,
       client,
       handle.schema,
@@ -324,6 +324,7 @@ export async function verifySqliteImport(config: SqliteImportConfig): Promise<Sq
       counts,
       false,
     );
+    return report;
   } finally {
     source.exec('ROLLBACK');
     source.close();
