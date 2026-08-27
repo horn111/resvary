@@ -75,8 +75,6 @@ function canvas({ width, height, content, glowX = '50%', glowY = '50%' }) {
     </svg>`;
 }
 
-const textStyle = `font-family="Archivo, Helvetica Neue, Arial, sans-serif" font-weight="500" fill="${palette.ink}" letter-spacing="-0.038em"`;
-
 const assets = [
   {
     filename: 'resvary-x-avatar.png',
@@ -86,48 +84,6 @@ const assets = [
       width: 800,
       height: 800,
       content: lockedMark({ x: 100, y: 287, width: 600, id: 'avatar' }),
-    }),
-  },
-  {
-    filename: 'resvary-x-header-clean.png',
-    width: 1500,
-    height: 500,
-    svg: canvas({
-      width: 1500,
-      height: 500,
-      content: lockedMark({ x: 465, y: 139, width: 570, id: 'header-clean' }),
-    }),
-  },
-  {
-    filename: 'resvary-x-header.png',
-    width: 1500,
-    height: 500,
-    svg: canvas({
-      width: 1500,
-      height: 500,
-      content: `
-        <text x="54" y="115" font-size="76" ${textStyle}>Resvary.</text>
-        ${lockedMark({ x: 475, y: 139, width: 550, id: 'header' })}
-        <text x="1446" y="372" font-size="66" text-anchor="end" ${textStyle}>
-          <tspan x="1446" dy="0">credits</tspan>
-          <tspan x="1446" dy="0.96em">for AI</tspan>
-        </text>`,
-    }),
-  },
-  {
-    filename: 'resvary-rebrand-announcement.png',
-    width: 1600,
-    height: 900,
-    svg: canvas({
-      width: 1600,
-      height: 900,
-      content: `
-        <text x="92" y="188" font-size="94" ${textStyle}>Resvary.</text>
-        ${lockedMark({ x: 480, y: 328, width: 640, id: 'announcement' })}
-        <text x="1508" y="684" font-size="78" text-anchor="end" ${textStyle}>
-          <tspan x="1508" dy="0">New name.</tspan>
-          <tspan x="1508" dy="0.96em">Same focus.</tspan>
-        </text>`,
     }),
   },
 ];
