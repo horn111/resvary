@@ -1,13 +1,12 @@
 #!/usr/bin/env node
 import { getPostgresMigrationStatus, migratePostgres } from './index.js';
-
-type Options = Record<string, string | boolean>;
+import { parsePostgresCliOptions, type PostgresCliOptions } from './cli-options.js';
 
 async function main(): Promise<void> {
   const [command, ...rest] = process.argv.slice(2);
-  const options = parseOptions(rest);
-  const connectionString = optionString(options, 'database-url') ?? process.env.DATABASE_URL;
-  if (!connectionString) throw new Error('DATABASE_URL or --database-url is required');
+  const options = parsePostgresCliOptions(rest);
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) throw new Error('DATABASE_URL is required');
   const schema = optionString(options, 'schema') ?? process.env.RESVARY_POSTGRES_SCHEMA ?? 'public';
   const base = { connectionString, schema };
 
@@ -43,48 +42,17 @@ async function main(): Promise<void> {
     }
     default:
       throw new Error(
-        'Usage: resvary-postgres <status|migrate|import-sqlite|verify-import> [--database-url URL] [--schema NAME] [--sqlite PATH] [--dry-run]',
+        'Usage: resvary-postgres <status|migrate|import-sqlite|verify-import> [--schema NAME] [--sqlite PATH] [--dry-run]',
       );
   }
 }
 
-function parseOptions(args: string[]): Options {
-  const valueOptions = new Set(['database-url', 'schema', 'sqlite']);
-  const booleanOptions = new Set(['dry-run']);
-  const options: Options = {};
-  for (let index = 0; index < args.length; index += 1) {
-    const arg = args[index];
-    if (!arg?.startsWith('--')) throw new Error(`Unexpected argument: ${arg}`);
-    const separator = arg.indexOf('=');
-    const key = arg.slice(2, separator === -1 ? undefined : separator);
-    if (!valueOptions.has(key) && !booleanOptions.has(key)) {
-      throw new Error(`Unknown option: --${key}`);
-    }
-    const inlineValue = separator === -1 ? undefined : arg.slice(separator + 1);
-    const next = args[index + 1];
-    if (booleanOptions.has(key)) {
-      const candidate = inlineValue ?? (next === 'true' || next === 'false' ? next : undefined);
-      if (candidate !== undefined && candidate !== 'true' && candidate !== 'false') {
-        throw new Error(`--${key} must be true or false`);
-      }
-      options[key] = candidate === undefined ? true : candidate === 'true';
-      if (inlineValue === undefined && candidate !== undefined) index += 1;
-      continue;
-    }
-    const value = inlineValue ?? next;
-    if (!value || value.startsWith('--')) throw new Error(`--${key} requires a value`);
-    options[key] = value;
-    if (inlineValue === undefined) index += 1;
-  }
-  return options;
-}
-
-function optionString(options: Options, key: string): string | undefined {
+function optionString(options: PostgresCliOptions, key: string): string | undefined {
   const value = options[key];
   return typeof value === 'string' ? value : undefined;
 }
 
-function requireSqlitePath(options: Options): string {
+function requireSqlitePath(options: PostgresCliOptions): string {
   const value = optionString(options, 'sqlite');
   if (!value) throw new Error('--sqlite PATH is required');
   return value;

@@ -43,7 +43,7 @@ export async function generateProject(config: ProjectConfig): Promise<string[]> 
       targetDir,
       'app/page.tsx',
       config.template === 'ai-credits'
-        ? 'export default function Page() { return <main><h1>AI prepaid credits</h1><p>POST customerId, prompt, and idempotencyKey to /api/generate.</p></main>; }\n'
+        ? 'export default function Page() { return <main><h1>AI prepaid credits</h1><p>Authenticate with the server token, then POST prompt and idempotencyKey to /api/generate.</p></main>; }\n'
         : 'export default function Page() { return <main><h1>Paid API</h1><p>Request /api/data to try the x402 paywall.</p></main>; }\n',
       filesCreated,
     );

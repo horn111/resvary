@@ -9,6 +9,7 @@ import {
 } from '@resvary/sdk/receipts';
 import { jsonSafeResponse, proofErrorResponse } from '../responses';
 import { getDemoReceiptStore } from '../../../webhook-inbox/store';
+import { requireDemoMutationAuthorization } from '../../../demo-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,6 +26,9 @@ interface ValidWatchProofRequest {
 }
 
 export async function POST(request: Request) {
+  const denied = requireDemoMutationAuthorization(request);
+  if (denied) return denied;
+
   const body = (await request.json()) as WatchProofRequest;
   const proofRequest = validateWatchProofRequest(body);
   if (proofRequest instanceof Response) {
@@ -35,6 +39,7 @@ export async function POST(request: Request) {
     const result = await findMemoPaymentProof({
       paymentRequest: proofRequest.paymentRequest,
       fromBlock: parseOptionalBlock(proofRequest.fromBlock),
+      maxBlockRange: 5_000,
     });
     await saveProofWatchCursor(
       proofRequest.invoice,
@@ -80,6 +85,13 @@ function validateWatchProofRequest(body: WatchProofRequest): ValidWatchProofRequ
   if (!body.invoice || !body.paymentRequest) {
     return Response.json(
       { error: 'Missing invoice or payment request', reason: 'missing_payment_request' },
+      { status: 400 },
+    );
+  }
+
+  if (body.fromBlock !== undefined && !/^\d+$/.test(body.fromBlock)) {
+    return Response.json(
+      { error: 'fromBlock must be a non-negative decimal integer', reason: 'invalid_from_block' },
       { status: 400 },
     );
   }

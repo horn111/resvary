@@ -3,7 +3,7 @@
  */
 
 import type { EndpointConfig, PaymentPayload, PaymentRequirements } from '../types.js';
-import { DEFAULTS, USDC_DECIMALS, X402_HEADER } from '../constants.js';
+import { DEFAULTS, X402_HEADER } from '../constants.js';
 
 /** Configuration for the paywall middleware */
 export interface PaywallConfig extends EndpointConfig {
@@ -94,55 +94,17 @@ export function createPaywallMiddleware(config: PaywallConfig) {
       }
     },
 
-    /**
-     * Verify a payment payload.
-     * In production, this delegates to Circle Gateway for verification.
-     */
+    /** Verify a payment payload through the caller-provided trusted verifier. */
     async verifyPayment(payload: PaymentPayload): Promise<boolean> {
       if (config.verifyPayment) {
         const result = await config.verifyPayment(payload);
         return result.success;
       }
 
-      // Verify basic payment structure
-      if (!payload.payload?.signature || !payload.payload?.authorization) {
-        logger.error('Invalid payment payload structure');
-        return false;
-      }
-
-      // Verify payment amount meets minimum
-      const paymentAmount = BigInt(payload.payload.authorization.value);
-      const requiredAmount = BigInt(Math.floor(parseFloat(price) * 10 ** USDC_DECIMALS));
-
-      if (paymentAmount < requiredAmount) {
-        logger.error('Payment amount insufficient', {
-          received: paymentAmount.toString(),
-          required: requiredAmount.toString(),
-        });
-        return false;
-      }
-
-      // Verify payment is addressed to seller
-      if (payload.payload.authorization.to.toLowerCase() !== sellerAddress.toLowerCase()) {
-        logger.error('Payment not addressed to seller');
-        return false;
-      }
-
-      // Verify payment hasn't expired
-      const now = Math.floor(Date.now() / 1000);
-      const validBefore = parseInt(payload.payload.authorization.validBefore, 10);
-
-      if (now > validBefore) {
-        logger.error('Payment authorization has expired');
-        return false;
-      }
-
-      logger.info('Payment verified successfully', {
-        from: payload.payload.authorization.from,
-        amount: payload.payload.authorization.value,
-      });
-
-      return true;
+      logger.error(
+        'Payment verification is not configured. Pass a trusted verifyPayment implementation.',
+      );
+      return false;
     },
   };
 }

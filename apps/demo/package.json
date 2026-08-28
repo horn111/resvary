@@ -7,7 +7,8 @@
     "dev": "next dev",
     "prebuild": "node ../../scripts/check-claude-design.mjs && npm run build --workspace=@resvary/sdk && npm run build --workspace=@resvary/sqlite && npm run build --workspace=@resvary/circle",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "test": "vitest run src/app/api/demo-security.test.ts"
   },
   "engines": {
     "node": ">=24.0.0"
@@ -25,6 +26,7 @@
     "@types/node": "^22.0.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "vitest": "^4.1.10"
   }
 }

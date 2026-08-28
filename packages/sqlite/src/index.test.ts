@@ -1,4 +1,4 @@
-import { mkdtempSync } from 'node:fs';
+import { existsSync, mkdtempSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -16,6 +16,23 @@ const buyer = '0x2222222222222222222222222222222222222222' as const;
 const txHash = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' as const;
 
 describe('SqliteReceiptStore', () => {
+  const posixIt = process.platform === 'win32' ? it.skip : it;
+
+  posixIt('creates new database resources with owner-only permissions', () => {
+    const root = mkdtempSync(join(tmpdir(), 'resvary-sqlite-permissions-'));
+    const directory = join(root, 'private');
+    const path = join(directory, 'receipts.sqlite');
+    const store = createSqliteReceiptStore({ path });
+
+    expect(statSync(directory).mode & 0o777).toBe(0o700);
+    expect(statSync(path).mode & 0o777).toBe(0o600);
+    for (const suffix of ['-wal', '-shm']) {
+      const companion = `${path}${suffix}`;
+      if (existsSync(companion)) expect(statSync(companion).mode & 0o777).toBe(0o600);
+    }
+    store.close();
+  });
+
   it('persists invoices, receipts, webhook events, deliveries, and cursors', async () => {
     const dbPath = tempDatabasePath();
     const store = createSqliteReceiptStore({ path: dbPath });

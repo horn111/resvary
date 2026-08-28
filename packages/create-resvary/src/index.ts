@@ -29,7 +29,7 @@ async function main() {
     const readyMessage =
       config.template === 'ai-credits'
         ? 'Your AI app now has prepaid credits, metered usage, and durable balances.'
-        : 'Your API is paywalled and ready to accept USDC.';
+        : 'Your paywall scaffold is ready for a trusted payment verifier.';
     console.log(pc.yellow(`\n${readyMessage}\n`));
   } catch (error) {
     if (error instanceof Error && error.message === 'Cancelled') {

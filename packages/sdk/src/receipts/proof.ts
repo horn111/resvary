@@ -40,6 +40,7 @@ const MEMO_EVENT = parseAbiItem(
 );
 
 const DEFAULT_PROOF_LOOKBACK_BLOCKS = 5_000n;
+const DEFAULT_PROOF_SCAN_BLOCKS = 5_000n;
 
 export type VerifyMemoPaymentProofFailureReason =
   | 'tx_not_found'
@@ -83,6 +84,8 @@ export interface FindMemoPaymentProofInput {
   toBlock?: bigint;
   confirmations?: number;
   lookbackBlocks?: bigint | number;
+  /** Maximum inclusive block count scanned by one call. Use nextFromBlock to continue. */
+  maxBlockRange?: bigint | number;
   verifiedAt?: number;
 }
 
@@ -212,15 +215,26 @@ async function resolveProofSearchRange(
     input.lookbackBlocks === undefined
       ? DEFAULT_PROOF_LOOKBACK_BLOCKS
       : BigInt(input.lookbackBlocks);
+  const maxBlockRange =
+    input.maxBlockRange === undefined ? DEFAULT_PROOF_SCAN_BLOCKS : BigInt(input.maxBlockRange);
+  if (lookbackBlocks < 0n) {
+    throw new RangeError('lookbackBlocks must be non-negative');
+  }
+  if (maxBlockRange <= 0n) {
+    throw new RangeError('maxBlockRange must be positive');
+  }
+  const fromBlock = input.fromBlock ?? defaultProofFromBlock(toBlock, lookbackBlocks);
+  const maximumToBlock = fromBlock + maxBlockRange - 1n;
 
   return {
-    fromBlock: input.fromBlock ?? defaultProofFromBlock(toBlock, lookbackBlocks),
-    toBlock,
+    fromBlock,
+    toBlock: maximumToBlock < toBlock ? maximumToBlock : toBlock,
   };
 }
 
 function defaultProofFromBlock(toBlock: bigint, lookbackBlocks: bigint): bigint {
-  return toBlock > lookbackBlocks ? toBlock - lookbackBlocks : 0n;
+  if (lookbackBlocks === 0n) return toBlock;
+  return toBlock >= lookbackBlocks ? toBlock - lookbackBlocks + 1n : 0n;
 }
 
 async function getMemoProofLogs(

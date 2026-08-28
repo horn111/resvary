@@ -7,6 +7,7 @@ export function expressTemplate(config: ProjectConfig): string {
         ? `import { createPostgresCreditStore } from '@resvary/postgres';\n\nconst store = createPostgresCreditStore({\n  connectionString: process.env.DATABASE_URL!,\n  schema: process.env.RESVARY_POSTGRES_SCHEMA,\n});`
         : `import { createSqliteCreditStore } from '@resvary/sqlite';\n\nconst store = createSqliteCreditStore({ path: '.resvary/resvary.sqlite' });`;
     return `import express from 'express';
+import { timingSafeEqual } from 'node:crypto';
 import { CreditLedger } from '@resvary/sdk/credits';
 ${persistence}
 
@@ -17,10 +18,23 @@ const ledger = new CreditLedger({
   projectId: 'my_ai_product',
   store,
 });
+const customerId = process.env.RESVARY_CUSTOMER_ID;
+const apiToken = process.env.RESVARY_API_TOKEN;
+if (!customerId || !apiToken) {
+  throw new Error('Set RESVARY_CUSTOMER_ID and RESVARY_API_TOKEN before starting the API');
+}
 
 app.post('/api/generate', async (req, res, next) => {
   try {
-    const { customerId, prompt, idempotencyKey } = req.body;
+    if (!isAuthorized(req.headers.authorization, apiToken)) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const { prompt, idempotencyKey } = req.body;
+    if (typeof prompt !== 'string' || typeof idempotencyKey !== 'string') {
+      res.status(400).json({ error: 'prompt and idempotencyKey are required' });
+      return;
+    }
     const meter = await ledger.registerMeter({
       key: 'llm_tokens',
       dimensions: ['input_tokens', 'output_tokens'],
@@ -34,17 +48,12 @@ app.post('/api/generate', async (req, res, next) => {
       ],
       idempotencyKey: 'price-v1',
     });
-    await ledger.grantCredits({
-      customerId,
-      amount: '5',
-      idempotencyKey: \`starter-credit:\${customerId}\`,
-    });
     const result = await ledger.runMetered(
       {
         customerId,
         priceId: price.id,
         estimatedUsage: { input_tokens: '2000', output_tokens: '1000' },
-        idempotencyKey,
+        idempotencyKey: \`\${customerId}:\${idempotencyKey}\`,
       },
       async () => ({
         value: { answer: \`Simulated answer for: \${prompt}\` },
@@ -57,6 +66,13 @@ app.post('/api/generate', async (req, res, next) => {
     next(error);
   }
 });
+
+function isAuthorized(header: string | undefined, expectedToken: string): boolean {
+  const providedToken = header?.startsWith('Bearer ') ? header.slice('Bearer '.length) : '';
+  const provided = Buffer.from(providedToken);
+  const expected = Buffer.from(expectedToken);
+  return provided.length === expected.length && timingSafeEqual(provided, expected);
+}
 
 const server = app.listen(process.env.PORT || 3000, () => {
   console.log('Resvary AI credits API is running on http://localhost:3000');
@@ -85,6 +101,7 @@ const port = process.env.PORT || 3000;
 
 app.get(
   '/api/data',
+  // This legacy middleware fails closed until a trusted verifyPayment callback is configured.
   expressPaywall({
     price: '${price}',
     network: 'arc-testnet',

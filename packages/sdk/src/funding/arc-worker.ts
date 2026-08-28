@@ -25,6 +25,7 @@ export interface ArcFundingWorkerConfig {
   confirmations?: number;
   pollIntervalMs?: number;
   maxBlockRange?: number;
+  maxBlocksPerPoll?: number;
   cursorOverlap?: number;
   retryAttempts?: number;
   retryBaseDelayMs?: number;
@@ -64,6 +65,7 @@ export class ArcFundingWorker {
       fromBlock: config.fromBlock,
       confirmations: config.confirmations ?? 1,
       maxBlockRange: config.maxBlockRange ?? 2_000,
+      maxBlocksPerPoll: config.maxBlocksPerPoll ?? 10_000,
       cursorOverlap: config.cursorOverlap ?? 2,
       retryAttempts: config.retryAttempts ?? 3,
       retryBaseDelayMs: config.retryBaseDelayMs ?? 250,

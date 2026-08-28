@@ -20,6 +20,11 @@ const dbPath = process.env.RESVARY_CREDITS_DB_PATH?.trim() || '.resvary/proof.sq
 const output =
   process.env.RESVARY_GATEWAY_EVIDENCE_PATH?.trim() ||
   'docs/evidence/gateway-nanopayment-proof.json';
+const demoAdminToken = process.env.RESVARY_DEMO_ADMIN_TOKEN?.trim();
+if (!demoAdminToken) {
+  throw new Error('RESVARY_DEMO_ADMIN_TOKEN is required by the demo Gateway proof route');
+}
+const adminHeaders = { authorization: `Bearer ${demoAdminToken}` };
 
 const routeStatusResponse = await fetch(endpoint);
 if (!routeStatusResponse.ok) {
@@ -57,7 +62,7 @@ gateway.onAfterPaymentCreation(async (context) => {
 });
 
 const body = { proofId };
-const paid = await gateway.pay(endpoint, { method: 'POST', body });
+const paid = await gateway.pay(endpoint, { method: 'POST', headers: adminHeaders, body });
 if (!capturedPayment) throw new Error('Circle buyer did not expose the signed payment payload');
 
 const paymentSignature = Buffer.from(JSON.stringify(capturedPayment)).toString('base64');
@@ -66,6 +71,7 @@ const replayResponse = await fetch(endpoint, {
   headers: {
     'content-type': 'application/json',
     'payment-signature': paymentSignature,
+    ...adminHeaders,
   },
   body: JSON.stringify(body),
 });

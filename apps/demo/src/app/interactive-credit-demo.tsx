@@ -51,7 +51,6 @@ type DemoState = {
   outboxEvents: Array<Record<string, unknown>>;
   fundingTransactions: Array<Record<string, unknown>>;
   arcLiveFundingTransaction: Record<string, unknown> | null;
-  liveProviderConfigured: boolean;
   persistence: string;
   arcLiveConfigured: boolean;
   arcFundingRequest: ArcFundingRequest | null;
@@ -66,6 +65,7 @@ export function InteractiveCreditDemo() {
   const [error, setError] = useState('');
   const [lastRunKey, setLastRunKey] = useState('');
   const [arcTxHash, setArcTxHash] = useState('');
+  const [adminToken, setAdminToken] = useState('');
   const [fundingMethod, setFundingMethod] = useState<FundingMethod>('arc');
   const mutationController = useRef<AbortController | null>(null);
 
@@ -119,7 +119,10 @@ export function InteractiveCreditDemo() {
     try {
       const response = await fetch('/api/credits', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: {
+          'content-type': 'application/json',
+          ...(adminToken ? { authorization: `Bearer ${adminToken}` } : {}),
+        },
         body: JSON.stringify({
           action,
           idempotencyKey,
@@ -192,6 +195,16 @@ export function InteractiveCreditDemo() {
       </div>
 
       <div className={styles.actions} aria-label="Credit demo actions">
+        <label className={styles.adminAccess}>
+          <span>Demo admin token</span>
+          <input
+            autoComplete="off"
+            onChange={(event) => setAdminToken(event.target.value)}
+            placeholder="RESVARY_DEMO_ADMIN_TOKEN"
+            type="password"
+            value={adminToken}
+          />
+        </label>
         <button disabled={Boolean(busy)} onClick={() => void run('grant')} type="button">
           Grant $5
         </button>

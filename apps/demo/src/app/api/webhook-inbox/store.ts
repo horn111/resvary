@@ -6,8 +6,11 @@ import {
   type ReceiptStore,
 } from '@resvary/sdk/receipts';
 
-export const DEMO_WEBHOOK_SECRET = 'resvary_receipts_demo_secret';
 export const DEMO_WEBHOOK_TARGET = 'https://seller.app/webhooks/arc';
+
+export function getDemoWebhookSecret(): string | undefined {
+  return process.env.RESVARY_WEBHOOK_SECRET?.trim() || undefined;
+}
 
 const globalWebhookInbox = globalThis as typeof globalThis & {
   __resvaryReceiptStore?: ReceiptStore;

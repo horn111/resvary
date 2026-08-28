@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { CreditLedger } from './ledger.js';
+import { InMemoryCreditStore } from './store.js';
 import {
   IdempotencyConflictError,
   InsufficientCreditsError,
@@ -254,5 +255,75 @@ describe('CreditLedger', () => {
     await ledger.releaseExpiredReservations({ idempotencyKey: 'expire-1' });
     expect((await ledger.getReservation(first.id))?.status).toBe('expired');
     expect((await ledger.getBalance('cus_1')).reservedUnits).toBe('0');
+  });
+
+  it('keeps every public read scoped to the ledger project', async () => {
+    const store = new InMemoryCreditStore();
+    const first = new CreditLedger({ projectId: 'project_first', store });
+    const second = new CreditLedger({ projectId: 'project_second', store });
+    const meter = await second.registerMeter({
+      key: 'tokens',
+      dimensions: ['tokens'],
+      idempotencyKey: 'meter-second',
+    });
+    const price = await second.createPriceVersion({
+      meterKey: meter.key,
+      rates: [{ dimension: 'tokens', unitSize: '1', amount: '0.01' }],
+      idempotencyKey: 'price-second',
+    });
+    await second.grantCredits({
+      customerId: 'shared_customer',
+      amount: '2',
+      idempotencyKey: 'grant-second',
+    });
+    const reservation = await second.reserveCredits({
+      customerId: 'shared_customer',
+      priceId: price.id,
+      estimatedUsage: { tokens: '10' },
+      idempotencyKey: 'reserve-second',
+    });
+    const committed = await second.commitUsage({
+      reservationId: reservation.id,
+      usageEventId: 'usage-second',
+      actualUsage: { tokens: '5' },
+      idempotencyKey: 'commit-second',
+    });
+    const intent = await second.createFundingIntent({
+      customerId: 'shared_customer',
+      amount: '1',
+      rail: 'arc_direct',
+      network: 'arc-testnet',
+      invoiceId: 'invoice-second',
+      idempotencyKey: 'intent-second',
+    });
+    const confirmed = await second.confirmFunding({
+      fundingIntentId: intent.id,
+      rail: 'arc_direct',
+      network: 'arc-testnet',
+      externalPaymentId: `0x${'ab'.repeat(32)}`,
+      txHash: `0x${'ab'.repeat(32)}`,
+      amount: '1',
+      paymentReceiptId: 'receipt-second',
+      idempotencyKey: 'confirm-second',
+    });
+
+    await expect(first.getReservation(reservation.id)).resolves.toBeUndefined();
+    await expect(first.getUsageReceipt(committed.receipt.id)).resolves.toBeUndefined();
+    await expect(first.getFundingIntent(intent.id)).resolves.toBeUndefined();
+    await expect(
+      first.getFundingTransaction(confirmed.fundingTransaction.id),
+    ).resolves.toBeUndefined();
+    await expect(first.listUsageReceipts()).resolves.toEqual([]);
+    await expect(first.listLedgerEntries()).resolves.toEqual([]);
+    await expect(first.listFundingTransactions()).resolves.toEqual([]);
+    await expect(first.listFundingTransactions(intent.id)).resolves.toEqual([]);
+
+    await expect(second.getReservation(reservation.id)).resolves.toMatchObject({
+      projectId: 'project_second',
+    });
+    await expect(second.getUsageReceipt(committed.receipt.id)).resolves.toMatchObject({
+      projectId: 'project_second',
+    });
+    await expect(second.listFundingTransactions(intent.id)).resolves.toHaveLength(1);
   });
 });

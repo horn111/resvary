@@ -199,6 +199,52 @@ describe('findMemoPaymentProof', () => {
       },
     });
   });
+
+  it('bounds an explicit historical range and returns a continuation block', async () => {
+    const invoice = createInvoice({ id: 'inv_poll_bounded', amount: '19.00', payTo: seller });
+    const request = createMemoPaymentRequest(invoice);
+    const client = createPollingMockClient({ memoLogs: [], receiptLogs: [] });
+
+    const result = await findMemoPaymentProof({
+      paymentRequest: request,
+      publicClient: client,
+      fromBlock: 0n,
+      toBlock: 20_000n,
+      confirmations: 0,
+      maxBlockRange: 5_000n,
+    });
+
+    expect(result).toMatchObject({
+      status: 'pending',
+      fromBlock: 0n,
+      toBlock: 4_999n,
+      nextFromBlock: 5_000n,
+    });
+    expect(client.getLogs).toHaveBeenCalledWith(
+      expect.objectContaining({ fromBlock: 0n, toBlock: 4_999n }),
+    );
+  });
+
+  it('rejects a non-positive scan budget', async () => {
+    const invoice = createInvoice({
+      id: 'inv_poll_invalid_budget',
+      amount: '19.00',
+      payTo: seller,
+    });
+    const request = createMemoPaymentRequest(invoice);
+    const client = createPollingMockClient({ memoLogs: [], receiptLogs: [] });
+
+    await expect(
+      findMemoPaymentProof({
+        paymentRequest: request,
+        publicClient: client,
+        fromBlock: 0n,
+        toBlock: 12n,
+        maxBlockRange: 0,
+      }),
+    ).rejects.toThrow('maxBlockRange must be positive');
+    expect(client.getLogs).not.toHaveBeenCalled();
+  });
 });
 
 function createMockClient(params: { status?: string; logs: unknown[] }) {

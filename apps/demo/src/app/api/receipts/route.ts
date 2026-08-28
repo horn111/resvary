@@ -1,9 +1,9 @@
 import { createMemoPaymentRequest, signWebhookEvent } from '@resvary/sdk/receipts';
 import {
-  DEMO_WEBHOOK_SECRET,
   DEMO_WEBHOOK_TARGET,
   getDemoReceiptLedger,
   getDemoReceiptStoreSummary,
+  getDemoWebhookSecret,
 } from '../webhook-inbox/store';
 
 export const dynamic = 'force-dynamic';
@@ -13,6 +13,14 @@ const DEMO_PAYER = '0x2222222222222222222222222222222222222222';
 const DEMO_TX_HASH = '0x7a6d91b9f5b42e6f9a4d8d5c0a5f1a833f9f94c8b2e7d4d0a0e8c7b6a5f4d3c2';
 
 export async function GET() {
+  const webhookSecret = getDemoWebhookSecret();
+  if (!webhookSecret) {
+    return Response.json(
+      { error: 'Receipt demo is disabled until RESVARY_WEBHOOK_SECRET is configured.' },
+      { status: 503 },
+    );
+  }
+
   const now = Date.now();
   const ledger = await getDemoReceiptLedger();
 
@@ -67,7 +75,7 @@ export async function GET() {
     );
   }
 
-  const signature = signWebhookEvent(paidEvent, DEMO_WEBHOOK_SECRET);
+  const signature = signWebhookEvent(paidEvent, webhookSecret);
   const store = await getDemoReceiptStoreSummary();
 
   return Response.json({

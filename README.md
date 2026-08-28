@@ -145,15 +145,16 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). The default flow is deterministic and does not require an AI API key. Optional OpenAI-compatible mode uses:
+Set a local admin token, start the demo, and enter the same token in the UI. Mutating demo actions fail closed when the token is missing.
 
 ```dotenv
-RESVARY_AI_BASE_URL=https://api.openai.com/v1
-RESVARY_AI_API_KEY=
-RESVARY_AI_MODEL=
+RESVARY_DEMO_ADMIN_TOKEN=replace-with-a-long-random-token
+RESVARY_WEBHOOK_SECRET=replace-with-a-different-long-random-token
 ```
 
-The old payment operations APIs remain under `/api/receipts`, `/api/receipts/proof`, and `/api/webhook-inbox`.
+Open [http://localhost:3000](http://localhost:3000). The flow is deterministic and never sends a request to an external AI provider.
+
+The old payment operations APIs remain under `/api/receipts`, `/api/receipts/proof`, and `/api/webhook-inbox`. Receipt signing and webhook ingestion stay disabled until `RESVARY_WEBHOOK_SECRET` is configured.
 
 ## Modules
 
