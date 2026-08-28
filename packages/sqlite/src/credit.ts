@@ -1,5 +1,3 @@
-import { mkdirSync } from 'node:fs';
-import { dirname } from 'node:path';
 import { DatabaseSync, type DatabaseSync as DatabaseSyncType } from 'node:sqlite';
 import type {
   CreditAccount,
@@ -25,6 +23,7 @@ import type {
   UsageReceipt,
 } from '@resvary/sdk/credits';
 import { parseReceiptStoreValue, serializeReceiptStoreValue } from '@resvary/sdk/receipts';
+import { hardenSqliteDatabaseFiles, prepareSqliteDatabasePath } from './filesystem.js';
 
 export interface SqliteCreditStoreConfig {
   path: string;
@@ -38,11 +37,10 @@ export class SqliteCreditStore implements CreditStore, OutboxDeliveryStore {
   private transactionTail: Promise<void> = Promise.resolve();
 
   constructor(config: SqliteCreditStoreConfig) {
-    if (config.path !== ':memory:' && config.createDirectory !== false) {
-      mkdirSync(dirname(config.path), { recursive: true });
-    }
+    prepareSqliteDatabasePath(config.path, config.createDirectory !== false);
     this.db = new DatabaseSync(config.path);
     this.migrate();
+    hardenSqliteDatabaseFiles(config.path);
   }
 
   async transaction<T>(handler: (transaction: CreditStoreTransaction) => Promise<T>): Promise<T> {

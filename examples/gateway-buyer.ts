@@ -13,6 +13,7 @@ const gateway = new GatewayClient({
   chain: 'arcTestnet',
   privateKey,
 });
+const demoAdminToken = process.env.RESVARY_DEMO_ADMIN_TOKEN?.trim();
 
 const depositAmount = process.env.RESVARY_GATEWAY_DEPOSIT;
 if (depositAmount) {
@@ -20,6 +21,9 @@ if (depositAmount) {
   console.log('Gateway deposit:', deposit);
 }
 
-const result = await gateway.pay(endpoint, { method: 'POST' });
+const result = await gateway.pay(endpoint, {
+  method: 'POST',
+  headers: demoAdminToken ? { authorization: `Bearer ${demoAdminToken}` } : undefined,
+});
 console.log('Top-up result:', result.data);
 console.log('Gateway settlement:', result.transaction);

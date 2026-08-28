@@ -27,6 +27,6 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000), grant `$5`, and run the simulated AI operation. Repeat the same request to inspect idempotency, or trigger provider failure to verify full release.
+Set `RESVARY_DEMO_ADMIN_TOKEN` and a separate `RESVARY_WEBHOOK_SECRET`, open [http://localhost:3000](http://localhost:3000), enter the admin token, grant `$5`, and run the simulated AI operation. Repeat the same request to inspect idempotency, or trigger provider failure to verify full release.
 
 Read [prepaid-credits.md](prepaid-credits.md), [usage-rating.md](usage-rating.md), and [credit-security-model.md](credit-security-model.md) before integrating production data.

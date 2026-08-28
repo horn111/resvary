@@ -1,4 +1,4 @@
-import { mkdtempSync } from 'node:fs';
+import { existsSync, mkdtempSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -7,6 +7,23 @@ import { CreditLedger, InsufficientCreditsError, type CreditAccount } from '@res
 import { createSqliteCreditStore } from './credit.js';
 
 describe('SqliteCreditStore', () => {
+  const posixIt = process.platform === 'win32' ? it.skip : it;
+
+  posixIt('creates new database resources with owner-only permissions', () => {
+    const root = mkdtempSync(join(tmpdir(), 'resvary-credits-permissions-'));
+    const directory = join(root, 'private');
+    const path = join(directory, 'resvary.sqlite');
+    const store = createSqliteCreditStore({ path });
+
+    expect(statSync(directory).mode & 0o777).toBe(0o700);
+    expect(statSync(path).mode & 0o777).toBe(0o600);
+    for (const suffix of ['-wal', '-shm']) {
+      const companion = `${path}${suffix}`;
+      if (existsSync(companion)) expect(statSync(companion).mode & 0o777).toBe(0o600);
+    }
+    store.close();
+  });
+
   it('persists balances, reservations, usage receipts, ledger, outbox, and idempotency across restarts', async () => {
     const path = tempDatabasePath();
     const firstStore = createSqliteCreditStore({ path });

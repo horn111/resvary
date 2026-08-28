@@ -88,6 +88,8 @@ export interface ReceiptWatcherConfig {
   pollIntervalMs?: number;
   expectedChainId?: number;
   maxBlockRange?: number;
+  /** Maximum inclusive block count processed for one invoice during a single poll. */
+  maxBlocksPerPoll?: number;
   cursorOverlap?: number;
   retryAttempts?: number;
   retryBaseDelayMs?: number;
@@ -104,6 +106,7 @@ export class ReceiptWatcher {
   private readonly pollIntervalMs: number;
   private readonly expectedChainId: number;
   private readonly maxBlockRange: bigint;
+  private readonly maxBlocksPerPoll: bigint;
   private readonly cursorOverlap: bigint;
   private readonly retryAttempts: number;
   private readonly retryBaseDelayMs: number;
@@ -127,12 +130,17 @@ export class ReceiptWatcher {
     this.pollIntervalMs = config.pollIntervalMs ?? 5_000;
     this.expectedChainId = config.expectedChainId ?? ARC_TESTNET.chainId;
     this.maxBlockRange = BigInt(config.maxBlockRange ?? 2_000);
+    this.maxBlocksPerPoll = BigInt(config.maxBlocksPerPoll ?? 10_000);
     this.cursorOverlap = BigInt(config.cursorOverlap ?? 0);
     this.retryAttempts = config.retryAttempts ?? 3;
     this.retryBaseDelayMs = config.retryBaseDelayMs ?? 250;
     this.fromBlock = config.fromBlock;
     if (this.maxBlockRange <= 0n) throw new Error('maxBlockRange must be positive');
+    if (this.maxBlocksPerPoll <= 0n) throw new Error('maxBlocksPerPoll must be positive');
     if (this.cursorOverlap < 0n) throw new Error('cursorOverlap cannot be negative');
+    if (this.cursorOverlap >= this.maxBlocksPerPoll) {
+      throw new Error('cursorOverlap must be smaller than maxBlocksPerPoll');
+    }
     if (!Number.isSafeInteger(this.retryAttempts) || this.retryAttempts < 1) {
       throw new Error('retryAttempts must be a positive integer');
     }
@@ -177,9 +185,10 @@ export class ReceiptWatcher {
         continue;
       }
 
+      const pollToBlock = minBigInt(toBlock, fromBlock + this.maxBlocksPerPoll - 1n);
       let chunkFrom = fromBlock;
-      while (chunkFrom <= toBlock) {
-        const chunkTo = minBigInt(toBlock, chunkFrom + this.maxBlockRange - 1n);
+      while (chunkFrom <= pollToBlock) {
+        const chunkTo = minBigInt(pollToBlock, chunkFrom + this.maxBlockRange - 1n);
         await this.emit({
           type: 'watcher.poll',
           fromBlock: chunkFrom,

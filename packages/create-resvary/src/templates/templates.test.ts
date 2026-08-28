@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ProjectConfig } from '../prompts.js';
+import { envTemplate } from './env.js';
 import { expressTemplate } from './express.js';
 import { nextTemplate } from './next.js';
 import { packageTemplate } from './package.js';
@@ -45,9 +46,23 @@ describe('starter templates', () => {
   });
 
   it('makes AI credits the functional embedded SDK starter', () => {
-    expect(nextTemplate(base)).toContain('ledger.runMetered');
-    expect(nextTemplate(base)).toContain('starter-credit');
-    expect(expressTemplate({ ...base, framework: 'express' })).toContain('createSqliteCreditStore');
+    const next = nextTemplate(base);
+    const express = expressTemplate({ ...base, framework: 'express' });
+    const env = envTemplate(base);
+    expect(next).toContain('ledger.runMetered');
+    expect(next).toContain('RESVARY_CUSTOMER_ID');
+    expect(next).toContain('RESVARY_API_TOKEN');
+    expect(env).toContain('RESVARY_API_TOKEN=\n');
+    expect(env).not.toContain('RESVARY_API_TOKEN=replace-');
+    const postgresEnv = envTemplate({ ...base, database: 'postgres' });
+    expect(postgresEnv).toContain('RESVARY_WEBHOOK_SECRET=\n');
+    expect(postgresEnv).not.toContain('RESVARY_WEBHOOK_SECRET=replace-');
+    expect(next).not.toContain('ledger.grantCredits');
+    expect(next).not.toContain('const { customerId');
+    expect(express).toContain('createSqliteCreditStore');
+    expect(express).toContain('RESVARY_API_TOKEN');
+    expect(express).not.toContain('ledger.grantCredits');
+    expect(express).not.toContain('const { customerId');
     const postgres = { ...base, database: 'postgres' as const };
     expect(nextTemplate(postgres)).toContain('createPostgresCreditStore');
     expect(JSON.parse(packageTemplate(postgres)).dependencies['@resvary/postgres']).toBe('0.5.0');

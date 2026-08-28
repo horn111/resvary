@@ -1,4 +1,5 @@
 import { GatewayNanopaymentFunding, createNextGatewayTopUpHandler } from '@resvary/circle';
+import { requireDemoMutationAuthorization } from '../../demo-auth';
 import { getDemoCredits } from '../store';
 
 export const dynamic = 'force-dynamic';
@@ -26,6 +27,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const denied = requireDemoMutationAuthorization(request);
+  if (denied) return denied;
+
   const config = readLiveGatewayConfig();
   if (!config.enabled || !config.sellerAddress) {
     return disabledResponse(

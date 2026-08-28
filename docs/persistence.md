@@ -10,6 +10,10 @@ const store = createSqliteCreditStore({ path: '.resvary/resvary.sqlite' });
 const credits = new CreditLedger({ projectId: 'my_ai_product', store });
 ```
 
+New SQLite directories and database files are owner-only on POSIX (`0700` and `0600`).
+WAL and shared-memory companions are hardened to `0600` as well. On Windows, use a dedicated
+service account and apply restrictive NTFS ACLs to the database directory.
+
 The credit schema stores accounts, grants, meters, price versions, reservations, usage events, usage receipts, ledger entries, funding records, idempotency records, and outbox events. SQLite schema v3 adds retry, lease, and dead-letter state. Schema v4 enforces one funding grant per network transaction hash across every funding rail.
 
 SQLite writes use WAL mode, a five-second busy timeout, and `BEGIN IMMEDIATE`. A failed command rolls back all balance, receipt, outbox, and idempotency writes.

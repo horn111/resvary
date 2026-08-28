@@ -6,10 +6,12 @@ The persistent demo requires Node.js 24.
 
 ```bash
 npm install
+$env:RESVARY_DEMO_ADMIN_TOKEN = 'replace-with-a-long-random-token'
+$env:RESVARY_WEBHOOK_SECRET = 'replace-with-a-different-long-random-token'
 npm run dev --workspace=@resvary/demo -- --port 3004
 ```
 
-Open [http://localhost:3004](http://localhost:3004). No wallet or AI key is required for the deterministic flow.
+Open [http://localhost:3004](http://localhost:3004) and enter the token in **Demo admin token**. No wallet or AI key is required for the deterministic flow. Every mutating demo request fails closed without the server-configured token.
 
 ## Shared credit lifecycle
 
@@ -39,8 +41,4 @@ Select **Gateway Nanopayment**.
 4. Inspect the external reference, funding transaction, credit grant, and account balance.
 5. Click **Replay authorization**. No second grant is created.
 
-The public demo uses a deterministic facilitator fixture so it works without a buyer key. The release evidence flow must use Circle's Testnet facilitator and the official `@circle-fin/x402-batching` buyer. The UI labels the fixture and does not present it as a live settlement.
-
-## Optional live provider
-
-Set `RESVARY_AI_API_KEY` and `RESVARY_AI_MODEL`; optionally set `RESVARY_AI_BASE_URL`. The route expects an OpenAI-compatible chat completions response with prompt and completion token usage.
+The demo uses a deterministic facilitator fixture so it works without a buyer key. The release evidence flow must use Circle's Testnet facilitator and the official `@circle-fin/x402-batching` buyer. The UI labels the fixture and does not present it as a live settlement.

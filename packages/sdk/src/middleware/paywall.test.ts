@@ -57,7 +57,8 @@ describe('createPaywallMiddleware', () => {
   });
 
   describe('verifyPayment', () => {
-    const paywall = createPaywallMiddleware({ price: '0.001', payTo: sellerAddress });
+    const logger = { info: vi.fn(), error: vi.fn() };
+    const paywall = createPaywallMiddleware({ price: '0.001', payTo: sellerAddress, logger });
 
     const createPayload = (overrides: any = {}) =>
       ({
@@ -73,30 +74,10 @@ describe('createPaywallMiddleware', () => {
         },
       }) as any;
 
-    it('rejects missing signature or authorization', async () => {
-      expect(await paywall.verifyPayment({} as any)).toBe(false);
-      expect(await paywall.verifyPayment({ payload: {} } as any)).toBe(false);
-    });
-
-    it('rejects insufficient payment amount', async () => {
-      // price is 0.001 = 1000 units. passing 500
-      const payload = createPayload({ value: '500' });
-      expect(await paywall.verifyPayment(payload)).toBe(false);
-    });
-
-    it('rejects wrong recipient address', async () => {
-      const payload = createPayload({ to: '0x3333333333333333333333333333333333333333' });
-      expect(await paywall.verifyPayment(payload)).toBe(false);
-    });
-
-    it('rejects expired authorization', async () => {
-      const payload = createPayload({ validBefore: Math.floor(Date.now() / 1000) - 100 });
-      expect(await paywall.verifyPayment(payload)).toBe(false);
-    });
-
-    it('accepts valid payment with correct amount, recipient, and expiry', async () => {
-      const payload = createPayload();
-      expect(await paywall.verifyPayment(payload)).toBe(true);
+    it('fails closed when no trusted verifier is configured', async () => {
+      expect(await paywall.verifyPayment(createPayload())).toBe(false);
+      expect(await paywall.verifyPayment(createPayload({ value: '999999999' }))).toBe(false);
+      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('not configured'));
     });
 
     it('uses custom verifyPayment if provided', async () => {

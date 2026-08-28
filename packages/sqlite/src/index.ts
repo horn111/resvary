@@ -1,5 +1,3 @@
-import { mkdirSync } from 'node:fs';
-import { dirname } from 'node:path';
 import { DatabaseSync, type DatabaseSync as DatabaseSyncType } from 'node:sqlite';
 import {
   parseReceiptStoreValue,
@@ -15,6 +13,7 @@ import {
   type WebhookDeliveryAttempt,
   type WebhookEvent,
 } from '@resvary/sdk/receipts';
+import { hardenSqliteDatabaseFiles, prepareSqliteDatabasePath } from './filesystem.js';
 
 export {
   SqliteCreditStore,
@@ -36,12 +35,10 @@ export class SqliteReceiptStore implements TransactionalReceiptStore {
   private transactionTail: Promise<void> = Promise.resolve();
 
   constructor(config: SqliteReceiptStoreConfig) {
-    if (config.path !== ':memory:' && config.createDirectory !== false) {
-      mkdirSync(dirname(config.path), { recursive: true });
-    }
-
+    prepareSqliteDatabasePath(config.path, config.createDirectory !== false);
     this.db = new DatabaseSync(config.path);
     this.migrate();
+    hardenSqliteDatabaseFiles(config.path);
   }
 
   async transaction<T>(handler: (store: ReceiptStore) => Promise<T>): Promise<T> {

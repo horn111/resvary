@@ -16,6 +16,21 @@ const transferEvent = parseAbiItem(
 const memoEvent = ARC_MEMO_ABI.find((item) => item.type === 'event' && item.name === 'Memo');
 
 describe('ReceiptWatcher', () => {
+  it('rejects cursor overlap that cannot make forward progress', () => {
+    const ledger = new ReceiptLedger();
+    const publicClient = createMockClient({ memoLogs: [], receiptLogs: [] });
+
+    expect(
+      () =>
+        new ReceiptWatcher({
+          ledger,
+          publicClient,
+          maxBlocksPerPoll: 5,
+          cursorOverlap: 5,
+        }),
+    ).toThrow('cursorOverlap must be smaller than maxBlocksPerPoll');
+  });
+
   it('creates a receipt when it sees matching Memo and ERC-20 Transfer logs', async () => {
     const ledger = new ReceiptLedger();
     const invoice = ledger.createInvoice({ id: 'inv_watch', amount: '19.00', payTo: seller });
@@ -159,7 +174,7 @@ describe('ReceiptWatcher', () => {
     expect(publicClient.getLogs).not.toHaveBeenCalled();
   });
 
-  it('retries transient RPC failures and scans bounded ranges', async () => {
+  it('retries transient RPC failures and catches up within a bounded poll budget', async () => {
     const store = new InMemoryReceiptStore();
     const ledger = new ReceiptLedger();
     const invoice = ledger.createInvoice({ id: 'inv_ranges', amount: '1', payTo: seller });
@@ -176,6 +191,7 @@ describe('ReceiptWatcher', () => {
       publicClient,
       cursorStore: store,
       maxBlockRange: 3,
+      maxBlocksPerPoll: 6,
       cursorOverlap: 2,
       retryAttempts: 2,
       retryBaseDelayMs: 0,
@@ -190,8 +206,6 @@ describe('ReceiptWatcher', () => {
     ).toEqual([
       [10n, 12n],
       [13n, 15n],
-      [16n, 18n],
-      [19n, 19n],
     ]);
     const request = createMemoPaymentRequest(invoice);
     const cursor = await store.getWatcherCursor(
@@ -201,7 +215,28 @@ describe('ReceiptWatcher', () => {
         memoId: request.memoId,
       }),
     );
-    expect(cursor?.nextFromBlock).toBe(18n);
+    expect(cursor?.nextFromBlock).toBe(14n);
+
+    await watcher.pollOnce();
+    expect(
+      publicClient.getLogs.mock.calls.map(([query]) => [query.fromBlock, query.toBlock]),
+    ).toEqual([
+      [10n, 12n],
+      [13n, 15n],
+      [14n, 16n],
+      [17n, 19n],
+    ]);
+    expect(
+      (
+        await store.getWatcherCursor(
+          createWatcherCursorKey({
+            network: invoice.network,
+            invoiceId: invoice.id,
+            memoId: request.memoId,
+          }),
+        )
+      )?.nextFromBlock,
+    ).toBe(18n);
   });
 });
 

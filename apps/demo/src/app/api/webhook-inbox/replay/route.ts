@@ -1,5 +1,6 @@
 import type { WebhookEvent } from '@resvary/sdk/receipts';
-import { DEMO_WEBHOOK_SECRET, DEMO_WEBHOOK_TARGET, getDemoWebhookInbox } from '../store';
+import { requireDemoMutationAuthorization } from '../../demo-auth';
+import { DEMO_WEBHOOK_TARGET, getDemoWebhookInbox, getDemoWebhookSecret } from '../store';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,6 +10,16 @@ interface ReplayRequest {
 }
 
 export async function POST(request: Request) {
+  const denied = requireDemoMutationAuthorization(request);
+  if (denied) return denied;
+  const secret = getDemoWebhookSecret();
+  if (!secret) {
+    return Response.json(
+      { error: 'Webhook replay is disabled until RESVARY_WEBHOOK_SECRET is configured.' },
+      { status: 503 },
+    );
+  }
+
   const body = (await request.json()) as ReplayRequest;
 
   if (!body.event) {
@@ -27,7 +38,7 @@ export async function POST(request: Request) {
   const inbox = await getDemoWebhookInbox();
   const delivery = await inbox.replay({
     event: body.event,
-    secret: DEMO_WEBHOOK_SECRET,
+    secret,
     target: DEMO_WEBHOOK_TARGET,
     replayOf: body.replayOf,
   });

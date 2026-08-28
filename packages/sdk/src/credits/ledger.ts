@@ -835,33 +835,35 @@ export class CreditLedger {
     return account;
   }
 
-  getReservation(id: string) {
-    return this.store.getReservation(id);
+  async getReservation(id: string) {
+    return this.forCurrentProject(await this.store.getReservation(id));
   }
-  getUsageReceipt(id: string) {
-    return this.store.getUsageReceipt(id);
+  async getUsageReceipt(id: string) {
+    return this.forCurrentProject(await this.store.getUsageReceipt(id));
   }
-  getFundingIntent(id: string) {
-    return this.store.getFundingIntent(id);
+  async getFundingIntent(id: string) {
+    return this.forCurrentProject(await this.store.getFundingIntent(id));
   }
   listFundingIntents() {
     return this.store.listFundingIntents(this.projectId);
   }
-  getFundingTransaction(id: string) {
-    return this.store.getFundingTransaction(id);
+  async getFundingTransaction(id: string) {
+    return this.forCurrentProject(await this.store.getFundingTransaction(id));
   }
-  listFundingTransactions(fundingIntentId?: string) {
-    return this.store.listFundingTransactions(fundingIntentId);
+  async listFundingTransactions(fundingIntentId?: string) {
+    return this.forCurrentProjectList(await this.store.listFundingTransactions(fundingIntentId));
   }
-  listUsageReceipts(customerId?: string) {
-    return customerId
+  async listUsageReceipts(customerId?: string) {
+    const values = customerId
       ? this.getBalance(customerId).then((account) => this.store.listUsageReceipts(account.id))
       : this.store.listUsageReceipts();
+    return this.forCurrentProjectList(await values);
   }
-  listLedgerEntries(customerId?: string) {
-    return customerId
+  async listLedgerEntries(customerId?: string) {
+    const values = customerId
       ? this.getBalance(customerId).then((account) => this.store.listLedgerEntries(account.id))
       : this.store.listLedgerEntries();
+    return this.forCurrentProjectList(await values);
   }
   listOutboxEvents(filter: Omit<OutboxEventFilter, 'projectId'> = {}) {
     return this.store.listOutboxEvents({ ...filter, projectId: this.projectId });
@@ -1093,6 +1095,14 @@ export class CreditLedger {
     if (!value || value.projectId !== this.projectId)
       throw new CreditNotFoundError('Usage receipt', id);
     return value;
+  }
+
+  private forCurrentProject<T extends { projectId: string }>(value: T | undefined): T | undefined {
+    return value?.projectId === this.projectId ? value : undefined;
+  }
+
+  private forCurrentProjectList<T extends { projectId: string }>(values: T[]): T[] {
+    return values.filter((value) => value.projectId === this.projectId);
   }
 }
 

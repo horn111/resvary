@@ -23,6 +23,7 @@ const worker = new ArcFundingWorker({
   payTo,
   confirmations: 2,
   maxBlockRange: 2_000,
+  maxBlocksPerPoll: 10_000,
   cursorOverlap: 2,
   retryAttempts: 3,
 });
