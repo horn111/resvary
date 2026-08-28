@@ -39,7 +39,7 @@ Good keys already exist in most applications: request IDs, job IDs, provider res
 - Create another reservation before continuing a job that needs a higher limit.
 - Open reservations expire after 15 minutes by default.
 - Expiry is processed lazily during reservations or explicitly with `releaseExpiredReservations`.
-- Credit grants do not expire in the alpha.
+- Credit grants do not expire in version 0.5.
 
 ## Corrections
 

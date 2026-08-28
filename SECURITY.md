@@ -7,9 +7,9 @@
 | 0.5.x   | :white_check_mark: |
 | < 0.5   | :x:                |
 
-## Prepaid credits alpha
+## Prepaid credits
 
-The `0.5.0-alpha.3` credit engine is intended for evaluation and design-partner deployments. SQLite is a local or single-node backend. Postgres supports multi-process deployments but does not carry a production SLA or compliance certification.
+The `0.5.0` credit engine supports self-hosted deployments. SQLite is a local or single-node backend. Postgres 16–18 supports multi-process deployments. Resvary does not provide a hosted control plane, production SLA, or compliance certification.
 
 - Authorize `customerId`, grants, adjustments, price IDs, and project scope on the server.
 - Never expose admin grant or adjustment operations directly to an untrusted client.

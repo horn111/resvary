@@ -3,7 +3,7 @@
 At-least-once delivery for Resvary credit outbox events. Receivers must deduplicate by `x-resvary-event-id` before applying side effects.
 
 ```bash
-npm install @resvary/worker@alpha
+npm install @resvary/worker
 DATABASE_URL=postgres://... \
 RESVARY_WEBHOOK_URL=https://example.com/webhooks/resvary \
 RESVARY_WEBHOOK_SECRET=replace-me \

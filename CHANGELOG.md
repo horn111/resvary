@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-28
+
+### Changed
+
+- Promoted the self-hosted SDK, Postgres persistence, and outbox worker to the stable `0.5.0` release channel.
+- Made Postgres 16–18 the recommended backend for multi-process deployments; SQLite remains supported for local and single-node use.
+- Updated package metadata, starter templates, installation instructions, and product copy to use the stable npm release.
+
+### Compatibility
+
+- Kept the public TypeScript API, CLI flags, webhook and outbox events, and SQLite/Postgres schemas identical to `0.5.0-alpha.3`.
+- Upgrading from `0.5.0-alpha.3` requires only a package version change and does not run a database migration.
+
+### Limits
+
+- The self-hosted release does not include a hosted control plane, SLA, RBAC, compliance certification, or managed operations.
+- Direct Arc and Circle Gateway funding remain Testnet-only and do not represent a production settlement or custody claim.
+
 ## [0.5.0-alpha.3] - 2026-08-27
 
 ### Fixed
@@ -126,7 +144,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI/CD pipeline with GitHub Actions
 - Security policy and contribution guidelines
 
-[unreleased]: https://github.com/horn111/resvary/compare/v0.5.0-alpha.3...HEAD
+[unreleased]: https://github.com/horn111/resvary/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/horn111/resvary/compare/v0.5.0-alpha.3...v0.5.0
 [0.5.0-alpha.3]: https://github.com/horn111/resvary/compare/v0.5.0-alpha.2...v0.5.0-alpha.3
 [0.5.0-alpha.2]: https://github.com/horn111/resvary/compare/v0.5.0-alpha.0...v0.5.0-alpha.2
 [0.1.0-alpha]: https://github.com/horn111/resvary/releases/tag/v0.1.0-alpha

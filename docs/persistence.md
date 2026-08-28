@@ -22,7 +22,7 @@ Requirements:
 
 - Node.js 24+;
 - local filesystem access;
-- one application node for the alpha.
+- one application node.
 
 Call `store.close()` during graceful shutdown. Use the in-memory store for tests that do not need restart behavior.
 

@@ -29,4 +29,4 @@ The receipt total is the sum of the individually rounded line items. Quantities 
 
 Meters and price versions are immutable after creation. Changing rates creates a new version; existing receipts continue to reference the version used for their charge.
 
-The alpha supports linear multi-dimensional rates. Tiering, packages, monthly minimums, subscriptions, and allowances are intentionally deferred.
+Version 0.5 supports linear multi-dimensional rates. Tiering, packages, monthly minimums, subscriptions, and allowances are intentionally deferred.

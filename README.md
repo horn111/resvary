@@ -40,7 +40,7 @@ Resvary provides:
 ## Quickstart
 
 ```bash
-npm install @resvary/sdk@alpha @resvary/sqlite@alpha
+npm install @resvary/sdk @resvary/sqlite
 ```
 
 ```typescript
@@ -105,7 +105,7 @@ If the provider throws, `runMetered` releases the full reservation. If provider 
 For a multi-process deployment, install Postgres persistence and apply migrations before the application starts:
 
 ```bash
-npm install @resvary/postgres@alpha @resvary/worker@alpha
+npm install @resvary/postgres @resvary/worker
 DATABASE_URL=postgres://... npx resvary-postgres migrate
 ```
 
@@ -116,7 +116,7 @@ See the production persistence guide before moving an existing SQLite database.
 Install the optional adapter when credits should be funded by direct Arc USDC or a Circle Gateway Nanopayment:
 
 ```bash
-npm install @resvary/circle@alpha
+npm install @resvary/circle
 ```
 
 ```typescript
@@ -178,7 +178,7 @@ The old payment operations APIs remain under `/api/receipts`, `/api/receipts/pro
 - A project/customer account cannot have a negative available balance.
 - SQLite mutations use `BEGIN IMMEDIATE` and store the balance change, receipt, idempotency result, and outbox event together.
 - Credits are closed-loop product credits. Resvary does not support user-to-user transfer, cash-out, redemption, custody, tax invoices, subscriptions, or marketplace balances.
-- SQLite remains a local and single-node backend. Postgres is the 0.5 design-partner deployment backend.
+- SQLite remains a local and single-node backend. Postgres 16–18 is the recommended backend for multi-process deployments.
 - Outbox delivery is at least once. Webhook consumers must deduplicate by `x-resvary-event-id`.
 - Postgres migrations are explicit deployment steps and never run when a store is constructed.
 - Direct Arc and Gateway funding are Testnet-only and are not production money-flow claims.

@@ -20,7 +20,7 @@ Resvary is an embedded, open-source prepaid credit ledger and usage billing SDK 
 
 The published evidence is pinned to `v0.4.0-alpha.0` and records an external Arc Testnet transaction, a Circle Gateway settlement, replay checks, and the shared credit lifecycle.
 
-## 0.5 design-partner alpha: production persistence
+## 0.5 stable: production persistence
 
 - [x] Postgres `CreditStore` and receipt store
 - [x] Serializable transactions and cross-process concurrency tests
@@ -30,7 +30,7 @@ The published evidence is pinned to `v0.4.0-alpha.0` and records an external Arc
 - [x] SQLite schema v4 compatibility for outbox lifecycle and cross-rail transaction uniqueness
 - [x] Postgres schema constraints and sequential migration coverage
 - [x] SQLite/Postgres starter build coverage
-- [x] Design-partner deployment and cutover guide
+- [x] Self-hosted deployment and cutover guide
 
 ## Later
 

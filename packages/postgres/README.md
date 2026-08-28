@@ -1,9 +1,9 @@
 # @resvary/postgres
 
-Postgres `CreditStore` and `ReceiptStore` implementations for Resvary design-partner deployments. Stores never migrate automatically.
+Postgres `CreditStore` and `ReceiptStore` implementations for Resvary multi-process deployments. Resvary supports PostgreSQL 16–18. Stores never migrate automatically.
 
 ```bash
-npm install @resvary/sdk@alpha @resvary/postgres@alpha
+npm install @resvary/sdk @resvary/postgres
 DATABASE_URL=postgres://... npx resvary-postgres migrate
 ```
 
