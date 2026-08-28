@@ -1,6 +1,6 @@
 {
   "name": "@resvary/sqlite",
-  "version": "0.5.0-alpha.3",
+  "version": "0.5.0",
   "description": "SQLite persistence for Resvary credits, usage receipts, and payment receipts",
   "type": "module",
   "main": "./dist/index.js",
@@ -17,8 +17,7 @@
     "LICENSE"
   ],
   "publishConfig": {
-    "access": "public",
-    "tag": "alpha"
+    "access": "public"
   },
   "scripts": {
     "build": "tsc",
@@ -30,7 +29,7 @@
     "node": ">=24.0.0"
   },
   "dependencies": {
-    "@resvary/sdk": "0.5.0-alpha.3"
+    "@resvary/sdk": "0.5.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

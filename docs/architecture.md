@@ -25,7 +25,7 @@ Optional funding
   Gateway authorization -> Circle verify -> settle -----+
 ```
 
-The embedded SDK is the supported alpha interface. Domain commands do not depend on HTTP, Next.js, Express, a wallet, or an AI provider. A future service can therefore wrap the same operations without replacing the ledger.
+The embedded SDK is the supported interface. Domain commands do not depend on HTTP, Next.js, Express, a wallet, or an AI provider. A future service can therefore wrap the same operations without replacing the ledger.
 
 ## Transaction boundary
 

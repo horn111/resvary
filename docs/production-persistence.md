@@ -1,6 +1,6 @@
-# Production Persistence for Design Partners
+# Production Persistence
 
-Resvary 0.5 is a self-hosted design-partner alpha. Postgres supports multiple application and worker processes, but this release does not include a hosted control plane, SLA, RBAC, or managed operations.
+Resvary 0.5 is a stable self-hosted SDK. PostgreSQL 16–18 supports multiple application and worker processes. This release does not include a hosted control plane, SLA, RBAC, compliance certification, or managed operations.
 
 ## Provisioning
 

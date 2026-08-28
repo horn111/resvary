@@ -11,7 +11,7 @@
 - Deliver the transactional outbox from a trusted worker and mark events delivered only after the receiver accepts them.
 - Rotate webhook secrets using an overlap window at the application layer.
 
-SQLite is an alpha local/single-node backend. Multi-process design-partner deployments should use the Postgres adapter with explicit migrations, serializable transactions, and at least one outbox worker. This remains an alpha without a production SLA or compliance certification.
+SQLite supports local and single-node deployments. Multi-process deployments should use the Postgres adapter with explicit migrations, serializable transactions, and at least one outbox worker. Resvary does not provide a hosted control plane, production SLA, or compliance certification.
 
 ## Funding-specific controls
 
