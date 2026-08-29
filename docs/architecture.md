@@ -19,11 +19,13 @@ Credit outbox
   └─ lease / retry / dead letter
       └─ OutboxWorker -> signed HTTP webhook
 
-Optional funding
+Arc settlement
   Direct Arc transfer -> Memo proof -> payment receipt --+
                                                         +-> funding transaction -> credit grant
   Gateway authorization -> Circle verify -> settle -----+
 ```
+
+Arc is the reference settlement network for external USDC funding. Both Arc paths end in the same funding transaction and exactly-once credit grant. The ledger also accepts manual product grants and can support more payment sources without changing usage accounting.
 
 The embedded SDK is the supported interface. Domain commands do not depend on HTTP, Next.js, Express, a wallet, or an AI provider. A future service can therefore wrap the same operations without replacing the ledger.
 

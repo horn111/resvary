@@ -17,7 +17,7 @@ grant or top up credits
 → issue an auditable usage receipt
 ```
 
-The credit engine is payment-rail agnostic. Resvary 0.5 adds Postgres persistence and durable webhook delivery to the two Circle-native Testnet top-up paths introduced in 0.4.
+Resvary keeps credit accounting separate from settlement. Arc is the reference network for external USDC funding: direct Arc transfers and Circle Gateway Nanopayments fund the same ledger. Resvary 0.5 adds Postgres persistence and durable webhook delivery to this Circle-native funding lifecycle.
 
 ## Why Resvary
 
@@ -111,9 +111,9 @@ DATABASE_URL=postgres://... npx resvary-postgres migrate
 
 See the production persistence guide before moving an existing SQLite database.
 
-## Circle-native Testnet funding
+## Arc settlement for external USDC funding
 
-Install the optional adapter when credits should be funded by direct Arc USDC or a Circle Gateway Nanopayment:
+Arc provides Resvary's reference settlement path for external USDC funding. Install the Circle integration package to accept direct Arc Testnet transfers and Circle Gateway Nanopayments on Arc:
 
 ```bash
 npm install @resvary/circle
@@ -134,7 +134,7 @@ const request = await funding.createFundingRequest({
 });
 ```
 
-Credits are created only after the official Circle facilitator verifies and settles the authorization. See the direct Arc and Gateway guides for the complete server flows.
+Both paths create closed-loop credits after Resvary verifies external payment evidence. The Gateway path calls the official Circle facilitator to verify and settle the authorization. The direct path verifies the Arc transaction and Memo-wrapped USDC transfer. See the direct Arc and Gateway guides for the complete server flows.
 
 ## Demo
 

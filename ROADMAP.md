@@ -2,7 +2,7 @@
 
 > Last updated: August 2026
 
-Resvary is an embedded, open-source prepaid credit ledger and usage billing SDK for AI products. Payment rails fund the ledger; they do not define the product.
+Resvary is an embedded, open-source prepaid credit ledger and usage billing SDK for AI products. Arc is the reference settlement network for external USDC funding. The ledger keeps settlement separate from usage accounting so manual grants and future payment sources can fund the same credit lifecycle.
 
 ## 0.4 alpha: Circle-native funding proof
 
@@ -10,7 +10,7 @@ Resvary is an embedded, open-source prepaid credit ledger and usage billing SDK 
 - [x] SQLite schema migration v2 and rail-scoped external payment uniqueness
 - [x] Durable Arc worker with persisted cursors, bounded scans, overlap, retry, and crash reconciliation
 - [x] Direct Arc Testnet proof path with exactly-once grants
-- [x] Optional `@resvary/circle` package
+- [x] `@resvary/circle` integration package for Arc and Circle Gateway funding
 - [x] Official Circle batching facilitator verify and settle integration
 - [x] Exact-amount Gateway Nanopayment top-ups and replay-safe grants
 - [x] Framework-neutral, Next.js, and Express HTTP handlers

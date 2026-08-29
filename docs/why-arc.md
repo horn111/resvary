@@ -1,8 +1,8 @@
 # Why Arc?
 
-> Arc is now an optional USDC funding rail for Resvary credits, not the product category. The credit ledger itself is payment-rail agnostic.
+> Arc is Resvary's reference settlement network for external USDC funding. Resvary keeps credit accounting separate from settlement, so manual grants and future payment sources can use the same ledger.
 
-Resvary is built on [Arc](https://arc.network), Circle's Layer 1 blockchain. Here's why Arc is the foundation for its usage-based billing and paid API workflows.
+Resvary built and proved its external funding lifecycle on [Arc](https://arc.network), Circle's Layer 1 blockchain. Direct Arc transfers and Circle Gateway Nanopayments on Arc feed the same reserve, commit, release, and usage-receipt lifecycle.
 
 ## USDC-Native Gas
 
