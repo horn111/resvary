@@ -6,6 +6,10 @@ import { createHttpWebhookTransport, OutboxWorker, type OutboxWorkerLog } from '
 
 async function main(): Promise<void> {
   const [command = 'run', subcommand, eventId] = process.argv.slice(2);
+  if (command === '--help' || command === '-h' || command === 'help') {
+    process.stdout.write(`${usage()}\n`);
+    return;
+  }
   const connectionString = requireEnv('DATABASE_URL');
   const schema = process.env.RESVARY_POSTGRES_SCHEMA ?? 'public';
   const pool = new Pool({ connectionString });
@@ -31,7 +35,7 @@ async function main(): Promise<void> {
       return;
     }
     if (command !== 'run') {
-      throw new Error('Usage: resvary-worker [run|dead-letter list|dead-letter requeue EVENT_ID]');
+      throw new Error(usage());
     }
 
     const controller = new AbortController();
@@ -69,6 +73,10 @@ async function main(): Promise<void> {
     await store.close();
     await pool.end();
   }
+}
+
+function usage(): string {
+  return 'Usage: resvary-worker [run|dead-letter list|dead-letter requeue EVENT_ID]';
 }
 
 async function startHealthServer(

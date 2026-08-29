@@ -313,6 +313,37 @@ describe('SqliteCreditStore', () => {
 
     store.close();
   });
+
+  it('preserves funding intent ownership when another project reuses its id', async () => {
+    const store = createSqliteCreditStore({ path: tempDatabasePath() });
+    const victim = new CreditLedger({ projectId: 'sqlite_victim', store });
+    const attacker = new CreditLedger({ projectId: 'sqlite_attacker', store });
+    const intent = await victim.createFundingIntent({
+      id: 'fund_sqlite_shared',
+      customerId: 'victim_customer',
+      amount: '3',
+      network: 'arc-testnet',
+      invoiceId: 'victim_invoice',
+      idempotencyKey: 'victim_create',
+    });
+
+    await expect(
+      attacker.createFundingIntent({
+        id: intent.id,
+        customerId: 'attacker_customer',
+        amount: '1',
+        network: 'arc-testnet',
+        invoiceId: 'attacker_invoice',
+        idempotencyKey: 'attacker_create',
+      }),
+    ).rejects.toThrow('Funding intent id already exists');
+    await expect(victim.getFundingIntent(intent.id)).resolves.toMatchObject({
+      projectId: 'sqlite_victim',
+      requestedAmount: '3',
+    });
+    await expect(attacker.getFundingIntent(intent.id)).resolves.toBeUndefined();
+    store.close();
+  });
 });
 
 function tempDatabasePath(): string {

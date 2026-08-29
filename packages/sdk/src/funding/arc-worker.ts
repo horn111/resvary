@@ -55,6 +55,8 @@ export class ArcFundingWorker {
       ledger: config.ledger,
       payTo: config.payTo,
       receiptStore: config.receiptStore,
+      rpcUrl: config.rpcUrl,
+      publicClient: config.publicClient,
     });
     const receiptLedger = new PersistentReceiptLedger({ store: config.receiptStore });
     this.watcher = new ReceiptWatcher({

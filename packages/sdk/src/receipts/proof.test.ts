@@ -21,6 +21,21 @@ const transferEvent = parseAbiItem(
 const memoEvent = ARC_MEMO_ABI.find((item) => item.type === 'event' && item.name === 'Memo');
 
 describe('verifyMemoPaymentProof', () => {
+  it('rejects proof data from the wrong chain', async () => {
+    const invoice = createInvoice({ id: 'inv_wrong_chain', amount: '19.00', payTo: seller });
+    const request = createMemoPaymentRequest(invoice);
+    const client = {
+      ...createMockClient({ logs: [] }),
+      getChainId: vi.fn().mockResolvedValue(1),
+    };
+
+    await expectProofFailure(
+      verifyMemoPaymentProof({ txHash, paymentRequest: request, publicClient: client }),
+      'chain_mismatch',
+    );
+    expect(client.getTransactionReceipt).not.toHaveBeenCalled();
+  });
+
   it('returns an onchain proof for a valid Arc Memo USDC payment tx', async () => {
     const invoice = createInvoice({ id: 'inv_proof', amount: '19.00', payTo: seller });
     const request = createMemoPaymentRequest(invoice);

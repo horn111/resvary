@@ -120,6 +120,36 @@ suite('Postgres stores', () => {
     expect((await first.getBalance('customer')).availableAmount).toBe('0.25');
   });
 
+  it('preserves funding intent ownership across projects', async () => {
+    const store = createPostgresCreditStore({ pool: pool!, schema });
+    const victim = new CreditLedger({ projectId: 'postgres_victim', store });
+    const attacker = new CreditLedger({ projectId: 'postgres_attacker', store });
+    const intent = await victim.createFundingIntent({
+      id: 'fund_postgres_shared',
+      customerId: 'victim_customer',
+      amount: '3',
+      network: 'arc-testnet',
+      invoiceId: 'victim_invoice',
+      idempotencyKey: 'victim_create',
+    });
+
+    await expect(
+      attacker.createFundingIntent({
+        id: intent.id,
+        customerId: 'attacker_customer',
+        amount: '1',
+        network: 'arc-testnet',
+        invoiceId: 'attacker_invoice',
+        idempotencyKey: 'attacker_create',
+      }),
+    ).rejects.toThrow('Funding intent id already exists');
+    await expect(victim.getFundingIntent(intent.id)).resolves.toMatchObject({
+      projectId: 'postgres_victim',
+      requestedAmount: '3',
+    });
+    await expect(attacker.getFundingIntent(intent.id)).resolves.toBeUndefined();
+  });
+
   it('claims disjoint outbox batches and persists receipts', async () => {
     const firstStore = createPostgresCreditStore({ pool: pool!, schema });
     const secondStore = createPostgresCreditStore({ pool: pool!, schema });

@@ -92,10 +92,7 @@ function getDemoReceiptStoreMode(): DemoReceiptStoreMode {
 
 async function importOptionalSqliteStore(): Promise<SqliteReceiptStoreModule> {
   try {
-    const runtimeImport = new Function('specifier', 'return import(specifier)') as (
-      specifier: string,
-    ) => Promise<SqliteReceiptStoreModule>;
-    return await runtimeImport('@resvary/sqlite');
+    return await import('@resvary/sqlite');
   } catch (error) {
     throw new Error(
       'RESVARY_RECEIPTS_STORE=sqlite requires the optional @resvary/sqlite package to be installed and built.',
