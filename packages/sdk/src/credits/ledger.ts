@@ -317,8 +317,13 @@ export class CreditLedger {
       this.idempotent(tx, 'create_funding_intent', input.idempotencyKey, input, async () => {
         const now = this.now();
         const account = await this.ensureAccountInTransaction(tx, input.customerId, input.metadata);
+        const intentId = input.id ?? createId('fund');
+        const existing = await tx.getFundingIntent(intentId);
+        if (existing) {
+          throw new InvalidCreditStateError(`Funding intent id already exists: ${intentId}`);
+        }
         const intent: FundingIntent = {
-          id: input.id ?? createId('fund'),
+          id: intentId,
           projectId: this.projectId,
           customerId: account.customerId,
           accountId: account.id,

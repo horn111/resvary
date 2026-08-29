@@ -4,6 +4,10 @@ import { parsePostgresCliOptions, type PostgresCliOptions } from './cli-options.
 
 async function main(): Promise<void> {
   const [command, ...rest] = process.argv.slice(2);
+  if (command === '--help' || command === '-h' || command === 'help') {
+    process.stdout.write(`${usage()}\n`);
+    return;
+  }
   const options = parsePostgresCliOptions(rest);
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) throw new Error('DATABASE_URL is required');
@@ -41,10 +45,12 @@ async function main(): Promise<void> {
       return;
     }
     default:
-      throw new Error(
-        'Usage: resvary-postgres <status|migrate|import-sqlite|verify-import> [--schema NAME] [--sqlite PATH] [--dry-run]',
-      );
+      throw new Error(usage());
   }
+}
+
+function usage(): string {
+  return 'Usage: resvary-postgres <status|migrate|import-sqlite|verify-import> [--schema NAME] [--sqlite PATH] [--dry-run]';
 }
 
 function optionString(options: PostgresCliOptions, key: string): string | undefined {

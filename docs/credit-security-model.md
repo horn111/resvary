@@ -16,6 +16,10 @@ SQLite supports local and single-node deployments. Multi-process deployments sho
 
 ## Funding-specific controls
 
+Automatic x402 buyers must configure a fail-closed `paymentPolicy` with a per-request limit, a client-instance total budget, and an exact recipient allowlist. `BuyerClient` rejects `402` responses without that policy and binds the response to the requested origin by default.
+
+Direct Arc funding re-fetches transaction evidence from Arc RPC before every credit grant, including crash recovery. Persisted invoices and receipts support recovery but are not trusted as payment authority without fresh proof verification.
+
 ### Direct Arc
 
 - Validate chain ID, Memo contract, Memo ID, calldata hash, sender, recipient, USDC amount, transaction status, and confirmation depth.

@@ -92,17 +92,16 @@ export async function POST(request: Request) {
       });
       const txHash =
         `0x${createHash('sha256').update(idempotencyKey).digest('hex')}` as `0x${string}`;
-      const receipt = createReceipt(fundingRequest.invoice, {
-        from: simulatedFundingPayer,
-        to: simulatedFundingRecipient,
-        amount: '2',
-        memo: fundingRequest.invoice.memo,
-        txHash,
-      });
-      await funding.confirmPayment({
+      await ledger.confirmFunding({
         fundingIntentId: fundingRequest.fundingIntent.id,
-        receipt,
+        rail: 'arc_direct',
+        network: fundingRequest.fundingIntent.network,
+        externalPaymentId: `simulated:${txHash}`,
+        amount: '2',
+        paymentReceiptId: `simulated:${txHash}`,
+        payer: simulatedFundingPayer,
         idempotencyKey: `arc-confirm:${idempotencyKey}`,
+        metadata: { mode: 'simulated_arc_testnet', simulated: true },
       });
     } else if (body.action === 'gateway_prepare') {
       const funding = createDemoGatewayFunding(ledger);

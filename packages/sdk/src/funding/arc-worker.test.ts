@@ -9,7 +9,7 @@ const buyer = '0x2222222222222222222222222222222222222222';
 const txHash = `0x${'ab'.repeat(32)}` as `0x${string}`;
 
 describe('ArcFundingWorker', () => {
-  it('reconciles a saved receipt after a crash before credit grant', async () => {
+  it('refuses to reconcile a saved receipt without fresh RPC verification', async () => {
     const ledger = new CreditLedger({ projectId: 'project_arc_worker' });
     const receiptStore = new InMemoryReceiptStore();
     const funding = new ArcCreditFunding({
@@ -49,14 +49,12 @@ describe('ArcFundingWorker', () => {
       } as any,
     });
 
-    expect(await worker.reconcile()).toBe(1);
+    await expect(worker.reconcile()).rejects.toThrow('not found');
     const confirmed = await ledger.getFundingIntent(request.fundingIntent.id);
     const account = await ledger.store.getAccount(request.fundingIntent.accountId);
-    expect(confirmed?.status).toBe('confirmed');
-    expect(account?.availableAmount).toBe('12.5');
-
-    expect(await worker.reconcile()).toBe(0);
-    expect(await ledger.listFundingTransactions()).toHaveLength(1);
+    expect(confirmed?.status).toBe('pending');
+    expect(account?.availableAmount).toBe('0');
+    expect(await ledger.listFundingTransactions()).toHaveLength(0);
   });
 
   it('restores pending invoices from the persistent receipt store', async () => {

@@ -14,6 +14,11 @@
  * const buyer = new BuyerClient({
  *   privateKey: '0x...',
  *   rpcUrl: 'https://rpc.testnet.arc.network',
+ *   paymentPolicy: {
+ *     maxAmount: '0.10',
+ *     maxTotalAmount: '1.00',
+ *     allowedPayTo: ['0x1111111111111111111111111111111111111111'],
+ *   },
  * });
  *
  * const response = await buyer.request('https://api.example.com/premium/data');
@@ -21,9 +26,10 @@
  * ```
  */
 
-import { type Account } from 'viem';
+import { getAddress, type Account } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import type { PaymentRequirements, PaymentPayload } from '../types.js';
+import { toStablecoinUnits } from '../receipts/amount.js';
 import {
   ARC_TESTNET,
   DEFAULTS,
@@ -45,6 +51,28 @@ export interface BuyerClientConfig {
   maxRetries?: number;
   /** Custom fetch implementation */
   fetch?: typeof globalThis.fetch;
+  /** Required fail-closed policy for automatic payment signatures. */
+  paymentPolicy?: BuyerPaymentPolicy;
+}
+
+export interface BuyerPaymentProposal {
+  readonly url: string;
+  readonly origin: string;
+  readonly requirements: Readonly<PaymentRequirements>;
+  readonly amountUnits: bigint;
+}
+
+export interface BuyerPaymentPolicy {
+  /** Maximum amount signed for one request, in human-readable USDC. */
+  maxAmount: string;
+  /** Maximum amount signed by this client instance, in human-readable USDC. */
+  maxTotalAmount: string;
+  /** Exact recipient allowlist. */
+  allowedPayTo: readonly `0x${string}`[];
+  /** Allowed final response origins. Defaults to the requested URL origin. */
+  allowedOrigins?: readonly string[];
+  /** Optional application approval hook called with normalized terms before signing. */
+  approve?: (proposal: BuyerPaymentProposal) => boolean | Promise<boolean>;
 }
 
 /** Response from a paid request */
@@ -73,11 +101,17 @@ export class BuyerClient {
   private readonly account: Account;
   private readonly chainId: number;
   private readonly fetchFn: typeof globalThis.fetch;
+  private readonly paymentPolicy?: BuyerPaymentPolicy;
+  private signedAmountUnits = 0n;
 
   constructor(config: BuyerClientConfig) {
     this.account = privateKeyToAccount(config.privateKey);
     this.chainId = config.chainId ?? ARC_TESTNET.chainId;
     this.fetchFn = config.fetch ?? globalThis.fetch;
+    this.paymentPolicy = config.paymentPolicy;
+    if (this.chainId !== ARC_TESTNET.chainId) {
+      throw new Error('BuyerClient currently supports Arc Testnet only');
+    }
   }
 
   /** Get the buyer's wallet address */
@@ -114,8 +148,8 @@ export class BuyerClient {
       throw new Error('Received 402 but could not parse payment requirements');
     }
 
-    // Sign the payment
-    const paymentPayload = await this.signPayment(requirements);
+    const proposal = await this.authorizePayment(url, initialResponse, requirements);
+    const paymentPayload = await this.signPayment(proposal.requirements, proposal.amountUnits);
 
     // Encode payment as base64
     const encodedPayment = Buffer.from(JSON.stringify(paymentPayload)).toString('base64');
@@ -168,7 +202,83 @@ export class BuyerClient {
   /**
    * Sign a payment authorization using EIP-3009.
    */
-  private async signPayment(requirements: PaymentRequirements): Promise<PaymentPayload> {
+  private async authorizePayment(
+    requestedUrl: string,
+    response: globalThis.Response,
+    requirements: PaymentRequirements,
+  ): Promise<BuyerPaymentProposal> {
+    const policy = this.paymentPolicy;
+    if (!policy) {
+      throw new Error('BuyerClient paymentPolicy is required before signing a 402 payment');
+    }
+    if (
+      requirements.x402Version !== DEFAULTS.x402Version ||
+      requirements.scheme !== DEFAULTS.scheme ||
+      requirements.network !== DEFAULTS.network
+    ) {
+      throw new Error('Payment requirements do not match the supported x402 Arc Testnet profile');
+    }
+    if (requirements.expiry !== undefined) {
+      if (!Number.isSafeInteger(requirements.expiry) || requirements.expiry <= Date.now() / 1000) {
+        throw new Error('Payment requirements are expired or contain an invalid expiry');
+      }
+    }
+
+    let payTo: `0x${string}`;
+    try {
+      payTo = getAddress(requirements.payTo);
+    } catch {
+      throw new Error('Payment requirements contain an invalid recipient');
+    }
+    const allowedPayTo = policy.allowedPayTo.map((address) => getAddress(address));
+    if (allowedPayTo.length === 0 || !allowedPayTo.includes(payTo)) {
+      throw new Error(`Payment recipient is not allowed: ${payTo}`);
+    }
+
+    const finalUrl = new URL(response.url || requestedUrl);
+    const requestedOrigin = new URL(requestedUrl).origin;
+    const allowedOrigins = (policy.allowedOrigins ?? [requestedOrigin]).map(
+      (origin) => new URL(origin).origin,
+    );
+    if (!allowedOrigins.includes(finalUrl.origin)) {
+      throw new Error(`Payment response origin is not allowed: ${finalUrl.origin}`);
+    }
+
+    const amountUnits = toStablecoinUnits(requirements.maxAmountRequired, USDC_DECIMALS);
+    if (amountUnits <= 0n) throw new Error('Payment amount must be positive');
+    const maxAmountUnits = toStablecoinUnits(policy.maxAmount, USDC_DECIMALS);
+    const maxTotalAmountUnits = toStablecoinUnits(policy.maxTotalAmount, USDC_DECIMALS);
+    if (amountUnits > maxAmountUnits) {
+      throw new Error('Payment amount exceeds the per-request policy limit');
+    }
+    if (this.signedAmountUnits + amountUnits > maxTotalAmountUnits) {
+      throw new Error('Payment amount exceeds the client total policy limit');
+    }
+
+    const normalizedRequirements = Object.freeze({ ...requirements, payTo });
+    const proposal: BuyerPaymentProposal = Object.freeze({
+      url: finalUrl.toString(),
+      origin: finalUrl.origin,
+      requirements: normalizedRequirements,
+      amountUnits,
+    });
+    this.signedAmountUnits += amountUnits;
+    try {
+      if (policy.approve && !(await policy.approve(proposal))) {
+        throw new Error('Payment was denied by the application approval policy');
+      }
+    } catch (error) {
+      this.signedAmountUnits -= amountUnits;
+      throw error;
+    }
+
+    return proposal;
+  }
+
+  private async signPayment(
+    requirements: PaymentRequirements,
+    amountUnits: bigint,
+  ): Promise<PaymentPayload> {
     const now = Math.floor(Date.now() / 1000);
     const nonce =
       `0x${Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('hex')}` as `0x${string}`;
@@ -176,9 +286,7 @@ export class BuyerClient {
     const authorization = {
       from: this.account.address,
       to: requirements.payTo,
-      value: String(
-        BigInt(Math.ceil(parseFloat(requirements.maxAmountRequired) * 10 ** USDC_DECIMALS)),
-      ),
+      value: amountUnits.toString(),
       validAfter: String(now - 60), // Valid from 1 minute ago (clock skew buffer)
       validBefore: String(now + DEFAULTS.paymentValiditySeconds),
       nonce,
@@ -188,33 +296,39 @@ export class BuyerClient {
     if (!this.account.signTypedData) {
       throw new Error('Account does not support signTypedData');
     }
-    const signature = await this.account.signTypedData({
-      domain: {
-        name: 'USD Coin',
-        version: '2',
-        chainId: BigInt(this.chainId),
-        verifyingContract: ARC_TESTNET.usdcAddress,
-      },
-      types: {
-        TransferWithAuthorization: [
-          { name: 'from', type: 'address' },
-          { name: 'to', type: 'address' },
-          { name: 'value', type: 'uint256' },
-          { name: 'validAfter', type: 'uint256' },
-          { name: 'validBefore', type: 'uint256' },
-          { name: 'nonce', type: 'bytes32' },
-        ],
-      },
-      primaryType: 'TransferWithAuthorization',
-      message: {
-        from: authorization.from,
-        to: authorization.to,
-        value: BigInt(authorization.value),
-        validAfter: BigInt(authorization.validAfter),
-        validBefore: BigInt(authorization.validBefore),
-        nonce: authorization.nonce,
-      },
-    });
+    let signature: `0x${string}`;
+    try {
+      signature = await this.account.signTypedData({
+        domain: {
+          name: 'USD Coin',
+          version: '2',
+          chainId: BigInt(this.chainId),
+          verifyingContract: ARC_TESTNET.usdcAddress,
+        },
+        types: {
+          TransferWithAuthorization: [
+            { name: 'from', type: 'address' },
+            { name: 'to', type: 'address' },
+            { name: 'value', type: 'uint256' },
+            { name: 'validAfter', type: 'uint256' },
+            { name: 'validBefore', type: 'uint256' },
+            { name: 'nonce', type: 'bytes32' },
+          ],
+        },
+        primaryType: 'TransferWithAuthorization',
+        message: {
+          from: authorization.from,
+          to: authorization.to,
+          value: BigInt(authorization.value),
+          validAfter: BigInt(authorization.validAfter),
+          validBefore: BigInt(authorization.validBefore),
+          nonce: authorization.nonce,
+        },
+      });
+    } catch (error) {
+      this.signedAmountUnits -= amountUnits;
+      throw error;
+    }
 
     return {
       x402Version: DEFAULTS.x402Version as 2,

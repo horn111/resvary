@@ -30,7 +30,7 @@ await funding.confirmPayment({
 });
 ```
 
-Confirmation checks invoice, network, recipient, actual amount, and transaction hash. The proof layer additionally checks Arc chain ID, Memo contract, Memo ID, calldata hash, USDC transfer, sender, transaction status, and confirmation depth.
+Confirmation fetches the transaction from Arc RPC before granting credits. It reconstructs the expected payment request from the durable funding intent, then checks the invoice, network, recipient, actual amount, transaction hash, Memo contract, Memo ID, calldata hash, USDC transfer, sender, and transaction status. Caller-provided payment terms are never trusted.
 
 - Underpayment fails.
 - A verified overpayment credits the actual amount.
@@ -55,7 +55,7 @@ const worker = new ArcFundingWorker({
 worker.start();
 ```
 
-The worker restores pending invoices after restart, persists cursors, bounds RPC ranges, retries transient failures, rescans a small overlap, and reconciles a receipt saved before a crash with a missing credit grant.
+The worker restores pending invoices after restart, persists cursors, bounds RPC ranges, retries transient failures, rescans a small overlap, and reconciles a receipt saved before a crash with a missing credit grant. Recovery re-fetches and verifies the transaction; a stored receipt is never sufficient authority by itself.
 
 This is Arc Testnet functionality. Resvary does not export a mainnet placeholder or claim production settlement, custody, or redemption.
 

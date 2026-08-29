@@ -5,9 +5,14 @@ import { runPrompts } from './prompts.js';
 import { generateProject } from './generator.js';
 
 async function main() {
-  console.log(pc.cyan('\n⚡ create-resvary\n'));
-
   const args = process.argv.slice(2);
+  if (args[0] === '--help' || args[0] === '-h' || args[0] === 'help') {
+    console.log('Usage: create-resvary [project-name]');
+    console.log('Scaffold an AI credits or x402 paid API project.');
+    return;
+  }
+
+  console.log(pc.cyan('\n⚡ create-resvary\n'));
   const initialProjectName = args[0];
 
   try {

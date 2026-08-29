@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
 
 const exportsToCheck = [
   ['@resvary/sdk', 'CreditLedger'],
@@ -25,9 +26,17 @@ const cliFiles = [
 ];
 
 for (const cliFile of cliFiles) {
-  const source = await readFile(resolve(cliFile), 'utf8');
+  const absoluteCliFile = resolve(cliFile);
+  const source = await readFile(absoluteCliFile, 'utf8');
   if (!source.startsWith('#!/usr/bin/env node')) {
     throw new Error(`${cliFile} is missing its Node.js shebang`);
+  }
+  const result = spawnSync(process.execPath, [absoluteCliFile, '--help'], {
+    encoding: 'utf8',
+    env: { ...process.env, DATABASE_URL: '', RESVARY_WEBHOOK_SECRET: '' },
+  });
+  if (result.status !== 0 || !result.stdout.includes('Usage:')) {
+    throw new Error(`${cliFile} --help failed: ${result.stderr || result.stdout}`);
   }
 }
 

@@ -22,6 +22,7 @@ export type ProofClient = {
   getTransactionReceipt: (params: {
     hash: `0x${string}`;
   }) => Promise<ProofTransactionReceipt | null>;
+  getChainId?: () => Promise<number>;
 };
 
 export type ProofPollingClient = ProofClient & {
@@ -43,6 +44,7 @@ const DEFAULT_PROOF_LOOKBACK_BLOCKS = 5_000n;
 const DEFAULT_PROOF_SCAN_BLOCKS = 5_000n;
 
 export type VerifyMemoPaymentProofFailureReason =
+  | 'chain_mismatch'
   | 'tx_not_found'
   | 'tx_reverted'
   | 'wrong_memo_contract'
@@ -131,6 +133,16 @@ export async function verifyMemoPaymentProof(
     createPublicClient({
       transport: http(input.rpcUrl ?? ARC_TESTNET.rpcUrl),
     });
+
+  if (client.getChainId) {
+    const chainId = await client.getChainId();
+    if (chainId !== ARC_TESTNET.chainId) {
+      throw new MemoPaymentProofError(
+        'chain_mismatch',
+        `RPC chain ${chainId} does not match Arc Testnet ${ARC_TESTNET.chainId}`,
+      );
+    }
+  }
 
   let txReceipt: ProofTransactionReceipt | null;
   try {
@@ -426,7 +438,7 @@ export function createMemoPaymentProofFromReceipt(params: {
     const args = log.args as {
       value?: bigint;
     };
-    return args.value?.toString() === paymentRequest.amountUnits;
+    return args.value !== undefined && args.value >= BigInt(paymentRequest.amountUnits);
   });
 
   if (!amountTransfer) {
@@ -435,6 +447,7 @@ export function createMemoPaymentProofFromReceipt(params: {
       `Transaction ${txHash} has no USDC Transfer for ${paymentRequest.amountUnits} units`,
     );
   }
+  const paidAmountUnits = (amountTransfer.args as { value: bigint }).value;
 
   return {
     chainId: ARC_TESTNET.chainId,
@@ -450,7 +463,7 @@ export function createMemoPaymentProofFromReceipt(params: {
     payer: getAddress(memoArgs.sender) as `0x${string}`,
     payTo: getAddress(paymentRequest.payTo) as `0x${string}`,
     target: getAddress(paymentRequest.target) as `0x${string}`,
-    amountUnits: paymentRequest.amountUnits,
+    amountUnits: paidAmountUnits.toString(),
     explorerUrl: `${ARC_TESTNET.explorerUrl}/tx/${txHash}`,
     verifiedAt: params.verifiedAt ?? Date.now(),
   };

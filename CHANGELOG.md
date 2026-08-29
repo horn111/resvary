@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- Made `BuyerClient` fail closed on `402` responses unless the caller supplies exact recipient and origin policy, a per-request limit, and a client-instance total budget.
+- Replaced floating-point x402 amount conversion with exact six-decimal stablecoin parsing and rejected malformed, expired, wrong-network, and unapproved payment requirements before signing.
+- Reserved the `BuyerClient` total budget before asynchronous approval and froze approved payment terms to prevent concurrent or callback-driven limit bypasses.
+- Re-verified direct Arc transaction evidence through RPC before every credit grant, including recovery from persisted receipts, and bound the proof to payment terms reconstructed from the funding intent.
+- Prevented a project-scoped ledger from replacing another project's funding intent through a reused caller-selected ID.
+- Restricted CI credentials to read-only repository access, stopped checkout credential persistence, and removed runtime-generated code from the demo's optional SQLite import.
+
+### Changed
+
+- Added `--help` output to all three public CLIs and verified it in package smoke tests.
+- Declared Node.js 20+ support in the SDK, Circle adapter, and `create-resvary` package metadata. SQLite and the demo continue to require Node.js 24+.
+- Allowed verified direct Arc overpayments while deriving the credited amount from onchain proof instead of receipt fields.
+
+### Compatibility
+
+- Existing databases require no migration.
+- Automatic `BuyerClient` payments now require `paymentPolicy`. Direct Arc confirmation now requires a working Arc RPC connection; the expected payment request is reconstructed from the funding intent and is never trusted from caller input.
+
 ## [0.5.0] - 2026-08-28
 
 ### Changed

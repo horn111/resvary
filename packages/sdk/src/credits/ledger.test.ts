@@ -326,4 +326,36 @@ describe('CreditLedger', () => {
     });
     await expect(second.listFundingTransactions(intent.id)).resolves.toHaveLength(1);
   });
+
+  it('does not let another project replace a caller-selected funding intent id', async () => {
+    const store = new InMemoryCreditStore();
+    const victim = new CreditLedger({ projectId: 'project_victim', store });
+    const attacker = new CreditLedger({ projectId: 'project_attacker', store });
+    const original = await victim.createFundingIntent({
+      id: 'fund_shared_id',
+      customerId: 'victim_customer',
+      amount: '5',
+      network: 'arc-testnet',
+      invoiceId: 'victim_invoice',
+      idempotencyKey: 'victim_intent',
+    });
+
+    await expect(
+      attacker.createFundingIntent({
+        id: original.id,
+        customerId: 'attacker_customer',
+        amount: '1',
+        network: 'arc-testnet',
+        invoiceId: 'attacker_invoice',
+        idempotencyKey: 'attacker_intent',
+      }),
+    ).rejects.toThrow('Funding intent id already exists');
+
+    await expect(victim.getFundingIntent(original.id)).resolves.toMatchObject({
+      projectId: 'project_victim',
+      customerId: 'victim_customer',
+      requestedAmount: '5',
+    });
+    await expect(attacker.getFundingIntent(original.id)).resolves.toBeUndefined();
+  });
 });
