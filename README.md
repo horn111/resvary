@@ -17,7 +17,7 @@ grant or top up credits
 → issue an auditable usage receipt
 ```
 
-Resvary keeps credit accounting separate from settlement. Arc is the reference network for external USDC funding: direct Arc transfers and Circle Gateway Nanopayments fund the same ledger. Resvary 0.5 adds Postgres persistence and durable webhook delivery to this Circle-native funding lifecycle.
+Resvary keeps credit accounting separate from settlement. Arc is the reference network for external USDC funding: direct Arc transfers and Circle Gateway Nanopayments fund the same ledger. Resvary 0.6 adds fail-closed buyer payment policy and mandatory Arc RPC proof to the stable Postgres-backed release.
 
 ## Why Resvary
 

@@ -1,0 +1,178 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Stable version to release (for example, 0.6.0)
+        required: true
+        type: string
+      dry_run:
+        description: Run preflight, pack, and local smoke without npm or Git mutations
+        required: true
+        default: true
+        type: boolean
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+
+jobs:
+  preflight:
+    name: Preflight and immutable artifacts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Require main
+        env:
+          RELEASE_REF: ${{ github.ref }}
+        run: test "$RELEASE_REF" = refs/heads/main
+
+      - name: Checkout release commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - name: Validate release metadata and successful CI
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/release/validate.mjs "${{ inputs.version }}"
+
+      - name: Clean install
+        run: npm ci
+
+      - name: Audit dependencies
+        run: |
+          npm audit --audit-level=high
+          npm audit signatures
+
+      - name: Run release gates
+        run: |
+          npm run format:check
+          npm run design:check
+          npm run typecheck
+          npm run build
+          npm test
+          npm run test:exports
+          npm run test:starters
+
+      - name: Pack and inspect release archives
+        env:
+          RELEASE_ARTIFACT_DIR: ${{ runner.temp }}/release-artifacts
+        run: node scripts/release/artifacts.mjs pack "${{ inputs.version }}"
+
+      - name: Install checked archives outside the monorepo
+        env:
+          RELEASE_ARTIFACT_DIR: ${{ runner.temp }}/release-artifacts
+        run: node scripts/release/artifacts.mjs smoke "${{ inputs.version }}"
+
+      - name: Upload checked release archives
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: release-${{ inputs.version }}-${{ github.sha }}
+          path: ${{ runner.temp }}/release-artifacts
+          if-no-files-found: error
+          retention-days: 7
+
+  publish_next:
+    name: Publish checked archives to next
+    if: ${{ !inputs.dry_run }}
+    needs: preflight
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout release commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Download checked release archives
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: release-${{ inputs.version }}-${{ github.sha }}
+          path: ${{ runner.temp }}/release-artifacts
+
+      - name: Publish dependency levels with provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          RELEASE_ARTIFACT_DIR: ${{ runner.temp }}/release-artifacts
+        run: node scripts/release/registry.mjs publish "${{ inputs.version }}"
+
+  registry_smoke:
+    name: Registry smoke before promotion
+    if: ${{ !inputs.dry_run }}
+    needs: publish_next
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout release commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Verify exact registry packages, provenance, CLIs, and starters
+        run: node scripts/release/registry.mjs smoke "${{ inputs.version }}"
+
+  promote:
+    name: Promote stable release
+    if: ${{ !inputs.dry_run }}
+    needs: registry_smoke
+    runs-on: ubuntu-latest
+    environment: Production
+    permissions:
+      contents: write
+      actions: read
+      id-token: write
+
+    steps:
+      - name: Checkout release commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Promote latest and restore stable dist-tags
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: node scripts/release/registry.mjs promote "${{ inputs.version }}"
+
+      - name: Verify latest installs and exact create-resvary execution
+        run: node scripts/release/registry.mjs post-smoke "${{ inputs.version }}"
+
+      - name: Create annotated tag and stable GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/release/registry.mjs github-release "${{ inputs.version }}"

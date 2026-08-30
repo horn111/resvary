@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "rail": "arc_direct",
+  "testnetOnly": true,
+  "proofId": "arc-proof-20260830013515",
+  "observedAt": "2026-08-30T01:35:22.958Z",
+  "network": "arc-testnet",
+  "chainId": 5042002,
+  "txHash": "0x988d91a71398f62ab7086222c53c0be4eb23b3d41da371571e036d3ab96aca7f",
+  "explorerUrl": "https://testnet.arcscan.app/tx/0x988d91a71398f62ab7086222c53c0be4eb23b3d41da371571e036d3ab96aca7f",
+  "blockNumber": "59529171",
+  "confirmations": 1,
+  "payer": "0x1E3f8Fab778Eb5035f629Ac94a80bFf181557985",
+  "recipient": "0x4ae8B4E11b05380d0B122D99C1A29050Cf8Eba2d",
+  "amount": "0.01",
+  "amountUnits": "10000",
+  "memoId": "0xce9431bbe3b1eb85f85b9a14dd45cc379d78667ead8746f0bf68c544a4c03501",
+  "callDataHash": "0x6e79426b370da1f555eecc6e8f7f7657929c1f9314bc7befd27f2a9acb00a56b",
+  "fundingIntentId": "fund_c373dd55d9a411dfa57db67d",
+  "paymentReceiptId": "rcpt_4702775ada52f084220f8f28",
+  "fundingTransactionId": "ftx_d86ecb93124cad9d6e9e66f4",
+  "creditGrantId": "grant_ed64666ad135751cd0265405",
+  "balanceAfterFunding": "0.01",
+  "workerRecovery": {
+    "recoveredFromPersistedRun": false,
+    "pendingIntentWasDurable": true,
+    "recoveredIntentAfterRestart": true,
+    "observedReceiptCount": 1,
+    "persistedCursorCount": 1,
+    "pendingAfterFinalRestart": 0,
+    "reconciledAfterFinalRestart": 0
+  },
+  "replay": {
+    "balanceUnchanged": true,
+    "observedBalanceBeforeReplay": "0.01",
+    "observedBalanceAfterReplay": "0.01"
+  },
+  "lifecycle": {
+    "reservationId": "rsv_7f546f75a0c583704ccc35ee",
+    "usageReceiptId": "urcpt_b6f1896bf750a7e9baf95daa",
+    "chargedAmount": "0.001",
+    "releasedAmount": "0.001",
+    "balanceAfterUsage": "0.009"
+  },
+  "privacy": {
+    "privateKeyRecorded": false
+  }
+}

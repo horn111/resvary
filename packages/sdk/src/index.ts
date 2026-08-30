@@ -15,7 +15,12 @@ export {
 export { expressPaywall } from './middleware/express.js';
 export { nextPaywall, type NextRouteHandler } from './middleware/next.js';
 
-export { BuyerClient, type BuyerClientConfig } from './client/buyer.js';
+export {
+  BuyerClient,
+  type BuyerClientConfig,
+  type BuyerPaymentPolicy,
+  type BuyerPaymentProposal,
+} from './client/buyer.js';
 
 export { UsageMeter, type UsageRecord, type MeterConfig } from './billing/meter.js';
 export {

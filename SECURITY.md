@@ -4,12 +4,12 @@
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.5.x   | :white_check_mark: |
-| < 0.5   | :x:                |
+| 0.6.x   | :white_check_mark: |
+| < 0.6   | :x:                |
 
 ## Prepaid credits
 
-The `0.5.0` credit engine supports self-hosted deployments. SQLite is a local or single-node backend. Postgres 16–18 supports multi-process deployments. Resvary does not provide a hosted control plane, production SLA, or compliance certification.
+The `0.6.0` credit engine supports self-hosted deployments. SQLite is a local or single-node backend. Postgres 16–18 supports multi-process deployments. Resvary does not provide a hosted control plane, production SLA, or compliance certification. Arc and Circle Gateway integrations remain Testnet-only.
 
 - Authorize `customerId`, grants, adjustments, price IDs, and project scope on the server.
 - Never expose admin grant or adjustment operations directly to an untrusted client.
@@ -19,6 +19,8 @@ The `0.5.0` credit engine supports self-hosted deployments. SQLite is a local or
 - Run Postgres migrations with a separate least-privilege deployment role.
 - Keep database URLs and webhook secrets in a secret manager and rotate them after suspected exposure.
 - Verify `x-resvary-signature` and deduplicate `x-resvary-event-id` before processing webhook side effects.
+- Configure a fail-closed `BuyerClient.paymentPolicy` before accepting automatic x402 payments.
+- Require a working Arc Testnet RPC endpoint and treat verified onchain evidence as the source of truth for direct funding.
 
 See [docs/credit-security-model.md](docs/credit-security-model.md) for the full model.
 

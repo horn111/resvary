@@ -1,6 +1,6 @@
 # Circle Gateway Nanopayment Funding
 
-Resvary 0.4 accepts Circle Gateway Nanopayments as a Testnet top-up rail. The payment funds closed-loop product credits. It does not replace reserve, commit, release, pricing, or usage receipts.
+Resvary 0.6 accepts Circle Gateway Nanopayments as a Testnet top-up rail. The payment funds closed-loop product credits. It does not replace reserve, commit, release, pricing, or usage receipts.
 
 ## Install
 
@@ -99,4 +99,4 @@ signature. Review the JSON before committing it.
 
 ## Testnet boundary
 
-0.4 supports Arc Testnet `eip155:5042002`, Gateway domain 26. The package does not expose an Arc mainnet preset. Do not describe this release as production settlement, custody, or a mainnet money flow.
+0.6 supports Arc Testnet `eip155:5042002`, Gateway domain 26. The package does not expose an Arc mainnet preset. Do not describe this release as production settlement, custody, or a mainnet money flow.

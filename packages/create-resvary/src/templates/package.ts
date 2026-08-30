@@ -5,8 +5,8 @@ export function packageTemplate(config: ProjectConfig): string {
   const persistenceDependency =
     config.template === 'ai-credits'
       ? config.database === 'postgres'
-        ? `,\n    "@resvary/postgres": "0.5.0",\n    "@resvary/worker": "0.5.0"`
-        : `,\n    "@resvary/sqlite": "0.5.0"`
+        ? `,\n    "@resvary/postgres": "0.6.0",\n    "@resvary/worker": "0.6.0"`
+        : `,\n    "@resvary/sqlite": "0.6.0"`
       : '';
   const minimumNode =
     config.template === 'ai-credits' && config.database === 'sqlite' ? '24' : '20';
@@ -33,19 +33,19 @@ export function packageTemplate(config: ProjectConfig): string {
     }
   },
   "dependencies": {
-    "@resvary/sdk": "0.5.0"${persistenceDependency},
+    "@resvary/sdk": "0.6.0"${persistenceDependency},
     ${
       isExpress
         ? `"express": "^4.21.2"`
-        : `"next": "16.3.0",\n    "react": "19.2.8",\n    "react-dom": "19.2.8"`
+        : `"next": "16.3.3",\n    "react": "19.2.8",\n    "react-dom": "19.2.8"`
     }
   },
   "devDependencies": {
-    "@types/node": "^22.19.19",
+    "@types/node": "^22.20.1",
     "typescript": "5.9.3"${
       isExpress
         ? `,\n    "@types/express": "^5.0.6",\n    "tsx": "^4.20.6"`
-        : `,\n    "@types/react": "^19.2.18",\n    "@types/react-dom": "^19.2.4"`
+        : `,\n    "@types/react": "^19.2.18",\n    "@types/react-dom": "^19.2.5"`
     }
   }
 }

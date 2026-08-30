@@ -9,7 +9,9 @@ const FOOTER_X_LINK =
 const SITE_HTML = CLAUDE_DESIGN_HTML.replaceAll(
   'Hosted Postgres service',
   'Postgres deployment backend',
-).replace(FOOTER_ISSUES_LINK, `${FOOTER_ISSUES_LINK}\n        ${FOOTER_X_LINK}`);
+)
+  .replaceAll('0.5 stable', '0.6 stable')
+  .replace(FOOTER_ISSUES_LINK, `${FOOTER_ISSUES_LINK}\n        ${FOOTER_X_LINK}`);
 
 export function ClaudeDesignPage() {
   return (

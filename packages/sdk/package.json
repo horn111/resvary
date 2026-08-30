@@ -1,6 +1,6 @@
 {
   "name": "@resvary/sdk",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Prepaid credits and usage billing SDK for AI products",
   "type": "module",
   "main": "./dist/index.js",
@@ -96,7 +96,7 @@
     "url": "https://github.com/horn111/resvary/issues"
   },
   "dependencies": {
-    "viem": "^2.55.8"
+    "viem": "^2.56.0"
   },
   "peerDependencies": {
     "express": ">=4.0.0",
@@ -113,6 +113,6 @@
   "devDependencies": {
     "@types/express": "^5.0.0",
     "typescript": "^5.6.0",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
   }
 }
