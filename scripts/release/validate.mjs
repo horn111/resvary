@@ -22,10 +22,16 @@ const manifests = [
   ['apps/demo/package.json', await readJson('apps/demo/package.json')],
 ];
 for (const packageInfo of publicPackages) {
-  manifests.push([
-    `${packageInfo.directory}/package.json`,
-    await readJson(`${packageInfo.directory}/package.json`),
-  ]);
+  const path = `${packageInfo.directory}/package.json`;
+  const manifest = await readJson(path);
+  if (
+    manifest.repository?.type !== 'git' ||
+    manifest.repository?.url !== 'git+https://github.com/horn111/resvary.git' ||
+    manifest.repository?.directory !== packageInfo.directory
+  ) {
+    throw new Error(`${path} must identify its exact GitHub repository directory for provenance`);
+  }
+  manifests.push([path, manifest]);
 }
 
 for (const [path, manifest] of manifests) {

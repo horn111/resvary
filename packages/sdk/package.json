@@ -1,6 +1,6 @@
 {
   "name": "@resvary/sdk",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Prepaid credits and usage billing SDK for AI products",
   "type": "module",
   "main": "./dist/index.js",

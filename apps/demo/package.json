@@ -1,6 +1,6 @@
 {
   "name": "@resvary/demo",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "private": true,
   "description": "Resvary prepaid AI credits and usage billing demo",
   "scripts": {

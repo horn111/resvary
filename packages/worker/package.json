@@ -1,6 +1,6 @@
 {
   "name": "@resvary/worker",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Durable outbox delivery worker for Resvary",
   "type": "module",
   "main": "./dist/index.js",
@@ -31,9 +31,14 @@
   "engines": {
     "node": ">=20.0.0"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/horn111/resvary.git",
+    "directory": "packages/worker"
+  },
   "dependencies": {
-    "@resvary/postgres": "0.6.0",
-    "@resvary/sdk": "0.6.0",
+    "@resvary/postgres": "0.6.1",
+    "@resvary/sdk": "0.6.1",
     "pg": "^8.16.3"
   },
   "devDependencies": {

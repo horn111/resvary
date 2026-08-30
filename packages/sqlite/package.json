@@ -1,6 +1,6 @@
 {
   "name": "@resvary/sqlite",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "SQLite persistence for Resvary credits, usage receipts, and payment receipts",
   "type": "module",
   "main": "./dist/index.js",
@@ -28,8 +28,13 @@
   "engines": {
     "node": ">=24.0.0"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/horn111/resvary.git",
+    "directory": "packages/sqlite"
+  },
   "dependencies": {
-    "@resvary/sdk": "0.6.0"
+    "@resvary/sdk": "0.6.1"
   },
   "devDependencies": {
     "@types/node": "^22.20.1",

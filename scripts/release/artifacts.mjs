@@ -102,7 +102,10 @@ async function inspectArchive(packageInfo, archivePath, gitHead) {
     if (
       packedManifest.name !== packageInfo.name ||
       packedManifest.version !== version ||
-      packedManifest.gitHead !== gitHead
+      packedManifest.gitHead !== gitHead ||
+      packedManifest.repository?.type !== 'git' ||
+      packedManifest.repository?.url !== 'git+https://github.com/horn111/resvary.git' ||
+      packedManifest.repository?.directory !== packageInfo.directory
     ) {
       throw new Error(`${packageInfo.name} archive metadata does not match the release commit`);
     }
