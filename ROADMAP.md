@@ -32,6 +32,15 @@ The published evidence is pinned to `v0.4.0-alpha.0` and records an external Arc
 - [x] SQLite/Postgres starter build coverage
 - [x] Self-hosted deployment and cutover guide
 
+## 0.6 stable: fail-closed payments
+
+- [x] Require explicit buyer amount, budget, recipient, and origin policy before signing a 402 response
+- [x] Parse stablecoin amounts without floating-point conversion
+- [x] Verify direct Arc funding through Testnet RPC before every credit grant and recovery
+- [x] Derive confirmation terms from the persisted funding intent
+- [x] Preserve SQLite/Postgres schemas, outbox/webhook events, and CLI flags without migration
+- [x] Publish all six packages from one checked artifact set with npm provenance and approval-gated promotion
+
 ## Later
 
 - allowance and promotional grant policies;

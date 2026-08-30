@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-30
+
 ### Security
 
 - Made `BuyerClient` fail closed on `402` responses unless the caller supplies exact recipient and origin policy, a per-request limit, and a client-instance total budget.
@@ -21,11 +23,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `--help` output to all three public CLIs and verified it in package smoke tests.
 - Declared Node.js 20+ support in the SDK, Circle adapter, and `create-resvary` package metadata. SQLite and the demo continue to require Node.js 24+.
 - Allowed verified direct Arc overpayments while deriving the credited amount from onchain proof instead of receipt fields.
+- Updated `viem`, x402, Circle batching, Next.js, Vitest, and supported Node/React type packages without changing the database schemas, event formats, or CLI flags.
+- Added a manual GitHub Actions release workflow with immutable package artifacts, npm provenance, registry smoke tests, and approval-gated dist-tag promotion.
 
 ### Compatibility
 
 - Existing databases require no migration.
 - Automatic `BuyerClient` payments now require `paymentPolicy`. Direct Arc confirmation now requires a working Arc RPC connection; the expected payment request is reconstructed from the funding intent and is never trusted from caller input.
+- See [docs/migration-0.6.md](docs/migration-0.6.md) for the application configuration changes.
+
+### Limits
+
+- Resvary remains self-hosted without a hosted SLA, RBAC, compliance certification, or managed operations.
+- SQLite is for local and single-node deployments. PostgreSQL 16–18 is the supported multi-process backend.
+- Direct Arc and Circle Gateway funding remain Testnet-only.
 
 ## [0.5.0] - 2026-08-28
 
@@ -164,7 +175,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI/CD pipeline with GitHub Actions
 - Security policy and contribution guidelines
 
-[unreleased]: https://github.com/horn111/resvary/compare/v0.5.0...HEAD
+[unreleased]: https://github.com/horn111/resvary/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/horn111/resvary/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/horn111/resvary/compare/v0.5.0-alpha.3...v0.5.0
 [0.5.0-alpha.3]: https://github.com/horn111/resvary/compare/v0.5.0-alpha.2...v0.5.0-alpha.3
 [0.5.0-alpha.2]: https://github.com/horn111/resvary/compare/v0.5.0-alpha.0...v0.5.0-alpha.2

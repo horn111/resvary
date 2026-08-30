@@ -3,7 +3,7 @@
 Scaffold a Resvary application with prepaid credits and usage billing for AI products.
 
 ```bash
-npm create resvary@0.5.0 my-ai-app
+npm create resvary@0.6.0 my-ai-app
 ```
 
 The default starter includes:
