@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "rail": "circle_gateway_nanopayment",
+  "testnetOnly": true,
+  "proofId": "gateway-proof-20260830205434",
+  "observedAt": "2026-08-30T20:54:44.381Z",
+  "endpoint": "http://localhost:3004/api/credits/gateway",
+  "network": "eip155:5042002",
+  "gatewayDomain": 26,
+  "sellerAddress": "0x4ae8B4E11b05380d0B122D99C1A29050Cf8Eba2d",
+  "payer": "0x1E3f8Fab778Eb5035f629Ac94a80bFf181557985",
+  "amount": "0.01",
+  "amountUnits": "10000",
+  "customerId": "gateway_proof_gateway-proof-20260830205434",
+  "fundingIntentId": "fund_7465012605d390978bb0c133",
+  "fundingTransactionId": "ftx_52112a226027884bde14baec",
+  "creditGrantId": "grant_c300b1989943e8a0e520803b",
+  "fundingLot": {
+    "kind": "general",
+    "expiresAt": null,
+    "originalAmount": "0.01"
+  },
+  "authorizationHash": "0xae2459a1c96d84e83ea98f3daa20b66f06c9e19eaa47a22867a0b4fcce9e2280",
+  "nonce": "0x2375a26cfbec4270aee31b13973f13618d46b5ff400cb4fb4f8af00106ec2db0",
+  "facilitatorReference": "915d6fc9-7955-4994-8d93-88f39fa3cc3e",
+  "acceptedAt": 1788123284146,
+  "settledAt": 1788123284146,
+  "settlementStatus": "settled",
+  "balanceAfterFunding": "0.01",
+  "replay": {
+    "replayed": true,
+    "sameGrant": true,
+    "balanceUnchanged": true,
+    "grantCountUnchanged": true
+  },
+  "lifecycle": {
+    "reservationId": "rsv_fd88746572e5056720b60215",
+    "usageReceiptId": "urcpt_4ba30fb3962b164bab40a98b",
+    "chargedAmount": "0.001",
+    "releasedAmount": "0.001",
+    "balanceBeforeUsage": "0.01",
+    "balanceAfterUsage": "0.009",
+    "reservedAfterCommit": "0",
+    "allocations": [
+      {
+        "lotKind": "general",
+        "allocatedAmount": "0.002",
+        "consumedAmount": "0.001",
+        "releasedAmount": "0.001",
+        "expiredAmount": "0"
+      }
+    ]
+  },
+  "gatewayBalances": {
+    "before": {
+      "availableUnits": "1070000",
+      "available": "1.07"
+    },
+    "after": {
+      "availableUnits": "1060000",
+      "available": "1.06"
+    }
+  },
+  "deposit": {
+    "approvalTxHash": "0xe6e90258f35883dff77f6041d5ddf6a39318a3186417742c717c0653909c9639",
+    "depositTxHash": "0x12ba7d14353c12dfcab8a82f8b0804f2d3e0fa3941fc52349176795c7138eb3f",
+    "amountUnits": "1000000",
+    "amount": "1"
+  },
+  "privacy": {
+    "privateKeyRecorded": false,
+    "fullPaymentSignatureRecorded": false
+  }
+}
