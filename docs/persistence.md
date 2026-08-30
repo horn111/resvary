@@ -14,7 +14,7 @@ New SQLite directories and database files are owner-only on POSIX (`0700` and `0
 WAL and shared-memory companions are hardened to `0600` as well. On Windows, use a dedicated
 service account and apply restrictive NTFS ACLs to the database directory.
 
-The credit schema stores accounts, grants, meters, price versions, reservations, usage events, usage receipts, ledger entries, funding records, idempotency records, and outbox events. SQLite schema v3 adds retry, lease, and dead-letter state. Schema v4 enforces one funding grant per network transaction hash across every funding rail.
+The credit schema stores accounts, grants, policies, credit lots, reservation allocations, policy applications, meters, price versions, reservations, usage events, usage receipts, ledger entries, funding records, idempotency records, and outbox events. SQLite schema v3 adds retry, lease, and dead-letter state. Schema v4 enforces one funding grant per network transaction hash across every funding rail. Schema v5 adds policies and lots, and automatically backfills existing balances and open reservations.
 
 SQLite writes use WAL mode, a five-second busy timeout, and `BEGIN IMMEDIATE`. A failed command rolls back all balance, receipt, outbox, and idempotency writes.
 
@@ -32,7 +32,7 @@ Call `store.close()` during graceful shutdown. Use the in-memory store for tests
 
 ## Postgres
 
-`@resvary/postgres` implements both `CreditStore` and `ReceiptStore`. Credit commands use `SERIALIZABLE` transactions with bounded retry. Outbox claims use `FOR UPDATE SKIP LOCKED`, so multiple workers may consume one database without sharing a process lock.
+`@resvary/postgres` implements `CreditPolicyStore` and `ReceiptStore`. Credit commands use `SERIALIZABLE` transactions with bounded retry. Outbox claims use `FOR UPDATE SKIP LOCKED`, so multiple workers may consume one database without sharing a process lock. PostgreSQL schema v3 adds policies, lots, allocations, and guarded legacy backfill.
 
 ```bash
 DATABASE_URL=postgres://postgres:postgres@localhost:5432/resvary \

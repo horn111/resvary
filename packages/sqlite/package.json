@@ -1,6 +1,6 @@
 {
   "name": "@resvary/sqlite",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "SQLite persistence for Resvary credits, usage receipts, and payment receipts",
   "type": "module",
   "main": "./dist/index.js",
@@ -34,7 +34,7 @@
     "directory": "packages/sqlite"
   },
   "dependencies": {
-    "@resvary/sdk": "0.6.1"
+    "@resvary/sdk": "0.7.0"
   },
   "devDependencies": {
     "@types/node": "^22.20.1",

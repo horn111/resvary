@@ -1,6 +1,6 @@
 # Production Persistence
 
-Resvary 0.6 is a stable self-hosted SDK. PostgreSQL 16–18 supports multiple application and worker processes. SQLite remains for local and single-node deployments. This release does not include a hosted control plane, SLA, RBAC, compliance certification, or managed operations. Direct Arc and Circle Gateway funding remain Testnet-only.
+Resvary 0.7 is a stable self-hosted SDK. PostgreSQL 16–18 supports multiple application and worker processes. SQLite remains for local and single-node deployments. This release does not include a hosted control plane, SLA, RBAC, compliance certification, or managed operations. Direct Arc and Circle Gateway funding remain Testnet-only.
 
 ## Provisioning
 
@@ -17,7 +17,7 @@ resvary-postgres migrate
 ```
 
 Store constructors fail against missing tables; they never migrate automatically.
-Postgres schema v2 adds domain checks, relational constraints, and global payment transaction-hash uniqueness. A migration stops if existing data violates a new invariant; reconcile the reported rows before retrying.
+Postgres schema v2 adds domain checks, relational constraints, and global payment transaction-hash uniqueness. Schema v3 adds grant policies, credit lots, reservation allocations, and policy applications. It backfills one legacy lot per account and stops when open reservations do not equal the reserved snapshot; reconcile the reported account before retrying.
 
 ## Application and workers
 
@@ -38,6 +38,8 @@ RESVARY_HEALTH_PORT=8081
 ## Monitoring
 
 Alert on readiness failures, increasing dead-letter count, sustained pending event growth, transaction retry exhaustion, connection pool saturation, and the age of the oldest pending event. JSON worker logs include event ID, type, attempt, latency, and sanitized error, never secret or payload.
+
+Schedule `sweepExpiredCreditLots` in application-owned maintenance infrastructure for inactive accounts. Normal balance operations already exclude expired promotion units transactionally. The outbox worker does not run credit expiry sweeps.
 
 Inspect and recover dead letters explicitly:
 

@@ -1,5 +1,7 @@
 import {
   CreditNotFoundError,
+  CreditLedger,
+  InMemoryCreditStore,
   signCreditOutboxEvent,
   type FundingIntent,
 } from '@resvary/sdk/credits';
@@ -256,6 +258,85 @@ async function getState() {
       latestLiveIntent && latestLiveIntentRecipient
         ? createLiveArcRequestSummary(latestLiveIntent, latestLiveIntentRecipient)
         : null,
+    policyScenario: await createPolicyScenario(),
+  };
+}
+
+async function createPolicyScenario() {
+  let now = Date.UTC(2026, 7, 1, 0, 0, 0);
+  const ledger = new CreditLedger({
+    projectId: 'resvary_policy_demo',
+    store: new InMemoryCreditStore(),
+    now: () => now,
+  });
+  const meter = await ledger.registerMeter({
+    key: 'jobs',
+    dimensions: ['jobs'],
+    idempotencyKey: 'policy-demo-meter',
+  });
+  const price = await ledger.createPriceVersion({
+    meterKey: meter.key,
+    rates: [{ dimension: 'jobs', unitSize: '1', amount: '1' }],
+    idempotencyKey: 'policy-demo-price',
+  });
+  const allowance = await ledger.createGrantPolicy({
+    type: 'allowance',
+    key: 'monthly-demo',
+    cadence: 'month',
+    amount: '5',
+    idempotencyKey: 'policy-demo-allowance',
+  });
+  const promotion = await ledger.createGrantPolicy({
+    type: 'promotion',
+    key: 'launch-demo',
+    amount: '3',
+    expiresInMs: 60_000,
+    idempotencyKey: 'policy-demo-promotion',
+  });
+  const allowanceResult = await ledger.applyAllowance({
+    policyId: allowance.id,
+    customerId: 'policy_demo_customer',
+    idempotencyKey: 'policy-demo-allowance-august',
+  });
+  const promotionResult = await ledger.claimPromotion({
+    policyId: promotion.id,
+    customerId: 'policy_demo_customer',
+    idempotencyKey: 'policy-demo-promotion-claim',
+  });
+  await ledger.grantCredits({
+    customerId: 'policy_demo_customer',
+    amount: '2',
+    idempotencyKey: 'policy-demo-general',
+  });
+  const reservation = await ledger.reserveCredits({
+    customerId: 'policy_demo_customer',
+    priceId: price.id,
+    estimatedUsage: { jobs: '4' },
+    expiresAt: now + 120_000,
+    idempotencyKey: 'policy-demo-reservation',
+  });
+  const reservedLots = await ledger.listCreditLots('policy_demo_customer');
+  now += 60_001;
+  const committed = await ledger.commitUsage({
+    reservationId: reservation.id,
+    usageEventId: 'policy-demo-usage',
+    actualUsage: { jobs: '2' },
+    idempotencyKey: 'policy-demo-commit',
+  });
+  return {
+    monthlyAllowance: allowanceResult.application,
+    promotionClaim: promotionResult.application,
+    priorityAtReserve: reservedLots.map((lot) => ({
+      kind: lot.kind,
+      expiresAt: lot.expiresAt,
+      availableAmount: lot.availableAmount,
+      reservedAmount: lot.reservedAmount,
+    })),
+    committedAfterPromotionExpiry: {
+      receiptAllocations: committed.receipt.allocations,
+      balance: committed.balance,
+      lots: await ledger.listCreditLots('policy_demo_customer'),
+    },
   };
 }
 

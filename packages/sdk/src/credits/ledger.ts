@@ -5,18 +5,35 @@ import {
   IdempotencyConflictError,
   InsufficientCreditsError,
   InvalidCreditStateError,
+  UnsupportedCreditStoreCapabilityError,
 } from './errors.js';
-import { InMemoryCreditStore, type CreditStore, type CreditStoreTransaction } from './store.js';
+import {
+  InMemoryCreditStore,
+  isCreditPolicyStore,
+  type CreditPolicyStore,
+  type CreditPolicyStoreTransaction,
+  type CreditStore,
+  type CreditStoreTransaction,
+} from './store.js';
 import type {
+  AllowanceCadence,
+  AllowanceGrantPolicy,
   CreditAccount,
   CreditEventType,
   CreditGrant,
+  CreditGrantPolicy,
   CreditGrantSource,
+  CreditLot,
+  CreditLotAllocation,
+  CreditLotFilter,
+  CreditLotKind,
   FundingEvidence,
   FundingIntent,
   FundingRail,
   FundingSettlementStatus,
   FundingTransaction,
+  GrantPolicyApplication,
+  GrantPolicyApplicationFilter,
   CreditOutboxEvent,
   CreditReservation,
   LedgerBucket,
@@ -26,6 +43,7 @@ import type {
   OutboxEventFilter,
   PriceRateInput,
   PriceVersion,
+  PromotionGrantPolicy,
   UsageEvent,
   UsageQuantities,
   UsageReceipt,
@@ -49,6 +67,53 @@ export interface GrantCreditsInput extends EnsureAccountInput {
   amount: string;
   source?: CreditGrantSource;
   externalRef?: string;
+}
+
+interface CreateGrantPolicyInputBase {
+  key: string;
+  amount: string;
+  idempotencyKey: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface CreateAllowanceGrantPolicyInput extends CreateGrantPolicyInputBase {
+  type: 'allowance';
+  cadence: AllowanceCadence;
+}
+
+export interface CreatePromotionGrantPolicyInput extends CreateGrantPolicyInputBase {
+  type: 'promotion';
+  expiresInMs: number;
+}
+
+export type CreateGrantPolicyInput =
+  | CreateAllowanceGrantPolicyInput
+  | CreatePromotionGrantPolicyInput;
+
+export interface ApplyAllowanceInput extends EnsureAccountInput {
+  policyId: string;
+}
+
+export interface ClaimPromotionInput extends EnsureAccountInput {
+  policyId: string;
+}
+
+export interface GrantPolicyResult {
+  policy: CreditGrantPolicy;
+  application: GrantPolicyApplication;
+  account: CreditAccount;
+  grant?: CreditGrant;
+}
+
+export interface SweepExpiredCreditLotsInput {
+  customerId?: string;
+  before?: number;
+  limit?: number;
+}
+
+export interface SweepExpiredCreditLotsResult {
+  lots: CreditLot[];
+  accounts: CreditAccount[];
 }
 
 export interface AdjustCreditsInput extends EnsureAccountInput {
@@ -176,6 +241,209 @@ export class CreditLedger {
     );
   }
 
+  async createGrantPolicy(input: CreateGrantPolicyInput): Promise<CreditGrantPolicy> {
+    const store = this.requirePolicyStore();
+    const amountUnits = toCreditUnits(input.amount);
+    if (amountUnits <= 0n) throw new Error('Grant policy amount must be positive');
+    if (input.type === 'promotion') {
+      if (!Number.isSafeInteger(input.expiresInMs) || input.expiresInMs <= 0) {
+        throw new Error('Promotion expiresInMs must be a positive integer');
+      }
+    } else if (!['day', 'week', 'month'].includes(input.cadence)) {
+      throw new Error('Allowance cadence must be day, week, or month');
+    }
+    const request = { ...input, amountUnits: amountUnits.toString() };
+    return store.transaction((tx) =>
+      this.idempotent(tx, 'create_grant_policy', input.idempotencyKey, request, async () => {
+        const key = requireText(input.key, 'key');
+        const policies = (await tx.listGrantPolicies(this.projectId)).filter(
+          (policy) => policy.key === key,
+        );
+        const version = Math.max(0, ...policies.map((policy) => policy.version)) + 1;
+        const base = {
+          id: createId('gpol'),
+          projectId: this.projectId,
+          key,
+          version,
+          type: input.type,
+          amount: creditUnitsToString(amountUnits),
+          amountUnits: amountUnits.toString(),
+          createdAt: this.now(),
+          metadata: input.metadata,
+        };
+        const policy: CreditGrantPolicy =
+          input.type === 'allowance'
+            ? ({
+                ...base,
+                type: 'allowance',
+                cadence: input.cadence,
+              } satisfies AllowanceGrantPolicy)
+            : ({
+                ...base,
+                type: 'promotion',
+                expiresInMs: input.expiresInMs,
+              } satisfies PromotionGrantPolicy);
+        await tx.saveGrantPolicy(policy);
+        await this.saveOutboxEvent(tx, 'credit.policy.created', { policy }, policy.createdAt);
+        return policy;
+      }),
+    );
+  }
+
+  async applyAllowance(input: ApplyAllowanceInput): Promise<GrantPolicyResult> {
+    const store = this.requirePolicyStore();
+    return store.transaction((tx) =>
+      this.idempotent(tx, 'apply_allowance', input.idempotencyKey, input, async () => {
+        const now = this.now();
+        const policy = await this.requireGrantPolicy(tx, input.policyId, 'allowance');
+        await this.expireDueCreditLots(tx, now, input.customerId);
+        const current = await this.ensureAccountInTransaction(tx, input.customerId, input.metadata);
+        const periodKey = allowancePeriodKey(now, policy.cadence);
+        const existing = await tx.getGrantPolicyApplicationByIdentity(
+          policy.id,
+          current.id,
+          periodKey,
+        );
+        if (existing) {
+          const account = await this.requireAccountById(tx, current.id);
+          return {
+            policy,
+            application: existing,
+            account,
+            grant: existing.grantId ? await tx.getGrant(existing.grantId) : undefined,
+          };
+        }
+        const lots = await tx.listCreditLots({
+          projectId: this.projectId,
+          customerId: current.customerId,
+          policyId: policy.id,
+          kind: 'allowance',
+        });
+        const unspentUnits = lots.reduce(
+          (total, lot) =>
+            total + parseCreditUnits(lot.availableUnits) + parseCreditUnits(lot.reservedUnits),
+          0n,
+        );
+        const targetUnits = parseCreditUnits(policy.amountUnits);
+        const topUpUnits = targetUnits > unspentUnits ? targetUnits - unspentUnits : 0n;
+        let account = current;
+        let grant: CreditGrant | undefined;
+        if (topUpUnits > 0n) {
+          const created = await this.createGrantInTransaction(tx, {
+            customerId: current.customerId,
+            amountUnits: topUpUnits,
+            source: 'allowance',
+            policyId: policy.id,
+            lotKind: 'allowance',
+            now,
+            metadata: input.metadata,
+          });
+          account = created.account;
+          grant = created.grant;
+        }
+        const application: GrantPolicyApplication = {
+          id: createId('gpa'),
+          policyId: policy.id,
+          policyType: 'allowance',
+          accountId: account.id,
+          projectId: this.projectId,
+          customerId: account.customerId,
+          periodKey,
+          grantId: grant?.id,
+          grantedAmount: creditUnitsToString(topUpUnits),
+          grantedUnits: topUpUnits.toString(),
+          createdAt: now,
+          metadata: input.metadata,
+        };
+        await tx.saveGrantPolicyApplication(application);
+        await this.saveOutboxEvent(
+          tx,
+          'credit.allowance.applied',
+          { policy, application, account, grant },
+          now,
+        );
+        return { policy, application, account, grant };
+      }),
+    );
+  }
+
+  async claimPromotion(input: ClaimPromotionInput): Promise<GrantPolicyResult> {
+    const store = this.requirePolicyStore();
+    return store.transaction((tx) =>
+      this.idempotent(tx, 'claim_promotion', input.idempotencyKey, input, async () => {
+        const now = this.now();
+        const policy = await this.requireGrantPolicy(tx, input.policyId, 'promotion');
+        await this.expireDueCreditLots(tx, now, input.customerId);
+        const current = await this.ensureAccountInTransaction(tx, input.customerId, input.metadata);
+        const periodKey = 'claim';
+        const existing = await tx.getGrantPolicyApplicationByIdentity(
+          policy.id,
+          current.id,
+          periodKey,
+        );
+        if (existing) {
+          const account = await this.requireAccountById(tx, current.id);
+          return {
+            policy,
+            application: existing,
+            account,
+            grant: existing.grantId ? await tx.getGrant(existing.grantId) : undefined,
+          };
+        }
+        const expiresAt = now + policy.expiresInMs;
+        if (!Number.isSafeInteger(expiresAt)) {
+          throw new Error('Promotion expiry exceeds the supported timestamp range');
+        }
+        const created = await this.createGrantInTransaction(tx, {
+          customerId: current.customerId,
+          amountUnits: parseCreditUnits(policy.amountUnits),
+          source: 'promotion',
+          policyId: policy.id,
+          expiresAt,
+          lotKind: 'promotion',
+          now,
+          metadata: input.metadata,
+        });
+        const application: GrantPolicyApplication = {
+          id: createId('gpa'),
+          policyId: policy.id,
+          policyType: 'promotion',
+          accountId: created.account.id,
+          projectId: this.projectId,
+          customerId: created.account.customerId,
+          periodKey,
+          grantId: created.grant.id,
+          grantedAmount: created.grant.amount,
+          grantedUnits: created.grant.amountUnits,
+          createdAt: now,
+          metadata: input.metadata,
+        };
+        await tx.saveGrantPolicyApplication(application);
+        await this.saveOutboxEvent(
+          tx,
+          'credit.promotion.claimed',
+          { policy, application, account: created.account, grant: created.grant },
+          now,
+        );
+        return { policy, application, account: created.account, grant: created.grant };
+      }),
+    );
+  }
+
+  async sweepExpiredCreditLots(
+    input: SweepExpiredCreditLotsInput = {},
+  ): Promise<SweepExpiredCreditLotsResult> {
+    const store = this.requirePolicyStore();
+    const limit = input.limit ?? 100;
+    if (!Number.isSafeInteger(limit) || limit <= 0) {
+      throw new Error('Credit lot sweep limit must be a positive integer');
+    }
+    const before = input.before ?? this.now();
+    if (!Number.isSafeInteger(before))
+      throw new Error('Credit lot sweep before must be an integer');
+    return store.transaction((tx) => this.expireDueCreditLots(tx, before, input.customerId, limit));
+  }
+
   async grantCredits(
     input: GrantCreditsInput,
   ): Promise<{ account: CreditAccount; grant: CreditGrant }> {
@@ -183,44 +451,18 @@ export class CreditLedger {
     if (amountUnits <= 0n) throw new Error('Credit grant amount must be positive');
     const request = { ...input, amountUnits: amountUnits.toString() };
 
-    return this.store.transaction((tx) =>
-      this.idempotent(tx, 'grant_credits', input.idempotencyKey, request, async () => {
-        const now = this.now();
-        const current = await this.ensureAccountInTransaction(tx, input.customerId, input.metadata);
-        const grant: CreditGrant = {
-          id: createId('grant'),
-          accountId: current.id,
-          projectId: this.projectId,
-          customerId: current.customerId,
-          amount: creditUnitsToString(amountUnits),
-          amountUnits: amountUnits.toString(),
+    return this.withStoreTransaction((tx) =>
+      this.idempotent(tx, 'grant_credits', input.idempotencyKey, request, () =>
+        this.createGrantInTransaction(tx, {
+          customerId: input.customerId,
+          amountUnits,
           source: input.source ?? 'manual',
           externalRef: input.externalRef,
-          createdAt: now,
+          lotKind: 'general',
+          now: this.now(),
           metadata: input.metadata,
-        };
-        const account = withBalances(
-          current,
-          parseCreditUnits(current.postedUnits) + amountUnits,
-          parseCreditUnits(current.reservedUnits),
-          now,
-        );
-        await tx.saveGrant(grant);
-        await tx.saveAccount(account);
-        await this.saveLedgerEntry(
-          tx,
-          account,
-          'grant',
-          'posted',
-          amountUnits,
-          'grant',
-          grant.id,
-          now,
-          input.metadata,
-        );
-        await this.saveOutboxEvent(tx, 'credit.granted', { account, grant }, now);
-        return { account, grant };
-      }),
+        }),
+      ),
     );
   }
 
@@ -231,14 +473,30 @@ export class CreditLedger {
     if (deltaUnits === 0n) throw new Error('Credit adjustment amount cannot be zero');
     const request = { ...input, deltaUnits: deltaUnits.toString() };
 
-    return this.store.transaction((tx) =>
+    return this.withStoreTransaction((tx) =>
       this.idempotent(tx, 'adjust_credits', input.idempotencyKey, request, async () => {
         const now = this.now();
+        if (isPolicyTransaction(tx)) await this.expireDueCreditLots(tx, now, input.customerId);
         const current = await this.ensureAccountInTransaction(tx, input.customerId, input.metadata);
         const nextPosted = parseCreditUnits(current.postedUnits) + deltaUnits;
         const reserved = parseCreditUnits(current.reservedUnits);
         if (nextPosted < reserved) {
           throw new InsufficientCreditsError((nextPosted - reserved).toString(), '0');
+        }
+        if (isPolicyTransaction(tx)) {
+          if (deltaUnits > 0n) {
+            await tx.saveCreditLot(
+              createCreditLot({
+                account: current,
+                kind: 'general',
+                amountUnits: deltaUnits,
+                now,
+                metadata: { ...input.metadata, reason: input.reason },
+              }),
+            );
+          } else {
+            await this.consumeAvailableLots(tx, current, -deltaUnits, now);
+          }
         }
         const account = withBalances(current, nextPosted, reserved, now);
         await tx.saveAccount(account);
@@ -357,7 +615,7 @@ export class CreditLedger {
       'externalPaymentId',
     );
 
-    return this.store.transaction(async (tx) => {
+    return this.withStoreTransaction(async (tx) => {
       const intent = await tx.getFundingIntent(input.fundingIntentId);
       if (!intent || intent.projectId !== this.projectId)
         throw new CreditNotFoundError('Funding intent', input.fundingIntentId);
@@ -413,6 +671,7 @@ export class CreditLedger {
         }
 
         const now = this.now();
+        if (isPolicyTransaction(tx)) await this.expireDueCreditLots(tx, now, intent.customerId);
         const current = await this.requireAccountById(tx, intent.accountId);
         const grant: CreditGrant = {
           id: createId('grant'),
@@ -467,6 +726,18 @@ export class CreditLedger {
           metadata: input.metadata,
         };
         await tx.saveGrant(grant);
+        if (isPolicyTransaction(tx)) {
+          await tx.saveCreditLot(
+            createCreditLot({
+              account: current,
+              kind: 'general',
+              amountUnits,
+              grantId: grant.id,
+              now,
+              metadata: grant.metadata,
+            }),
+          );
+        }
         await tx.saveAccount(account);
         await tx.saveFundingIntent(confirmedIntent);
         await tx.saveFundingTransaction(fundingTransaction);
@@ -573,10 +844,11 @@ export class CreditLedger {
   }
 
   async reserveCredits(input: ReserveCreditsInput): Promise<CreditReservation> {
-    return this.store.transaction((tx) =>
+    return this.withStoreTransaction((tx) =>
       this.idempotent(tx, 'reserve_credits', input.idempotencyKey, input, async () => {
         const now = this.now();
         await this.expireOpenReservations(tx, now, input.customerId);
+        if (isPolicyTransaction(tx)) await this.expireDueCreditLots(tx, now, input.customerId);
         const price = await this.requirePrice(tx, input.priceId);
         const rating = rateUsage(price, input.estimatedUsage);
         const reservedUnits = parseCreditUnits(rating.totalUnits);
@@ -610,6 +882,9 @@ export class CreditLedger {
           now,
         );
         await tx.saveReservation(reservation);
+        if (isPolicyTransaction(tx)) {
+          await this.reserveCreditLots(tx, current, reservation.id, reservedUnits, now);
+        }
         await tx.saveAccount(account);
         await this.saveLedgerEntry(
           tx,
@@ -631,7 +906,7 @@ export class CreditLedger {
   async commitUsage(
     input: CommitUsageInput,
   ): Promise<{ receipt: UsageReceipt; reservation: CreditReservation; balance: CreditAccount }> {
-    return this.store.transaction((tx) =>
+    return this.withStoreTransaction((tx) =>
       this.idempotent(tx, 'commit_usage', input.idempotencyKey, input, async () => {
         const now = this.now();
         const reservation = await this.requireReservation(tx, input.reservationId);
@@ -664,12 +939,18 @@ export class CreditLedger {
           );
         }
 
+        if (isPolicyTransaction(tx)) {
+          await this.expireDueCreditLots(tx, now, reservation.customerId);
+        }
         const accountBefore = await this.requireAccountById(tx, reservation.accountId);
         const postedBefore = parseCreditUnits(accountBefore.postedUnits);
         const reservedBefore = parseCreditUnits(accountBefore.reservedUnits);
+        const lotResult = isPolicyTransaction(tx)
+          ? await this.commitCreditLotAllocations(tx, reservation, chargeUnits, now)
+          : { allocations: undefined, expiredReleasedUnits: 0n, expiredLots: [] };
         const account = withBalances(
           accountBefore,
-          postedBefore - chargeUnits,
+          postedBefore - chargeUnits - lotResult.expiredReleasedUnits,
           reservedBefore - reservedUnits,
           now,
         );
@@ -703,6 +984,7 @@ export class CreditLedger {
           balanceBeforeUnits: accountBefore.availableUnits,
           balanceAfterUnits: account.availableUnits,
           createdAt: now,
+          allocations: lotResult.allocations,
           metadata: input.metadata,
         };
         const committedReservation: CreditReservation = {
@@ -742,6 +1024,25 @@ export class CreditLedger {
           now,
           input.metadata,
         );
+        for (const expired of lotResult.expiredLots) {
+          await this.saveLedgerEntry(
+            tx,
+            account,
+            'expire',
+            'posted',
+            -expired.units,
+            'credit_lot',
+            expired.lot.id,
+            now,
+            { reason: 'released_after_expiry', reservationId: reservation.id },
+          );
+          await this.saveOutboxEvent(
+            tx,
+            'credit.lot.expired',
+            { account, lot: expired.lot, expiredUnits: expired.units.toString() },
+            now,
+          );
+        }
         await this.saveOutboxEvent(
           tx,
           'usage.charged',
@@ -754,6 +1055,7 @@ export class CreditLedger {
             amountUnits: receipt.amountUnits,
             releasedAmount: receipt.releasedAmount,
             balanceAfterUnits: receipt.balanceAfterUnits,
+            allocations: receipt.allocations,
           },
           now,
         );
@@ -765,7 +1067,7 @@ export class CreditLedger {
   async releaseReservation(
     input: ReleaseReservationInput,
   ): Promise<{ reservation: CreditReservation; balance: CreditAccount }> {
-    return this.store.transaction((tx) =>
+    return this.withStoreTransaction((tx) =>
       this.idempotent(tx, 'release_reservation', input.idempotencyKey, input, async () => {
         const reservation = await this.requireReservation(tx, input.reservationId);
         if (reservation.status === 'released' || reservation.status === 'expired') {
@@ -785,7 +1087,7 @@ export class CreditLedger {
     idempotencyKey: string;
     now?: number;
   }): Promise<CreditReservation[]> {
-    return this.store.transaction((tx) =>
+    return this.withStoreTransaction((tx) =>
       this.idempotent(tx, 'release_expired', input.idempotencyKey, input, async () =>
         this.expireOpenReservations(tx, input.now ?? this.now()),
       ),
@@ -832,12 +1134,69 @@ export class CreditLedger {
   }
 
   async getBalance(customerId: string): Promise<CreditAccount> {
+    if (isCreditPolicyStore(this.store)) {
+      return this.store.transaction(async (tx) => {
+        const normalized = requireText(customerId, 'customerId');
+        await this.expireDueCreditLots(tx, this.now(), normalized);
+        const account = await tx.getAccountByCustomer(this.projectId, normalized);
+        if (!account) throw new CreditNotFoundError('Credit account', customerId);
+        return account;
+      });
+    }
     const account = await this.store.getAccountByCustomer(
       this.projectId,
       requireText(customerId, 'customerId'),
     );
     if (!account) throw new CreditNotFoundError('Credit account', customerId);
     return account;
+  }
+
+  async getGrantPolicy(id: string): Promise<CreditGrantPolicy | undefined> {
+    return this.forCurrentProject(await this.requirePolicyStore().getGrantPolicy(id));
+  }
+
+  listGrantPolicies(): Promise<CreditGrantPolicy[]> {
+    return this.requirePolicyStore().listGrantPolicies(this.projectId);
+  }
+
+  async getCreditLot(id: string): Promise<CreditLot | undefined> {
+    const store = this.requirePolicyStore();
+    const value = this.forCurrentProject(await store.getCreditLot(id));
+    if (!value) return undefined;
+    await this.getBalance(value.customerId);
+    return this.forCurrentProject(await store.getCreditLot(id));
+  }
+
+  async listCreditLots(
+    filter: string | Omit<CreditLotFilter, 'projectId'> = {},
+  ): Promise<CreditLot[]> {
+    const store = this.requirePolicyStore();
+    const normalized = typeof filter === 'string' ? { customerId: filter } : filter;
+    if (normalized.customerId) await this.getBalance(normalized.customerId);
+    else {
+      await store.transaction((tx) =>
+        this.expireDueCreditLots(tx, this.now(), undefined, Number.MAX_SAFE_INTEGER),
+      );
+    }
+    return store.listCreditLots({ ...normalized, projectId: this.projectId });
+  }
+
+  async listGrantPolicyApplications(
+    filter: string | Omit<GrantPolicyApplicationFilter, 'projectId'> = {},
+  ): Promise<GrantPolicyApplication[]> {
+    const store = this.requirePolicyStore();
+    const normalized = typeof filter === 'string' ? { customerId: filter } : filter;
+    if (normalized.customerId) await this.getBalance(normalized.customerId);
+    return store.listGrantPolicyApplications({ ...normalized, projectId: this.projectId });
+  }
+
+  async getGrantPolicyApplication(id: string): Promise<GrantPolicyApplication | undefined> {
+    return this.forCurrentProject(await this.requirePolicyStore().getGrantPolicyApplication(id));
+  }
+
+  async listCreditLotAllocations(reservationId?: string): Promise<CreditLotAllocation[]> {
+    const allocations = await this.requirePolicyStore().listCreditLotAllocations(reservationId);
+    return this.forCurrentProjectList(allocations);
   }
 
   async getReservation(id: string) {
@@ -896,6 +1255,375 @@ export class CreditLedger {
         return delivered;
       }),
     );
+  }
+
+  private withStoreTransaction<T>(
+    handler: (transaction: CreditStoreTransaction | CreditPolicyStoreTransaction) => Promise<T>,
+  ): Promise<T> {
+    if (isCreditPolicyStore(this.store)) return this.store.transaction(handler);
+    return this.store.transaction(handler);
+  }
+
+  private requirePolicyStore(): CreditPolicyStore {
+    if (!isCreditPolicyStore(this.store)) throw new UnsupportedCreditStoreCapabilityError();
+    return this.store;
+  }
+
+  private async requireGrantPolicy<TType extends CreditGrantPolicy['type']>(
+    tx: CreditPolicyStoreTransaction,
+    id: string,
+    type: TType,
+  ): Promise<Extract<CreditGrantPolicy, { type: TType }>> {
+    const policy = await tx.getGrantPolicy(id);
+    if (!policy || policy.projectId !== this.projectId) {
+      throw new CreditNotFoundError('Grant policy', id);
+    }
+    if (policy.type !== type) {
+      throw new InvalidCreditStateError(`Grant policy ${policy.id} is ${policy.type}, not ${type}`);
+    }
+    return policy as Extract<CreditGrantPolicy, { type: TType }>;
+  }
+
+  private async createGrantInTransaction(
+    tx: CreditStoreTransaction | CreditPolicyStoreTransaction,
+    input: {
+      customerId: string;
+      amountUnits: bigint;
+      source: CreditGrantSource;
+      externalRef?: string;
+      policyId?: string;
+      expiresAt?: number;
+      lotKind: CreditLotKind;
+      now: number;
+      metadata?: Record<string, unknown>;
+    },
+  ): Promise<{ account: CreditAccount; grant: CreditGrant }> {
+    if (input.amountUnits <= 0n) throw new Error('Credit grant amount must be positive');
+    if (isPolicyTransaction(tx)) {
+      await this.expireDueCreditLots(tx, input.now, input.customerId);
+    }
+    const current = await this.ensureAccountInTransaction(tx, input.customerId, input.metadata);
+    const grant: CreditGrant = {
+      id: createId('grant'),
+      accountId: current.id,
+      projectId: this.projectId,
+      customerId: current.customerId,
+      amount: creditUnitsToString(input.amountUnits),
+      amountUnits: input.amountUnits.toString(),
+      source: input.source,
+      externalRef: input.externalRef,
+      policyId: input.policyId,
+      expiresAt: input.expiresAt,
+      createdAt: input.now,
+      metadata: input.metadata,
+    };
+    const account = withBalances(
+      current,
+      parseCreditUnits(current.postedUnits) + input.amountUnits,
+      parseCreditUnits(current.reservedUnits),
+      input.now,
+    );
+    await tx.saveGrant(grant);
+    if (isPolicyTransaction(tx)) {
+      await tx.saveCreditLot(
+        createCreditLot({
+          account: current,
+          kind: input.lotKind,
+          amountUnits: input.amountUnits,
+          grantId: grant.id,
+          policyId: input.policyId,
+          expiresAt: input.expiresAt,
+          now: input.now,
+          metadata: input.metadata,
+        }),
+      );
+    }
+    await tx.saveAccount(account);
+    await this.saveLedgerEntry(
+      tx,
+      account,
+      'grant',
+      'posted',
+      input.amountUnits,
+      'grant',
+      grant.id,
+      input.now,
+      input.metadata,
+    );
+    await this.saveOutboxEvent(tx, 'credit.granted', { account, grant }, input.now);
+    return { account, grant };
+  }
+
+  private async expireDueCreditLots(
+    tx: CreditPolicyStoreTransaction,
+    before: number,
+    customerId?: string,
+    limit = Number.MAX_SAFE_INTEGER,
+  ): Promise<SweepExpiredCreditLotsResult> {
+    const due = (
+      await tx.listCreditLots({
+        projectId: this.projectId,
+        customerId,
+        expiresBefore: before,
+      })
+    )
+      .filter((lot) => parseCreditUnits(lot.availableUnits) > 0n)
+      .sort(compareCreditLots)
+      .slice(0, limit);
+    const accounts = new Map<string, CreditAccount>();
+    const lots: CreditLot[] = [];
+    for (const lot of due) {
+      const availableUnits = parseCreditUnits(lot.availableUnits);
+      if (availableUnits === 0n) continue;
+      const accountBefore =
+        accounts.get(lot.accountId) ?? (await this.requireAccountById(tx, lot.accountId));
+      const account = withBalances(
+        accountBefore,
+        parseCreditUnits(accountBefore.postedUnits) - availableUnits,
+        parseCreditUnits(accountBefore.reservedUnits),
+        before,
+      );
+      const expired = withCreditLotBalances(
+        lot,
+        0n,
+        parseCreditUnits(lot.reservedUnits),
+        parseCreditUnits(lot.consumedUnits),
+        parseCreditUnits(lot.expiredUnits) + availableUnits,
+        before,
+      );
+      await tx.saveCreditLot(expired);
+      await tx.saveAccount(account);
+      await this.saveLedgerEntry(
+        tx,
+        account,
+        'expire',
+        'posted',
+        -availableUnits,
+        'credit_lot',
+        lot.id,
+        before,
+        { reason: 'lot_expired' },
+      );
+      await this.saveOutboxEvent(
+        tx,
+        'credit.lot.expired',
+        { account, lot: expired, expiredUnits: availableUnits.toString() },
+        before,
+      );
+      accounts.set(account.id, account);
+      lots.push(expired);
+    }
+    return { lots, accounts: [...accounts.values()] };
+  }
+
+  private async reserveCreditLots(
+    tx: CreditPolicyStoreTransaction,
+    account: CreditAccount,
+    reservationId: string,
+    amountUnits: bigint,
+    now: number,
+  ): Promise<CreditLotAllocation[]> {
+    let remaining = amountUnits;
+    const lots = (
+      await tx.listCreditLots({
+        projectId: this.projectId,
+        customerId: account.customerId,
+      })
+    )
+      .filter(
+        (lot) =>
+          lot.accountId === account.id &&
+          parseCreditUnits(lot.availableUnits) > 0n &&
+          (lot.expiresAt === undefined || lot.expiresAt > now),
+      )
+      .sort(compareCreditLots);
+    const allocations: CreditLotAllocation[] = [];
+    for (const lot of lots) {
+      if (remaining === 0n) break;
+      const available = parseCreditUnits(lot.availableUnits);
+      const allocated = available < remaining ? available : remaining;
+      const updatedLot = withCreditLotBalances(
+        lot,
+        available - allocated,
+        parseCreditUnits(lot.reservedUnits) + allocated,
+        parseCreditUnits(lot.consumedUnits),
+        parseCreditUnits(lot.expiredUnits),
+        now,
+      );
+      const allocation = createCreditLotAllocation({
+        reservationId,
+        lot,
+        amountUnits: allocated,
+        now,
+      });
+      await tx.saveCreditLot(updatedLot);
+      await tx.saveCreditLotAllocation(allocation);
+      allocations.push(allocation);
+      remaining -= allocated;
+    }
+    if (remaining !== 0n) {
+      throw new InvalidCreditStateError(
+        `Credit lot balance is missing ${remaining.toString()} units for account ${account.id}`,
+      );
+    }
+    return allocations;
+  }
+
+  private async commitCreditLotAllocations(
+    tx: CreditPolicyStoreTransaction,
+    reservation: CreditReservation,
+    chargeUnits: bigint,
+    now: number,
+  ): Promise<{
+    allocations: CreditLotAllocation[];
+    expiredReleasedUnits: bigint;
+    expiredLots: { lot: CreditLot; units: bigint }[];
+  }> {
+    const allocations = await tx.listCreditLotAllocations(reservation.id);
+    const allocatedTotal = allocations.reduce(
+      (total, allocation) => total + parseCreditUnits(allocation.reservedUnits),
+      0n,
+    );
+    if (allocatedTotal !== parseCreditUnits(reservation.reservedUnits)) {
+      throw new InvalidCreditStateError(
+        `Reservation lot allocations are incomplete: ${reservation.id}`,
+      );
+    }
+    let remainingCharge = chargeUnits;
+    let expiredReleasedUnits = 0n;
+    const updated: CreditLotAllocation[] = [];
+    const expiredLots: { lot: CreditLot; units: bigint }[] = [];
+    const allocationLots = await Promise.all(
+      allocations.map(async (allocation) => {
+        const lot = await tx.getCreditLot(allocation.lotId);
+        if (!lot) throw new CreditNotFoundError('Credit lot', allocation.lotId);
+        return { allocation, lot };
+      }),
+    );
+    allocationLots.sort((left, right) => compareCreditLots(left.lot, right.lot));
+    for (const { allocation, lot } of allocationLots) {
+      const reserved = parseCreditUnits(allocation.reservedUnits);
+      const consumed = reserved < remainingCharge ? reserved : remainingCharge;
+      const remainder = reserved - consumed;
+      const expired = lot.expiresAt !== undefined && lot.expiresAt <= now;
+      const updatedLot = withCreditLotBalances(
+        lot,
+        parseCreditUnits(lot.availableUnits) + (expired ? 0n : remainder),
+        parseCreditUnits(lot.reservedUnits) - reserved,
+        parseCreditUnits(lot.consumedUnits) + consumed,
+        parseCreditUnits(lot.expiredUnits) + (expired ? remainder : 0n),
+        now,
+      );
+      const updatedAllocation = withCreditLotAllocationBalances(
+        allocation,
+        0n,
+        parseCreditUnits(allocation.consumedUnits) + consumed,
+        parseCreditUnits(allocation.releasedUnits) + (expired ? 0n : remainder),
+        parseCreditUnits(allocation.expiredUnits) + (expired ? remainder : 0n),
+        now,
+      );
+      await tx.saveCreditLot(updatedLot);
+      await tx.saveCreditLotAllocation(updatedAllocation);
+      updated.push(updatedAllocation);
+      remainingCharge -= consumed;
+      if (expired && remainder > 0n) {
+        expiredReleasedUnits += remainder;
+        expiredLots.push({ lot: updatedLot, units: remainder });
+      }
+    }
+    if (remainingCharge !== 0n) {
+      throw new InvalidCreditStateError(`Reservation cannot cover charge: ${reservation.id}`);
+    }
+    return { allocations: updated, expiredReleasedUnits, expiredLots };
+  }
+
+  private async releaseCreditLotAllocations(
+    tx: CreditPolicyStoreTransaction,
+    reservation: CreditReservation,
+    now: number,
+  ): Promise<{
+    expiredReleasedUnits: bigint;
+    expiredLots: { lot: CreditLot; units: bigint }[];
+  }> {
+    const allocations = await tx.listCreditLotAllocations(reservation.id);
+    const allocatedTotal = allocations.reduce(
+      (total, allocation) => total + parseCreditUnits(allocation.reservedUnits),
+      0n,
+    );
+    if (allocatedTotal !== parseCreditUnits(reservation.reservedUnits)) {
+      throw new InvalidCreditStateError(
+        `Reservation lot allocations are incomplete: ${reservation.id}`,
+      );
+    }
+    let expiredReleasedUnits = 0n;
+    const expiredLots: { lot: CreditLot; units: bigint }[] = [];
+    for (const allocation of allocations) {
+      const lot = await tx.getCreditLot(allocation.lotId);
+      if (!lot) throw new CreditNotFoundError('Credit lot', allocation.lotId);
+      const reserved = parseCreditUnits(allocation.reservedUnits);
+      const expired = lot.expiresAt !== undefined && lot.expiresAt <= now;
+      const updatedLot = withCreditLotBalances(
+        lot,
+        parseCreditUnits(lot.availableUnits) + (expired ? 0n : reserved),
+        parseCreditUnits(lot.reservedUnits) - reserved,
+        parseCreditUnits(lot.consumedUnits),
+        parseCreditUnits(lot.expiredUnits) + (expired ? reserved : 0n),
+        now,
+      );
+      const updatedAllocation = withCreditLotAllocationBalances(
+        allocation,
+        0n,
+        parseCreditUnits(allocation.consumedUnits),
+        parseCreditUnits(allocation.releasedUnits) + (expired ? 0n : reserved),
+        parseCreditUnits(allocation.expiredUnits) + (expired ? reserved : 0n),
+        now,
+      );
+      await tx.saveCreditLot(updatedLot);
+      await tx.saveCreditLotAllocation(updatedAllocation);
+      if (expired && reserved > 0n) {
+        expiredReleasedUnits += reserved;
+        expiredLots.push({ lot: updatedLot, units: reserved });
+      }
+    }
+    return { expiredReleasedUnits, expiredLots };
+  }
+
+  private async consumeAvailableLots(
+    tx: CreditPolicyStoreTransaction,
+    account: CreditAccount,
+    amountUnits: bigint,
+    now: number,
+  ): Promise<void> {
+    let remaining = amountUnits;
+    const lots = (
+      await tx.listCreditLots({
+        projectId: this.projectId,
+        customerId: account.customerId,
+      })
+    )
+      .filter((lot) => lot.accountId === account.id && parseCreditUnits(lot.availableUnits) > 0n)
+      .sort(compareCreditLots);
+    for (const lot of lots) {
+      if (remaining === 0n) break;
+      const available = parseCreditUnits(lot.availableUnits);
+      const consumed = available < remaining ? available : remaining;
+      await tx.saveCreditLot(
+        withCreditLotBalances(
+          lot,
+          available - consumed,
+          parseCreditUnits(lot.reservedUnits),
+          parseCreditUnits(lot.consumedUnits) + consumed,
+          parseCreditUnits(lot.expiredUnits),
+          now,
+        ),
+      );
+      remaining -= consumed;
+    }
+    if (remaining !== 0n) {
+      throw new InvalidCreditStateError(
+        `Credit lot balance is missing ${remaining.toString()} units for account ${account.id}`,
+      );
+    }
   }
 
   private async ensureAccountInTransaction(
@@ -964,11 +1692,17 @@ export class CreditLedger {
     now: number,
     reason?: string,
   ) {
+    if (isPolicyTransaction(tx)) {
+      await this.expireDueCreditLots(tx, now, reservation.customerId);
+    }
     const accountBefore = await this.requireAccountById(tx, reservation.accountId);
     const reservedUnits = parseCreditUnits(reservation.reservedUnits);
+    const lotResult = isPolicyTransaction(tx)
+      ? await this.releaseCreditLotAllocations(tx, reservation, now)
+      : { expiredReleasedUnits: 0n, expiredLots: [] };
     const account = withBalances(
       accountBefore,
-      parseCreditUnits(accountBefore.postedUnits),
+      parseCreditUnits(accountBefore.postedUnits) - lotResult.expiredReleasedUnits,
       parseCreditUnits(accountBefore.reservedUnits) - reservedUnits,
       now,
     );
@@ -992,6 +1726,25 @@ export class CreditLedger {
       now,
       { reason },
     );
+    for (const expired of lotResult.expiredLots) {
+      await this.saveLedgerEntry(
+        tx,
+        account,
+        'expire',
+        'posted',
+        -expired.units,
+        'credit_lot',
+        expired.lot.id,
+        now,
+        { reason: 'released_after_expiry', reservationId: reservation.id },
+      );
+      await this.saveOutboxEvent(
+        tx,
+        'credit.lot.expired',
+        { account, lot: expired.lot, expiredUnits: expired.units.toString() },
+        now,
+      );
+    }
     await this.saveOutboxEvent(
       tx,
       status === 'expired' ? 'credit.expired' : 'credit.released',
@@ -1131,6 +1884,194 @@ function withBalances(
     availableAmount: creditUnitsToString(available),
     updatedAt,
   };
+}
+
+function isPolicyTransaction(
+  transaction: CreditStoreTransaction | CreditPolicyStoreTransaction,
+): transaction is CreditPolicyStoreTransaction {
+  const value = transaction as Partial<CreditPolicyStoreTransaction>;
+  return (
+    typeof value.getGrantPolicy === 'function' &&
+    typeof value.listGrantPolicies === 'function' &&
+    typeof value.getCreditLot === 'function' &&
+    typeof value.listCreditLots === 'function' &&
+    typeof value.listCreditLotAllocations === 'function' &&
+    typeof value.getGrantPolicyApplicationByIdentity === 'function' &&
+    typeof value.saveGrantPolicy === 'function' &&
+    typeof value.saveCreditLot === 'function' &&
+    typeof value.saveCreditLotAllocation === 'function' &&
+    typeof value.saveGrantPolicyApplication === 'function'
+  );
+}
+
+function createCreditLot(input: {
+  account: CreditAccount;
+  kind: CreditLotKind;
+  amountUnits: bigint;
+  grantId?: string;
+  policyId?: string;
+  expiresAt?: number;
+  now: number;
+  metadata?: Record<string, unknown>;
+}): CreditLot {
+  if (input.amountUnits <= 0n) {
+    throw new InvalidCreditStateError('Credit lot amount must be positive');
+  }
+  if (input.expiresAt !== undefined && input.expiresAt <= input.now) {
+    throw new InvalidCreditStateError('Credit lot expiry must be in the future');
+  }
+  const amount = creditUnitsToString(input.amountUnits);
+  return {
+    id: createId('lot'),
+    accountId: input.account.id,
+    projectId: input.account.projectId,
+    customerId: input.account.customerId,
+    kind: input.kind,
+    grantId: input.grantId,
+    policyId: input.policyId,
+    originalAmount: amount,
+    originalUnits: input.amountUnits.toString(),
+    availableAmount: amount,
+    availableUnits: input.amountUnits.toString(),
+    reservedAmount: '0',
+    reservedUnits: '0',
+    consumedAmount: '0',
+    consumedUnits: '0',
+    expiredAmount: '0',
+    expiredUnits: '0',
+    createdAt: input.now,
+    updatedAt: input.now,
+    expiresAt: input.expiresAt,
+    metadata: input.metadata,
+  };
+}
+
+function withCreditLotBalances(
+  lot: CreditLot,
+  available: bigint,
+  reserved: bigint,
+  consumed: bigint,
+  expired: bigint,
+  updatedAt: number,
+): CreditLot {
+  if (available < 0n || reserved < 0n || consumed < 0n || expired < 0n) {
+    throw new InvalidCreditStateError(`Credit lot balance cannot be negative: ${lot.id}`);
+  }
+  const original = parseCreditUnits(lot.originalUnits);
+  if (available + reserved + consumed + expired !== original) {
+    throw new InvalidCreditStateError(`Credit lot invariant violated: ${lot.id}`);
+  }
+  return {
+    ...lot,
+    availableAmount: creditUnitsToString(available),
+    availableUnits: available.toString(),
+    reservedAmount: creditUnitsToString(reserved),
+    reservedUnits: reserved.toString(),
+    consumedAmount: creditUnitsToString(consumed),
+    consumedUnits: consumed.toString(),
+    expiredAmount: creditUnitsToString(expired),
+    expiredUnits: expired.toString(),
+    updatedAt,
+  };
+}
+
+function createCreditLotAllocation(input: {
+  reservationId: string;
+  lot: CreditLot;
+  amountUnits: bigint;
+  now: number;
+}): CreditLotAllocation {
+  if (input.amountUnits <= 0n) {
+    throw new InvalidCreditStateError('Credit lot allocation amount must be positive');
+  }
+  const amount = creditUnitsToString(input.amountUnits);
+  return {
+    id: `cla_${createHash('sha256')
+      .update(`${input.reservationId}\u0000${input.lot.id}`)
+      .digest('hex')
+      .slice(0, 24)}`,
+    reservationId: input.reservationId,
+    lotId: input.lot.id,
+    accountId: input.lot.accountId,
+    projectId: input.lot.projectId,
+    customerId: input.lot.customerId,
+    allocatedAmount: amount,
+    allocatedUnits: input.amountUnits.toString(),
+    reservedAmount: amount,
+    reservedUnits: input.amountUnits.toString(),
+    consumedAmount: '0',
+    consumedUnits: '0',
+    releasedAmount: '0',
+    releasedUnits: '0',
+    expiredAmount: '0',
+    expiredUnits: '0',
+    createdAt: input.now,
+    updatedAt: input.now,
+  };
+}
+
+function withCreditLotAllocationBalances(
+  allocation: CreditLotAllocation,
+  reserved: bigint,
+  consumed: bigint,
+  released: bigint,
+  expired: bigint,
+  updatedAt: number,
+): CreditLotAllocation {
+  if (reserved < 0n || consumed < 0n || released < 0n || expired < 0n) {
+    throw new InvalidCreditStateError(
+      `Credit lot allocation balance cannot be negative: ${allocation.id}`,
+    );
+  }
+  const allocated = parseCreditUnits(allocation.allocatedUnits);
+  if (reserved + consumed + released + expired !== allocated) {
+    throw new InvalidCreditStateError(`Credit lot allocation invariant violated: ${allocation.id}`);
+  }
+  return {
+    ...allocation,
+    reservedAmount: creditUnitsToString(reserved),
+    reservedUnits: reserved.toString(),
+    consumedAmount: creditUnitsToString(consumed),
+    consumedUnits: consumed.toString(),
+    releasedAmount: creditUnitsToString(released),
+    releasedUnits: released.toString(),
+    expiredAmount: creditUnitsToString(expired),
+    expiredUnits: expired.toString(),
+    updatedAt,
+  };
+}
+
+function compareCreditLots(left: CreditLot, right: CreditLot): number {
+  const priority = (lot: CreditLot) => {
+    if (lot.kind === 'promotion') return 0;
+    if (lot.kind === 'allowance') return 1;
+    return 2;
+  };
+  const priorityDifference = priority(left) - priority(right);
+  if (priorityDifference !== 0) return priorityDifference;
+  if (left.kind === 'promotion' && right.kind === 'promotion') {
+    const expiryDifference =
+      (left.expiresAt ?? Number.MAX_SAFE_INTEGER) - (right.expiresAt ?? Number.MAX_SAFE_INTEGER);
+    if (expiryDifference !== 0) return expiryDifference;
+  }
+  return left.createdAt - right.createdAt || left.id.localeCompare(right.id);
+}
+
+function allowancePeriodKey(timestamp: number, cadence: AllowanceCadence): string {
+  if (!Number.isSafeInteger(timestamp)) throw new Error('Clock must return an integer timestamp');
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) throw new Error('Clock returned an invalid timestamp');
+  const day = date.toISOString().slice(0, 10);
+  if (cadence === 'day') return `day:${day}`;
+  if (cadence === 'month') return `month:${day.slice(0, 7)}`;
+  if (cadence === 'week') {
+    const utcDay = date.getUTCDay();
+    const daysSinceMonday = (utcDay + 6) % 7;
+    const monday = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+    monday.setUTCDate(monday.getUTCDate() - daysSinceMonday);
+    return `week:${monday.toISOString().slice(0, 10)}`;
+  }
+  throw new Error(`Unsupported allowance cadence: ${String(cadence)}`);
 }
 
 function normalizeUsage(usage: UsageQuantities): UsageQuantities {

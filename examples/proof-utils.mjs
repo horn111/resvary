@@ -57,43 +57,64 @@ export function createProofId(prefix) {
 }
 
 export async function runUsageLifecycle({ dbPath, projectId, customerId, proofId }) {
-  const ledger = new CreditLedger({
-    projectId,
-    store: createSqliteCreditStore({ path: dbPath }),
-  });
-  const meter = await ledger.registerMeter({
-    key: 'proof_units',
-    name: 'Proof usage units',
-    dimensions: ['units'],
-    idempotencyKey: 'proof-meter-v1',
-  });
-  const price = await ledger.createPriceVersion({
-    meterKey: meter.key,
-    rates: [{ dimension: 'units', unitSize: '1', amount: '0.001' }],
-    idempotencyKey: 'proof-price-v1',
-  });
-  const result = await ledger.runMetered(
-    {
-      customerId,
-      priceId: price.id,
-      estimatedUsage: { units: '2' },
-      idempotencyKey: `proof-reserve:${proofId}`,
-      metadata: { proofId },
-    },
-    async () => ({
-      value: { ok: true },
-      actualUsage: { units: '1' },
-      usageEventId: `proof-usage:${proofId}`,
-      metadata: { proofId },
-    }),
-  );
-  return {
-    reservationId: result.reservation.id,
-    usageReceiptId: result.receipt.id,
-    chargedAmount: result.receipt.amount,
-    releasedAmount: result.receipt.releasedAmount,
-    balanceAfterUsage: result.balance.availableAmount,
-  };
+  const store = createSqliteCreditStore({ path: dbPath });
+  const ledger = new CreditLedger({ projectId, store });
+  try {
+    const balanceBefore = await ledger.getBalance(customerId);
+    const meter = await ledger.registerMeter({
+      key: 'proof_units',
+      name: 'Proof usage units',
+      dimensions: ['units'],
+      idempotencyKey: 'proof-meter-v1',
+    });
+    const price = await ledger.createPriceVersion({
+      meterKey: meter.key,
+      rates: [{ dimension: 'units', unitSize: '1', amount: '0.001' }],
+      idempotencyKey: 'proof-price-v1',
+    });
+    const result = await ledger.runMetered(
+      {
+        customerId,
+        priceId: price.id,
+        estimatedUsage: { units: '2' },
+        idempotencyKey: `proof-reserve:${proofId}`,
+        metadata: { proofId },
+      },
+      async () => ({
+        value: { ok: true },
+        actualUsage: { units: '1' },
+        usageEventId: `proof-usage:${proofId}`,
+        metadata: { proofId },
+      }),
+    );
+    if (!result.receipt.allocations?.length) {
+      throw new Error('Usage lifecycle did not record credit lot allocations');
+    }
+    if (result.balance.reservedUnits !== '0') {
+      throw new Error('Usage lifecycle left reserved credits after commit');
+    }
+    const allocations = await Promise.all(
+      result.receipt.allocations.map(async (allocation) => ({
+        lotKind: (await ledger.getCreditLot(allocation.lotId))?.kind,
+        allocatedAmount: allocation.allocatedAmount,
+        consumedAmount: allocation.consumedAmount,
+        releasedAmount: allocation.releasedAmount,
+        expiredAmount: allocation.expiredAmount,
+      })),
+    );
+    return {
+      reservationId: result.reservation.id,
+      usageReceiptId: result.receipt.id,
+      chargedAmount: result.receipt.amount,
+      releasedAmount: result.receipt.releasedAmount,
+      balanceBeforeUsage: balanceBefore.availableAmount,
+      balanceAfterUsage: result.balance.availableAmount,
+      reservedAfterCommit: result.balance.reservedAmount,
+      allocations,
+    };
+  } finally {
+    store.close();
+  }
 }
 
 export async function writeEvidence(path, evidence) {

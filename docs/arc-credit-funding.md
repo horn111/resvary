@@ -61,11 +61,13 @@ This is Arc Testnet functionality. Resvary does not export a mainnet placeholder
 
 ## Release proof runner
 
-For the `0.4.0-alpha.0` evidence run, copy `.env.example` to `.env.local`, fund a disposable Arc
+For the `0.7.0` evidence run, copy `.env.example` to `.env.local`, fund a disposable Arc
 Testnet buyer, and set `RESVARY_ARC_BUYER_PRIVATE_KEY` plus
 `RESVARY_ARC_FUNDING_RECIPIENT`. Run `npm run proof:arc`.
 
 The runner persists the funding intent and invoice, restarts the worker before payment, sends the
 Memo-wrapped USDC transaction, scans it after the configured confirmation depth, persists the
 watcher cursor, replays the same receipt, and runs one reserve/commit usage lifecycle. It writes
-`docs/evidence/arc-testnet-proof.json`; the private key is never written to evidence or logs.
+`docs/evidence/0.7.0/arc-testnet-proof.json`; the private key is never written to evidence or logs.
+The proof also checks that funding creates one non-expiring general lot, replay creates no second
+grant, and usage records lot allocations.

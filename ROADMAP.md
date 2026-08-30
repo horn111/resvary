@@ -41,9 +41,18 @@ The published evidence is pinned to `v0.4.0-alpha.0` and records an external Arc
 - [x] Preserve SQLite/Postgres schemas, outbox/webhook events, and CLI flags without migration
 - [x] Publish all six packages from one checked artifact set with npm provenance and approval-gated promotion
 
+## 0.7 stable: allowances and promotional credits
+
+- [x] Immutable versioned allowance and promotion policies
+- [x] UTC day, Monday-based week, and month allowance periods
+- [x] One-time promotion claims with required expiry
+- [x] Credit-lot priority, reservation allocations, and expiry-safe commit/release behavior
+- [x] SQLite schema v5 automatic migration and PostgreSQL schema v3 explicit migration
+- [x] Legacy balance and open-reservation backfill with invariant checks
+- [x] OIDC trusted publishing with npm staged approval and provenance
+
 ## Later
 
-- allowance and promotional grant policies;
 - tiered and package pricing;
 - dashboard and audit explorer;
 - Fastify, Hono, Python, and Go clients;

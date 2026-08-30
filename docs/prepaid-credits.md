@@ -39,7 +39,13 @@ Good keys already exist in most applications: request IDs, job IDs, provider res
 - Create another reservation before continuing a job that needs a higher limit.
 - Open reservations expire after 15 minutes by default.
 - Expiry is processed lazily during reservations or explicitly with `releaseExpiredReservations`.
-- Credit grants do not expire in version 0.5.
+- Manual, funding, allowance, and migrated legacy credits do not expire. Promotion policies require a positive expiry.
+
+## Allowances and promotions
+
+Allowance applications top the policy's unspent available plus reserved balance up to its target once per UTC period. They do not erase leftovers or accumulate above the target. Promotion claims are one-time per customer and policy version; the application owns eligibility and coupon checks.
+
+Policy-capable stores allocate lots in this order: promotion by nearest expiry, allowance FIFO, then general and legacy FIFO. Open reservations retain promotion allocations after expiry. Commit remains allowed, while expired units released from the reservation burn. See [Grant policies and credit lots](grant-policies.md).
 
 ## Corrections
 

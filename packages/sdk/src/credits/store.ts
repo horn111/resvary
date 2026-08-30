@@ -2,11 +2,17 @@ import type {
   CreditAccount,
   CreditBalanceFilter,
   CreditGrant,
+  CreditGrantPolicy,
+  CreditLot,
+  CreditLotAllocation,
+  CreditLotFilter,
   CreditOutboxEvent,
   CreditReservation,
   FundingIntent,
   FundingTransaction,
   IdempotencyRecord,
+  GrantPolicyApplication,
+  GrantPolicyApplicationFilter,
   LedgerEntry,
   MeterDefinition,
   OutboxEventFilter,
@@ -72,6 +78,48 @@ export interface CreditStore extends CreditStoreReader {
   transaction<T>(handler: (transaction: CreditStoreTransaction) => Promise<T>): Promise<T>;
 }
 
+export interface CreditPolicyStoreReader {
+  getGrantPolicy(id: string): Promise<CreditGrantPolicy | undefined>;
+  listGrantPolicies(projectId?: string): Promise<CreditGrantPolicy[]>;
+  getCreditLot(id: string): Promise<CreditLot | undefined>;
+  listCreditLots(filter?: CreditLotFilter): Promise<CreditLot[]>;
+  listCreditLotAllocations(reservationId?: string): Promise<CreditLotAllocation[]>;
+  getGrantPolicyApplication(id: string): Promise<GrantPolicyApplication | undefined>;
+  getGrantPolicyApplicationByIdentity(
+    policyId: string,
+    accountId: string,
+    periodKey: string,
+  ): Promise<GrantPolicyApplication | undefined>;
+  listGrantPolicyApplications(
+    filter?: GrantPolicyApplicationFilter,
+  ): Promise<GrantPolicyApplication[]>;
+}
+
+export interface CreditPolicyStoreTransaction
+  extends CreditStoreTransaction, CreditPolicyStoreReader {
+  saveGrantPolicy(policy: CreditGrantPolicy): Promise<void>;
+  saveCreditLot(lot: CreditLot): Promise<void>;
+  saveCreditLotAllocation(allocation: CreditLotAllocation): Promise<void>;
+  saveGrantPolicyApplication(application: GrantPolicyApplication): Promise<void>;
+}
+
+export interface CreditPolicyStore extends CreditStore, CreditPolicyStoreReader {
+  transaction<T>(handler: (transaction: CreditPolicyStoreTransaction) => Promise<T>): Promise<T>;
+}
+
+export function isCreditPolicyStore(store: CreditStore): store is CreditPolicyStore {
+  const value = store as Partial<CreditPolicyStore>;
+  return (
+    typeof value.getGrantPolicy === 'function' &&
+    typeof value.listGrantPolicies === 'function' &&
+    typeof value.getCreditLot === 'function' &&
+    typeof value.listCreditLots === 'function' &&
+    typeof value.listCreditLotAllocations === 'function' &&
+    typeof value.getGrantPolicyApplicationByIdentity === 'function' &&
+    typeof value.listGrantPolicyApplications === 'function'
+  );
+}
+
 export interface ClaimOutboxEventsInput {
   workerId: string;
   now: number;
@@ -116,13 +164,19 @@ type MemoryState = {
   idempotencyRecords: Map<string, IdempotencyRecord>;
   fundingIntents: Map<string, FundingIntent>;
   fundingTransactions: Map<string, FundingTransaction>;
+  grantPolicies: Map<string, CreditGrantPolicy>;
+  creditLots: Map<string, CreditLot>;
+  creditLotAllocations: Map<string, CreditLotAllocation>;
+  grantPolicyApplications: Map<string, GrantPolicyApplication>;
 };
 
-export class InMemoryCreditStore implements CreditStore, OutboxDeliveryStore {
+export class InMemoryCreditStore implements CreditPolicyStore, OutboxDeliveryStore {
   private state = createMemoryState();
   private transactionTail: Promise<void> = Promise.resolve();
 
-  async transaction<T>(handler: (transaction: CreditStoreTransaction) => Promise<T>): Promise<T> {
+  async transaction<T>(
+    handler: (transaction: CreditPolicyStoreTransaction) => Promise<T>,
+  ): Promise<T> {
     let release!: () => void;
     const current = new Promise<void>((resolve) => {
       release = resolve;
@@ -220,6 +274,30 @@ export class InMemoryCreditStore implements CreditStore, OutboxDeliveryStore {
   }
   listFundingTransactions(fundingIntentId?: string) {
     return reader(this.state).listFundingTransactions(fundingIntentId);
+  }
+  getGrantPolicy(id: string) {
+    return reader(this.state).getGrantPolicy(id);
+  }
+  listGrantPolicies(projectId?: string) {
+    return reader(this.state).listGrantPolicies(projectId);
+  }
+  getCreditLot(id: string) {
+    return reader(this.state).getCreditLot(id);
+  }
+  listCreditLots(filter?: CreditLotFilter) {
+    return reader(this.state).listCreditLots(filter);
+  }
+  listCreditLotAllocations(reservationId?: string) {
+    return reader(this.state).listCreditLotAllocations(reservationId);
+  }
+  getGrantPolicyApplication(id: string) {
+    return reader(this.state).getGrantPolicyApplication(id);
+  }
+  getGrantPolicyApplicationByIdentity(policyId: string, accountId: string, periodKey: string) {
+    return reader(this.state).getGrantPolicyApplicationByIdentity(policyId, accountId, periodKey);
+  }
+  listGrantPolicyApplications(filter?: GrantPolicyApplicationFilter) {
+    return reader(this.state).listGrantPolicyApplications(filter);
   }
 
   claimOutboxEvents(input: ClaimOutboxEventsInput): Promise<CreditOutboxEvent[]> {
@@ -329,7 +407,7 @@ async function requireClaimedEvent(
   return event;
 }
 
-class MemoryCreditTransaction implements CreditStoreTransaction {
+class MemoryCreditTransaction implements CreditPolicyStoreTransaction {
   constructor(private readonly state: MemoryState) {}
 
   getAccount(id: string) {
@@ -412,6 +490,30 @@ class MemoryCreditTransaction implements CreditStoreTransaction {
   listFundingTransactions(fundingIntentId?: string) {
     return reader(this.state).listFundingTransactions(fundingIntentId);
   }
+  getGrantPolicy(id: string) {
+    return reader(this.state).getGrantPolicy(id);
+  }
+  listGrantPolicies(projectId?: string) {
+    return reader(this.state).listGrantPolicies(projectId);
+  }
+  getCreditLot(id: string) {
+    return reader(this.state).getCreditLot(id);
+  }
+  listCreditLots(filter?: CreditLotFilter) {
+    return reader(this.state).listCreditLots(filter);
+  }
+  listCreditLotAllocations(reservationId?: string) {
+    return reader(this.state).listCreditLotAllocations(reservationId);
+  }
+  getGrantPolicyApplication(id: string) {
+    return reader(this.state).getGrantPolicyApplication(id);
+  }
+  getGrantPolicyApplicationByIdentity(policyId: string, accountId: string, periodKey: string) {
+    return reader(this.state).getGrantPolicyApplicationByIdentity(policyId, accountId, periodKey);
+  }
+  listGrantPolicyApplications(filter?: GrantPolicyApplicationFilter) {
+    return reader(this.state).listGrantPolicyApplications(filter);
+  }
 
   async saveAccount(value: CreditAccount) {
     this.state.accounts.set(value.id, structuredClone(value));
@@ -452,9 +554,21 @@ class MemoryCreditTransaction implements CreditStoreTransaction {
   async saveFundingTransaction(value: FundingTransaction) {
     this.state.fundingTransactions.set(value.id, structuredClone(value));
   }
+  async saveGrantPolicy(value: CreditGrantPolicy) {
+    this.state.grantPolicies.set(value.id, structuredClone(value));
+  }
+  async saveCreditLot(value: CreditLot) {
+    this.state.creditLots.set(value.id, structuredClone(value));
+  }
+  async saveCreditLotAllocation(value: CreditLotAllocation) {
+    this.state.creditLotAllocations.set(value.id, structuredClone(value));
+  }
+  async saveGrantPolicyApplication(value: GrantPolicyApplication) {
+    this.state.grantPolicyApplications.set(value.id, structuredClone(value));
+  }
 }
 
-function reader(state: MemoryState): CreditStoreReader {
+function reader(state: MemoryState): CreditStoreReader & CreditPolicyStoreReader {
   return {
     async getAccount(id) {
       return clone(state.accounts.get(id));
@@ -582,6 +696,66 @@ function reader(state: MemoryState): CreditStoreReader {
         ),
       );
     },
+    async getGrantPolicy(id) {
+      return clone(state.grantPolicies.get(id));
+    },
+    async listGrantPolicies(projectId) {
+      return clones(
+        [...state.grantPolicies.values()]
+          .filter((item) => !projectId || item.projectId === projectId)
+          .sort((a, b) => a.key.localeCompare(b.key) || a.version - b.version),
+      );
+    },
+    async getCreditLot(id) {
+      return clone(state.creditLots.get(id));
+    },
+    async listCreditLots(filter = {}) {
+      return clones(
+        [...state.creditLots.values()]
+          .filter(
+            (item) =>
+              matchesBalanceFilter(item, filter) &&
+              (!filter.policyId || item.policyId === filter.policyId) &&
+              (!filter.kind || item.kind === filter.kind) &&
+              (filter.expiresBefore === undefined ||
+                (item.expiresAt !== undefined && item.expiresAt <= filter.expiresBefore)),
+          )
+          .sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id)),
+      );
+    },
+    async listCreditLotAllocations(reservationId) {
+      return clones(
+        [...state.creditLotAllocations.values()]
+          .filter((item) => !reservationId || item.reservationId === reservationId)
+          .sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id)),
+      );
+    },
+    async getGrantPolicyApplication(id) {
+      return clone(state.grantPolicyApplications.get(id));
+    },
+    async getGrantPolicyApplicationByIdentity(policyId, accountId, periodKey) {
+      return clone(
+        [...state.grantPolicyApplications.values()].find(
+          (item) =>
+            item.policyId === policyId &&
+            item.accountId === accountId &&
+            item.periodKey === periodKey,
+        ),
+      );
+    },
+    async listGrantPolicyApplications(filter = {}) {
+      return clones(
+        [...state.grantPolicyApplications.values()]
+          .filter(
+            (item) =>
+              matchesBalanceFilter(item, filter) &&
+              (!filter.policyId || item.policyId === filter.policyId) &&
+              (!filter.policyType || item.policyType === filter.policyType) &&
+              (!filter.periodKey || item.periodKey === filter.periodKey),
+          )
+          .sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id)),
+      );
+    },
   };
 }
 
@@ -609,6 +783,10 @@ function createMemoryState(): MemoryState {
     idempotencyRecords: new Map(),
     fundingIntents: new Map(),
     fundingTransactions: new Map(),
+    grantPolicies: new Map(),
+    creditLots: new Map(),
+    creditLotAllocations: new Map(),
+    grantPolicyApplications: new Map(),
   };
 }
 
@@ -626,6 +804,10 @@ function cloneMemoryState(state: MemoryState): MemoryState {
     idempotencyRecords: new Map(clones([...state.idempotencyRecords.entries()])),
     fundingIntents: new Map(clones([...state.fundingIntents.entries()])),
     fundingTransactions: new Map(clones([...state.fundingTransactions.entries()])),
+    grantPolicies: new Map(clones([...state.grantPolicies.entries()])),
+    creditLots: new Map(clones([...state.creditLots.entries()])),
+    creditLotAllocations: new Map(clones([...state.creditLotAllocations.entries()])),
+    grantPolicyApplications: new Map(clones([...state.grantPolicyApplications.entries()])),
   };
 }
 

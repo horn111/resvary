@@ -1,4 +1,6 @@
 import { GatewayClient } from '@circle-fin/x402-batching/client';
+import { CreditLedger } from '@resvary/sdk/credits';
+import { createSqliteCreditStore } from '@resvary/sqlite';
 import {
   createProofId,
   loadLocalEnv,
@@ -19,7 +21,7 @@ const proofId = createProofId('gateway-proof');
 const dbPath = process.env.RESVARY_CREDITS_DB_PATH?.trim() || '.resvary/proof.sqlite';
 const output =
   process.env.RESVARY_GATEWAY_EVIDENCE_PATH?.trim() ||
-  'docs/evidence/gateway-nanopayment-proof.json';
+  'docs/evidence/0.7.0/gateway-nanopayment-proof.json';
 const demoAdminToken = process.env.RESVARY_DEMO_ADMIN_TOKEN?.trim();
 if (!demoAdminToken) {
   throw new Error('RESVARY_DEMO_ADMIN_TOKEN is required by the demo Gateway proof route');
@@ -65,6 +67,18 @@ const body = { proofId };
 const paid = await gateway.pay(endpoint, { method: 'POST', headers: adminHeaders, body });
 if (!capturedPayment) throw new Error('Circle buyer did not expose the signed payment payload');
 
+const evidenceStore = createSqliteCreditStore({ path: dbPath });
+const evidenceLedger = new CreditLedger({ projectId: 'resvary_ai_demo', store: evidenceStore });
+const customerId = paid.data.fundingIntent.customerId;
+const balanceBeforeReplay = await evidenceLedger.getBalance(customerId);
+const grantsBeforeReplay = await evidenceLedger.store.listGrants(balanceBeforeReplay.id);
+const fundingLot = (await evidenceLedger.listCreditLots(customerId)).find(
+  (lot) => lot.grantId === paid.data.grant.id,
+);
+if (!fundingLot || fundingLot.kind !== 'general' || fundingLot.expiresAt !== undefined) {
+  throw new Error('Gateway funding did not create a non-expiring general credit lot');
+}
+
 const paymentSignature = Buffer.from(JSON.stringify(capturedPayment)).toString('base64');
 const replayResponse = await fetch(endpoint, {
   method: 'POST',
@@ -86,11 +100,16 @@ if (replay.grant?.id !== paid.data?.grant?.id) {
 if (replay.balance?.availableAmount !== paid.data?.balance?.availableAmount) {
   throw new Error('Gateway replay changed the account balance');
 }
+const grantsAfterReplay = await evidenceLedger.store.listGrants(balanceBeforeReplay.id);
+if (grantsAfterReplay.length !== grantsBeforeReplay.length) {
+  throw new Error('Gateway replay created another credit grant');
+}
+evidenceStore.close();
 
 const lifecycle = await runUsageLifecycle({
   dbPath,
   projectId: 'resvary_ai_demo',
-  customerId: paid.data.fundingIntent.customerId,
+  customerId,
   proofId,
 });
 const balancesAfter = await gateway.getBalances();
@@ -114,6 +133,11 @@ const evidence = {
   fundingIntentId: paid.data.fundingIntent.id,
   fundingTransactionId: transaction.id,
   creditGrantId: paid.data.grant.id,
+  fundingLot: {
+    kind: fundingLot.kind,
+    expiresAt: fundingLot.expiresAt ?? null,
+    originalAmount: fundingLot.originalAmount,
+  },
   authorizationHash: transaction.evidence?.authorizationHash,
   nonce: authorization.nonce,
   facilitatorReference: paid.transaction,
@@ -125,6 +149,7 @@ const evidence = {
     replayed: replay.replayed,
     sameGrant: replay.grant.id === paid.data.grant.id,
     balanceUnchanged: replay.balance.availableAmount === paid.data.balance.availableAmount,
+    grantCountUnchanged: grantsAfterReplay.length === grantsBeforeReplay.length,
   },
   lifecycle,
   gatewayBalances: {

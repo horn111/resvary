@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "rail": "arc_direct",
+  "testnetOnly": true,
+  "proofId": "arc-proof-20260830204813",
+  "observedAt": "2026-08-30T20:48:21.566Z",
+  "network": "arc-testnet",
+  "chainId": 5042002,
+  "txHash": "0x2e1b1272805e0363d77dd2e1a92818a109b1643c5e9525dad640173511ef01e8",
+  "explorerUrl": "https://testnet.arcscan.app/tx/0x2e1b1272805e0363d77dd2e1a92818a109b1643c5e9525dad640173511ef01e8",
+  "blockNumber": "59662633",
+  "confirmations": 1,
+  "payer": "0x1E3f8Fab778Eb5035f629Ac94a80bFf181557985",
+  "recipient": "0x4ae8B4E11b05380d0B122D99C1A29050Cf8Eba2d",
+  "amount": "0.01",
+  "amountUnits": "10000",
+  "memoId": "0x661dcf8ee79558af0870edee65eae737e133228aa57467531b7816a292a1bc76",
+  "callDataHash": "0x6e79426b370da1f555eecc6e8f7f7657929c1f9314bc7befd27f2a9acb00a56b",
+  "fundingIntentId": "fund_5bb066458b20f7127f1012e1",
+  "paymentReceiptId": "rcpt_6d33b563a0b1bd69b3cf16e4",
+  "fundingTransactionId": "ftx_54df811476fb33fe0e1e639b",
+  "creditGrantId": "grant_e1182990d87eff9786c8b446",
+  "fundingLot": {
+    "kind": "general",
+    "expiresAt": null,
+    "originalAmount": "0.01"
+  },
+  "balanceAfterFunding": "0.019",
+  "workerRecovery": {
+    "recoveredFromPersistedRun": false,
+    "pendingIntentWasDurable": true,
+    "recoveredIntentAfterRestart": true,
+    "observedReceiptCount": 1,
+    "persistedCursorCount": 2,
+    "pendingAfterFinalRestart": 0,
+    "reconciledAfterFinalRestart": 0
+  },
+  "replay": {
+    "balanceUnchanged": true,
+    "grantCountUnchanged": true,
+    "observedBalanceBeforeReplay": "0.019",
+    "observedBalanceAfterReplay": "0.019"
+  },
+  "lifecycle": {
+    "reservationId": "rsv_6807d3b25e1068408509fc0e",
+    "usageReceiptId": "urcpt_a19e6cc0a84f7c09c09433fc",
+    "chargedAmount": "0.001",
+    "releasedAmount": "0.001",
+    "balanceBeforeUsage": "0.019",
+    "balanceAfterUsage": "0.018",
+    "reservedAfterCommit": "0",
+    "allocations": [
+      {
+        "lotKind": "legacy",
+        "allocatedAmount": "0.002",
+        "consumedAmount": "0.001",
+        "releasedAmount": "0.001",
+        "expiredAmount": "0"
+      }
+    ]
+  },
+  "privacy": {
+    "privateKeyRecorded": false
+  }
+}

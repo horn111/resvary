@@ -178,8 +178,177 @@ describe('SqliteCreditStore', () => {
           version: number;
         }
       ).version,
-    ).toBe(4);
+    ).toBe(5);
     migrated.close();
+  });
+
+  it('migrates v4 accounts and multiple open reservations into one verified legacy lot', async () => {
+    const path = tempDatabasePath();
+    const originalStore = createSqliteCreditStore({ path });
+    const ledger = new CreditLedger({ projectId: 'legacy_project', store: originalStore });
+    const meter = await ledger.registerMeter({
+      key: 'jobs',
+      dimensions: ['jobs'],
+      idempotencyKey: 'legacy-meter',
+    });
+    const price = await ledger.createPriceVersion({
+      meterKey: meter.key,
+      rates: [{ dimension: 'jobs', unitSize: '1', amount: '1' }],
+      idempotencyKey: 'legacy-price',
+    });
+    await ledger.grantCredits({
+      customerId: 'legacy-customer',
+      amount: '10',
+      idempotencyKey: 'legacy-grant',
+    });
+    const first = await ledger.reserveCredits({
+      customerId: 'legacy-customer',
+      priceId: price.id,
+      estimatedUsage: { jobs: '2' },
+      idempotencyKey: 'legacy-reserve-a',
+    });
+    const second = await ledger.reserveCredits({
+      customerId: 'legacy-customer',
+      priceId: price.id,
+      estimatedUsage: { jobs: '3' },
+      idempotencyKey: 'legacy-reserve-b',
+    });
+    originalStore.close();
+
+    const v4 = new DatabaseSync(path);
+    v4.exec(`
+      DROP TABLE resvary_grant_policy_applications;
+      DROP TABLE resvary_credit_lot_allocations;
+      DROP TABLE resvary_credit_lots;
+      DROP TABLE resvary_grant_policies;
+      DELETE FROM resvary_schema_migrations WHERE version = 5;
+    `);
+    v4.close();
+
+    const migratedStore = createSqliteCreditStore({ path });
+    const migratedLedger = new CreditLedger({ projectId: 'legacy_project', store: migratedStore });
+    const lots = await migratedLedger.listCreditLots('legacy-customer');
+    expect(lots).toHaveLength(1);
+    expect(lots[0]).toMatchObject({
+      kind: 'legacy',
+      originalAmount: '10',
+      availableAmount: '5',
+      reservedAmount: '5',
+    });
+    expect(await migratedStore.listCreditLotAllocations(first.id)).toMatchObject([
+      { reservedAmount: '2', lotId: lots[0]?.id },
+    ]);
+    expect(await migratedStore.listCreditLotAllocations(second.id)).toMatchObject([
+      { reservedAmount: '3', lotId: lots[0]?.id },
+    ]);
+    migratedStore.close();
+  });
+
+  it('rolls v5 migration back when open reservations do not match the account snapshot', async () => {
+    const path = tempDatabasePath();
+    const store = createSqliteCreditStore({ path });
+    const ledger = new CreditLedger({ projectId: 'invalid_backfill', store });
+    const meter = await ledger.registerMeter({
+      key: 'jobs',
+      dimensions: ['jobs'],
+      idempotencyKey: 'invalid-meter',
+    });
+    const price = await ledger.createPriceVersion({
+      meterKey: meter.key,
+      rates: [{ dimension: 'jobs', unitSize: '1', amount: '1' }],
+      idempotencyKey: 'invalid-price',
+    });
+    await ledger.grantCredits({
+      customerId: 'invalid-customer',
+      amount: '5',
+      idempotencyKey: 'invalid-grant',
+    });
+    const reservation = await ledger.reserveCredits({
+      customerId: 'invalid-customer',
+      priceId: price.id,
+      estimatedUsage: { jobs: '1' },
+      idempotencyKey: 'invalid-reserve',
+    });
+    store.close();
+
+    const v4 = new DatabaseSync(path);
+    v4.exec(`
+      DROP TABLE resvary_grant_policy_applications;
+      DROP TABLE resvary_credit_lot_allocations;
+      DROP TABLE resvary_credit_lots;
+      DROP TABLE resvary_grant_policies;
+      DELETE FROM resvary_schema_migrations WHERE version = 5;
+    `);
+    v4.prepare('UPDATE resvary_credit_reservations SET status = ? WHERE id = ?').run(
+      'released',
+      reservation.id,
+    );
+    v4.close();
+
+    expect(() => createSqliteCreditStore({ path })).toThrow(
+      'open reservations do not match account',
+    );
+    const unchanged = new DatabaseSync(path);
+    expect(
+      (
+        unchanged
+          .prepare('SELECT MAX(version) AS version FROM resvary_schema_migrations')
+          .get() as {
+          version: number;
+        }
+      ).version,
+    ).toBe(4);
+    expect(
+      (
+        unchanged
+          .prepare(
+            "SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table' AND name = 'resvary_credit_lots'",
+          )
+          .get() as { count: number }
+      ).count,
+    ).toBe(0);
+    unchanged.close();
+  });
+
+  it('persists grant policies, applications, and expiring lots across restarts', async () => {
+    const path = tempDatabasePath();
+    let now = 1_000;
+    const firstStore = createSqliteCreditStore({ path });
+    const first = new CreditLedger({
+      projectId: 'policy_project',
+      store: firstStore,
+      now: () => now,
+    });
+    const policy = await first.createGrantPolicy({
+      type: 'promotion',
+      key: 'restart-promo',
+      amount: '2',
+      expiresInMs: 100,
+      idempotencyKey: 'restart-policy',
+    });
+    const claim = await first.claimPromotion({
+      policyId: policy.id,
+      customerId: 'restart-customer',
+      idempotencyKey: 'restart-claim',
+    });
+    firstStore.close();
+
+    now = 1_101;
+    const secondStore = createSqliteCreditStore({ path });
+    const second = new CreditLedger({
+      projectId: 'policy_project',
+      store: secondStore,
+      now: () => now,
+    });
+    expect(await second.getGrantPolicy(policy.id)).toEqual(policy);
+    expect(await second.listGrantPolicyApplications('restart-customer')).toEqual([
+      claim.application,
+    ]);
+    expect(await second.getBalance('restart-customer')).toMatchObject({ postedAmount: '0' });
+    expect(await second.listCreditLots('restart-customer')).toMatchObject([
+      { kind: 'promotion', expiredAmount: '2', availableAmount: '0' },
+    ]);
+    secondStore.close();
   });
 
   it('rolls a failed transaction back completely', async () => {

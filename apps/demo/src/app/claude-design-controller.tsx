@@ -24,6 +24,12 @@ export function ClaudeDesignController() {
   useEffect(() => {
     const root = document.querySelector<HTMLElement>('[data-resvary-page]');
     if (!root) return;
+    const textWalker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    for (let node = textWalker.nextNode(); node; node = textWalker.nextNode()) {
+      if (node.textContent?.includes('0.5 stable')) {
+        node.textContent = node.textContent.replaceAll('0.5 stable', '0.7 stable');
+      }
+    }
     setDemoTarget(root.querySelector<HTMLElement>('[data-claude-demo-root]'));
 
     const byRef = <T extends HTMLElement>(name: string) =>

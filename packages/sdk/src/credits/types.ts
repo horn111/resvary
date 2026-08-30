@@ -1,10 +1,19 @@
 export type CreditCurrency = 'USD';
-export type CreditGrantSource = 'manual' | 'migration' | 'arc' | 'circle_gateway_nanopayment';
+export type CreditGrantSource =
+  | 'manual'
+  | 'migration'
+  | 'arc'
+  | 'circle_gateway_nanopayment'
+  | 'allowance'
+  | 'promotion';
+export type CreditGrantPolicyType = 'allowance' | 'promotion';
+export type AllowanceCadence = 'day' | 'week' | 'month';
+export type CreditLotKind = 'legacy' | 'general' | 'allowance' | 'promotion';
 export type FundingRail = 'arc_direct' | 'circle_gateway_nanopayment';
 export type FundingIntentStatus = 'pending' | 'confirmed' | 'failed';
 export type FundingSettlementStatus = 'accepted' | 'settled' | 'failed' | 'reconciliation_required';
 export type ReservationStatus = 'open' | 'committed' | 'released' | 'expired';
-export type LedgerEntryType = 'grant' | 'adjustment' | 'reserve' | 'release' | 'charge';
+export type LedgerEntryType = 'grant' | 'adjustment' | 'reserve' | 'release' | 'charge' | 'expire';
 export type LedgerBucket = 'posted' | 'reserved';
 export type CreditEventType =
   | 'credit.granted'
@@ -12,6 +21,10 @@ export type CreditEventType =
   | 'credit.reserved'
   | 'credit.released'
   | 'credit.expired'
+  | 'credit.policy.created'
+  | 'credit.allowance.applied'
+  | 'credit.promotion.claimed'
+  | 'credit.lot.expired'
   | 'usage.charged'
   | 'funding.intent.created'
   | 'funding.accepted'
@@ -65,6 +78,92 @@ export interface CreditGrant {
   amountUnits: string;
   source: CreditGrantSource;
   externalRef?: string;
+  policyId?: string;
+  expiresAt?: number;
+  createdAt: number;
+  metadata?: Record<string, unknown>;
+}
+
+interface CreditGrantPolicyBase {
+  id: string;
+  projectId: string;
+  key: string;
+  version: number;
+  type: CreditGrantPolicyType;
+  amount: string;
+  amountUnits: string;
+  createdAt: number;
+  metadata?: Record<string, unknown>;
+}
+
+export interface AllowanceGrantPolicy extends CreditGrantPolicyBase {
+  type: 'allowance';
+  cadence: AllowanceCadence;
+}
+
+export interface PromotionGrantPolicy extends CreditGrantPolicyBase {
+  type: 'promotion';
+  expiresInMs: number;
+}
+
+export type CreditGrantPolicy = AllowanceGrantPolicy | PromotionGrantPolicy;
+
+export interface CreditLot {
+  id: string;
+  accountId: string;
+  projectId: string;
+  customerId: string;
+  kind: CreditLotKind;
+  grantId?: string;
+  policyId?: string;
+  originalAmount: string;
+  originalUnits: string;
+  availableAmount: string;
+  availableUnits: string;
+  reservedAmount: string;
+  reservedUnits: string;
+  consumedAmount: string;
+  consumedUnits: string;
+  expiredAmount: string;
+  expiredUnits: string;
+  createdAt: number;
+  updatedAt: number;
+  expiresAt?: number;
+  metadata?: Record<string, unknown>;
+}
+
+export interface CreditLotAllocation {
+  id: string;
+  reservationId: string;
+  lotId: string;
+  accountId: string;
+  projectId: string;
+  customerId: string;
+  allocatedAmount: string;
+  allocatedUnits: string;
+  reservedAmount: string;
+  reservedUnits: string;
+  consumedAmount: string;
+  consumedUnits: string;
+  releasedAmount: string;
+  releasedUnits: string;
+  expiredAmount: string;
+  expiredUnits: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface GrantPolicyApplication {
+  id: string;
+  policyId: string;
+  policyType: CreditGrantPolicyType;
+  accountId: string;
+  projectId: string;
+  customerId: string;
+  periodKey: string;
+  grantId?: string;
+  grantedAmount: string;
+  grantedUnits: string;
   createdAt: number;
   metadata?: Record<string, unknown>;
 }
@@ -171,6 +270,7 @@ export interface UsageReceipt {
   balanceBeforeUnits: string;
   balanceAfterUnits: string;
   createdAt: number;
+  allocations?: CreditLotAllocation[];
   metadata?: Record<string, unknown>;
 }
 
@@ -183,7 +283,14 @@ export interface LedgerEntry {
   bucket: LedgerBucket;
   deltaUnits: string;
   balanceAfterUnits: string;
-  referenceType: 'grant' | 'adjustment' | 'reservation' | 'usage_receipt' | 'funding';
+  referenceType:
+    | 'grant'
+    | 'adjustment'
+    | 'reservation'
+    | 'usage_receipt'
+    | 'funding'
+    | 'credit_lot'
+    | 'grant_policy';
   referenceId: string;
   createdAt: number;
   metadata?: Record<string, unknown>;
@@ -264,4 +371,16 @@ export interface OutboxEventFilter {
   projectId?: string;
   status?: CreditOutboxEvent['status'];
   type?: CreditEventType;
+}
+
+export interface CreditLotFilter extends CreditBalanceFilter {
+  policyId?: string;
+  kind?: CreditLotKind;
+  expiresBefore?: number;
+}
+
+export interface GrantPolicyApplicationFilter extends CreditBalanceFilter {
+  policyId?: string;
+  policyType?: CreditGrantPolicyType;
+  periodKey?: string;
 }

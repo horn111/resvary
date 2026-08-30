@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-08-30
+
+### Added
+
+- Added immutable, versioned allowance and promotion grant policies with explicit application and claim commands.
+- Added credit lots, reservation allocations, optional receipt allocations, expiry sweeps, and priority consumption: promotions by nearest expiry, allowance FIFO, then other credits FIFO.
+- Added `CreditPolicyStore` as an optional persistence capability and `UnsupportedCreditStoreCapabilityError` for policy commands on legacy custom stores.
+- Added `credit.policy.created`, `credit.allowance.applied`, `credit.promotion.claimed`, and `credit.lot.expired` events while retaining the existing `credit.granted` event for every issued grant.
+
+### Changed
+
+- SQLite migrates automatically from schema v4 to v5. PostgreSQL requires the explicit v2-to-v3 migration before application rollout.
+- Existing posted balances are backfilled into one non-expiring legacy lot per account, with open reservations mapped to allocations. Migration stops when account, lot, and reservation totals disagree.
+- Funding grants now create non-expiring general lots. Pricing, funding protocols, existing event fields, and CLI flags remain unchanged.
+- Replaced token-based npm publication with OIDC trusted publishing and a staged `dry_run → stage → finalize` workflow.
+
+### Compatibility
+
+- Existing `CreditStore` implementations keep serving grant, reserve, commit, release, funding, receipt, and outbox operations without source changes. Policy operations require the optional `CreditPolicyStore` capability.
+- Historical usage receipts remain valid without `allocations`; new receipts include allocations when the store supports credit lots.
+- See [docs/migration-0.7.md](docs/migration-0.7.md) and [docs/grant-policies.md](docs/grant-policies.md).
+
+### Limits
+
+- Allowance cadence is UTC-only and weeks start Monday. Eligibility, segments, coupons, and scheduling remain application responsibilities.
+- Resvary remains self-hosted without hosted SLA or compliance certification. SQLite is local/single-node, PostgreSQL 16–18 is multi-process, and Arc/Gateway remain Testnet-only.
+
 ## [0.6.1] - 2026-08-30
 
 ### Fixed
@@ -186,8 +213,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI/CD pipeline with GitHub Actions
 - Security policy and contribution guidelines
 
-[unreleased]: https://github.com/horn111/resvary/compare/v0.6.1...HEAD
-[0.6.1]: https://github.com/horn111/resvary/compare/v0.5.0...v0.6.1
+[unreleased]: https://github.com/horn111/resvary/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/horn111/resvary/compare/v0.6.1...v0.7.0
+[0.6.1]: https://github.com/horn111/resvary/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/horn111/resvary/compare/v0.5.0...18692d548fabd48387c789f568c02868f3a681dc
 [0.5.0]: https://github.com/horn111/resvary/compare/v0.5.0-alpha.3...v0.5.0
 [0.5.0-alpha.3]: https://github.com/horn111/resvary/compare/v0.5.0-alpha.2...v0.5.0-alpha.3

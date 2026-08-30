@@ -1,17 +1,26 @@
 import { DatabaseSync, type DatabaseSync as DatabaseSyncType } from 'node:sqlite';
+import { creditUnitsToString, parseCreditUnits } from '@resvary/sdk/credits';
 import type {
   CreditAccount,
   CreditBalanceFilter,
   CreditGrant,
+  CreditGrantPolicy,
+  CreditLot,
+  CreditLotAllocation,
+  CreditLotFilter,
   CreditOutboxEvent,
   CreditReservation,
   CreditReservationFilter,
-  CreditStore,
   CreditStoreReader,
   CreditStoreTransaction,
+  CreditPolicyStore,
+  CreditPolicyStoreReader,
+  CreditPolicyStoreTransaction,
   IdempotencyRecord,
   FundingIntent,
   FundingTransaction,
+  GrantPolicyApplication,
+  GrantPolicyApplicationFilter,
   LedgerEntry,
   MeterDefinition,
   OutboxEventFilter,
@@ -32,7 +41,7 @@ export interface SqliteCreditStoreConfig {
 
 type PayloadRow = { payload: string };
 
-export class SqliteCreditStore implements CreditStore, OutboxDeliveryStore {
+export class SqliteCreditStore implements CreditPolicyStore, OutboxDeliveryStore {
   private readonly db: DatabaseSyncType;
   private transactionTail: Promise<void> = Promise.resolve();
 
@@ -43,7 +52,9 @@ export class SqliteCreditStore implements CreditStore, OutboxDeliveryStore {
     hardenSqliteDatabaseFiles(config.path);
   }
 
-  async transaction<T>(handler: (transaction: CreditStoreTransaction) => Promise<T>): Promise<T> {
+  async transaction<T>(
+    handler: (transaction: CreditPolicyStoreTransaction) => Promise<T>,
+  ): Promise<T> {
     let release!: () => void;
     const current = new Promise<void>((resolve) => {
       release = resolve;
@@ -139,6 +150,30 @@ export class SqliteCreditStore implements CreditStore, OutboxDeliveryStore {
   }
   listFundingTransactions(fundingIntentId?: string) {
     return reader(this.db).listFundingTransactions(fundingIntentId);
+  }
+  getGrantPolicy(id: string) {
+    return reader(this.db).getGrantPolicy(id);
+  }
+  listGrantPolicies(projectId?: string) {
+    return reader(this.db).listGrantPolicies(projectId);
+  }
+  getCreditLot(id: string) {
+    return reader(this.db).getCreditLot(id);
+  }
+  listCreditLots(filter?: CreditLotFilter) {
+    return reader(this.db).listCreditLots(filter);
+  }
+  listCreditLotAllocations(reservationId?: string) {
+    return reader(this.db).listCreditLotAllocations(reservationId);
+  }
+  getGrantPolicyApplication(id: string) {
+    return reader(this.db).getGrantPolicyApplication(id);
+  }
+  getGrantPolicyApplicationByIdentity(policyId: string, accountId: string, periodKey: string) {
+    return reader(this.db).getGrantPolicyApplicationByIdentity(policyId, accountId, periodKey);
+  }
+  listGrantPolicyApplications(filter?: GrantPolicyApplicationFilter) {
+    return reader(this.db).listGrantPolicyApplications(filter);
   }
 
   claimOutboxEvents(input: ClaimOutboxEventsInput): Promise<CreditOutboxEvent[]> {
@@ -361,6 +396,7 @@ export class SqliteCreditStore implements CreditStore, OutboxDeliveryStore {
     this.migrateFundingV2();
     this.migrateOutboxV3();
     this.migrateFundingTransactionHashV4();
+    this.migrateCreditLotsV5();
   }
 
   private migrateFundingV2(): void {
@@ -566,9 +602,202 @@ export class SqliteCreditStore implements CreditStore, OutboxDeliveryStore {
       throw error;
     }
   }
+
+  private migrateCreditLotsV5(): void {
+    const row = this.db
+      .prepare('SELECT MAX(version) AS version FROM resvary_schema_migrations')
+      .get() as { version?: number | null } | undefined;
+    if ((row?.version ?? 0) >= 5) return;
+
+    this.db.exec('BEGIN IMMEDIATE;');
+    try {
+      this.db.exec(`
+        CREATE TABLE resvary_grant_policies (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL,
+          policy_key TEXT NOT NULL,
+          version INTEGER NOT NULL,
+          created_at INTEGER NOT NULL,
+          payload TEXT NOT NULL,
+          UNIQUE(project_id, policy_key, version)
+        );
+        CREATE INDEX resvary_grant_policies_project
+          ON resvary_grant_policies(project_id, created_at);
+
+        CREATE TABLE resvary_credit_lots (
+          id TEXT PRIMARY KEY,
+          account_id TEXT NOT NULL,
+          project_id TEXT NOT NULL,
+          customer_id TEXT NOT NULL,
+          kind TEXT NOT NULL,
+          policy_id TEXT,
+          expires_at INTEGER,
+          created_at INTEGER NOT NULL,
+          payload TEXT NOT NULL
+        );
+        CREATE INDEX resvary_credit_lots_account
+          ON resvary_credit_lots(account_id, created_at);
+        CREATE INDEX resvary_credit_lots_expiry
+          ON resvary_credit_lots(project_id, expires_at)
+          WHERE expires_at IS NOT NULL;
+
+        CREATE TABLE resvary_credit_lot_allocations (
+          id TEXT PRIMARY KEY,
+          reservation_id TEXT NOT NULL,
+          lot_id TEXT NOT NULL,
+          account_id TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          payload TEXT NOT NULL,
+          UNIQUE(reservation_id, lot_id)
+        );
+        CREATE INDEX resvary_credit_lot_allocations_reservation
+          ON resvary_credit_lot_allocations(reservation_id, created_at);
+
+        CREATE TABLE resvary_grant_policy_applications (
+          id TEXT PRIMARY KEY,
+          policy_id TEXT NOT NULL,
+          account_id TEXT NOT NULL,
+          project_id TEXT NOT NULL,
+          customer_id TEXT NOT NULL,
+          policy_type TEXT NOT NULL,
+          period_key TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          payload TEXT NOT NULL,
+          UNIQUE(policy_id, account_id, period_key)
+        );
+        CREATE INDEX resvary_grant_policy_applications_customer
+          ON resvary_grant_policy_applications(project_id, customer_id, created_at);
+      `);
+
+      const accounts = this.db
+        .prepare('SELECT payload FROM resvary_credit_accounts ORDER BY id')
+        .all() as PayloadRow[];
+      for (const accountRow of accounts) {
+        const account = parseReceiptStoreValue<CreditAccount>(accountRow.payload);
+        const posted = parseCreditUnits(account.postedUnits);
+        const reserved = parseCreditUnits(account.reservedUnits);
+        if (reserved > posted) {
+          throw new Error(
+            `Cannot migrate SQLite credit lots: account invariant failed for ${account.id}`,
+          );
+        }
+        const reservations = this.db
+          .prepare(
+            `SELECT payload FROM resvary_credit_reservations
+             WHERE account_id = ? AND status = 'open' ORDER BY created_at, id`,
+          )
+          .all(account.id) as PayloadRow[];
+        const open = reservations.map((item) =>
+          parseReceiptStoreValue<CreditReservation>(item.payload),
+        );
+        const reservationTotal = open.reduce(
+          (total, reservation) => total + parseCreditUnits(reservation.reservedUnits),
+          0n,
+        );
+        if (reservationTotal !== reserved) {
+          throw new Error(
+            `Cannot migrate SQLite credit lots: open reservations do not match account ${account.id}`,
+          );
+        }
+        if (posted === 0n) continue;
+        const lotId = `lot_legacy_${account.id}`;
+        const available = posted - reserved;
+        const lot: CreditLot = {
+          id: lotId,
+          accountId: account.id,
+          projectId: account.projectId,
+          customerId: account.customerId,
+          kind: 'legacy',
+          originalAmount: creditUnitsToString(posted),
+          originalUnits: posted.toString(),
+          availableAmount: creditUnitsToString(available),
+          availableUnits: available.toString(),
+          reservedAmount: creditUnitsToString(reserved),
+          reservedUnits: reserved.toString(),
+          consumedAmount: '0',
+          consumedUnits: '0',
+          expiredAmount: '0',
+          expiredUnits: '0',
+          createdAt: account.createdAt,
+          updatedAt: account.updatedAt,
+          metadata: { migratedFrom: 'sqlite-v4' },
+        };
+        insert(
+          this.db,
+          'resvary_credit_lots',
+          [
+            'id',
+            'account_id',
+            'project_id',
+            'customer_id',
+            'kind',
+            'policy_id',
+            'expires_at',
+            'created_at',
+          ],
+          [
+            lot.id,
+            lot.accountId,
+            lot.projectId,
+            lot.customerId,
+            lot.kind,
+            null,
+            null,
+            lot.createdAt,
+          ],
+          lot,
+        );
+        for (const reservation of open) {
+          const units = parseCreditUnits(reservation.reservedUnits);
+          if (units === 0n) continue;
+          const allocation: CreditLotAllocation = {
+            id: `cla_legacy_${reservation.id}`,
+            reservationId: reservation.id,
+            lotId,
+            accountId: account.id,
+            projectId: account.projectId,
+            customerId: account.customerId,
+            allocatedAmount: creditUnitsToString(units),
+            allocatedUnits: units.toString(),
+            reservedAmount: creditUnitsToString(units),
+            reservedUnits: units.toString(),
+            consumedAmount: '0',
+            consumedUnits: '0',
+            releasedAmount: '0',
+            releasedUnits: '0',
+            expiredAmount: '0',
+            expiredUnits: '0',
+            createdAt: reservation.createdAt,
+            updatedAt: account.updatedAt,
+          };
+          insert(
+            this.db,
+            'resvary_credit_lot_allocations',
+            ['id', 'reservation_id', 'lot_id', 'account_id', 'created_at'],
+            [
+              allocation.id,
+              allocation.reservationId,
+              allocation.lotId,
+              allocation.accountId,
+              allocation.createdAt,
+            ],
+            allocation,
+          );
+        }
+      }
+
+      this.db
+        .prepare('INSERT INTO resvary_schema_migrations(version, applied_at) VALUES (5, ?)')
+        .run(Date.now());
+      this.db.exec('COMMIT;');
+    } catch (error) {
+      this.db.exec('ROLLBACK;');
+      throw error;
+    }
+  }
 }
 
-class SqliteCreditTransaction implements CreditStoreTransaction {
+class SqliteCreditTransaction implements CreditPolicyStoreTransaction {
   constructor(private readonly db: DatabaseSyncType) {}
   getAccount(id: string) {
     return reader(this.db).getAccount(id);
@@ -645,6 +874,30 @@ class SqliteCreditTransaction implements CreditStoreTransaction {
   }
   listFundingTransactions(fundingIntentId?: string) {
     return reader(this.db).listFundingTransactions(fundingIntentId);
+  }
+  getGrantPolicy(id: string) {
+    return reader(this.db).getGrantPolicy(id);
+  }
+  listGrantPolicies(projectId?: string) {
+    return reader(this.db).listGrantPolicies(projectId);
+  }
+  getCreditLot(id: string) {
+    return reader(this.db).getCreditLot(id);
+  }
+  listCreditLots(filter?: CreditLotFilter) {
+    return reader(this.db).listCreditLots(filter);
+  }
+  listCreditLotAllocations(reservationId?: string) {
+    return reader(this.db).listCreditLotAllocations(reservationId);
+  }
+  getGrantPolicyApplication(id: string) {
+    return reader(this.db).getGrantPolicyApplication(id);
+  }
+  getGrantPolicyApplicationByIdentity(policyId: string, accountId: string, periodKey: string) {
+    return reader(this.db).getGrantPolicyApplicationByIdentity(policyId, accountId, periodKey);
+  }
+  listGrantPolicyApplications(filter?: GrantPolicyApplicationFilter) {
+    return reader(this.db).listGrantPolicyApplications(filter);
   }
 
   async saveAccount(value: CreditAccount) {
@@ -800,9 +1053,81 @@ class SqliteCreditTransaction implements CreditStoreTransaction {
       value,
     );
   }
+  async saveGrantPolicy(value: CreditGrantPolicy) {
+    insert(
+      this.db,
+      'resvary_grant_policies',
+      ['id', 'project_id', 'policy_key', 'version', 'created_at'],
+      [value.id, value.projectId, value.key, value.version, value.createdAt],
+      value,
+    );
+  }
+  async saveCreditLot(value: CreditLot) {
+    upsert(
+      this.db,
+      'resvary_credit_lots',
+      [
+        'id',
+        'account_id',
+        'project_id',
+        'customer_id',
+        'kind',
+        'policy_id',
+        'expires_at',
+        'created_at',
+      ],
+      [
+        value.id,
+        value.accountId,
+        value.projectId,
+        value.customerId,
+        value.kind,
+        value.policyId ?? null,
+        value.expiresAt ?? null,
+        value.createdAt,
+      ],
+      value,
+    );
+  }
+  async saveCreditLotAllocation(value: CreditLotAllocation) {
+    upsert(
+      this.db,
+      'resvary_credit_lot_allocations',
+      ['id', 'reservation_id', 'lot_id', 'account_id', 'created_at'],
+      [value.id, value.reservationId, value.lotId, value.accountId, value.createdAt],
+      value,
+    );
+  }
+  async saveGrantPolicyApplication(value: GrantPolicyApplication) {
+    insert(
+      this.db,
+      'resvary_grant_policy_applications',
+      [
+        'id',
+        'policy_id',
+        'account_id',
+        'project_id',
+        'customer_id',
+        'policy_type',
+        'period_key',
+        'created_at',
+      ],
+      [
+        value.id,
+        value.policyId,
+        value.accountId,
+        value.projectId,
+        value.customerId,
+        value.policyType,
+        value.periodKey,
+        value.createdAt,
+      ],
+      value,
+    );
+  }
 }
 
-function reader(db: DatabaseSyncType): CreditStoreReader {
+function reader(db: DatabaseSyncType): CreditStoreReader & CreditPolicyStoreReader {
   return {
     async getAccount(id) {
       return one<CreditAccount>(db, 'SELECT payload FROM resvary_credit_accounts WHERE id = ?', [
@@ -978,6 +1303,78 @@ function reader(db: DatabaseSyncType): CreditStoreReader {
             db,
             'SELECT payload FROM resvary_funding_transactions ORDER BY created_at ASC',
           );
+    },
+    async getGrantPolicy(id) {
+      return one<CreditGrantPolicy>(db, 'SELECT payload FROM resvary_grant_policies WHERE id = ?', [
+        id,
+      ]);
+    },
+    async listGrantPolicies(projectId) {
+      return projectId
+        ? all<CreditGrantPolicy>(
+            db,
+            'SELECT payload FROM resvary_grant_policies WHERE project_id = ? ORDER BY created_at, version',
+            [projectId],
+          )
+        : all<CreditGrantPolicy>(
+            db,
+            'SELECT payload FROM resvary_grant_policies ORDER BY created_at, version',
+          );
+    },
+    async getCreditLot(id) {
+      return one<CreditLot>(db, 'SELECT payload FROM resvary_credit_lots WHERE id = ?', [id]);
+    },
+    async listCreditLots(filter = {}) {
+      return all<CreditLot>(
+        db,
+        'SELECT payload FROM resvary_credit_lots ORDER BY created_at, id',
+      ).filter(
+        (item) =>
+          matchesBalanceFilter(item, filter) &&
+          (!filter.policyId || item.policyId === filter.policyId) &&
+          (!filter.kind || item.kind === filter.kind) &&
+          (filter.expiresBefore === undefined ||
+            (item.expiresAt !== undefined && item.expiresAt <= filter.expiresBefore)),
+      );
+    },
+    async listCreditLotAllocations(reservationId) {
+      return reservationId
+        ? all<CreditLotAllocation>(
+            db,
+            'SELECT payload FROM resvary_credit_lot_allocations WHERE reservation_id = ? ORDER BY created_at, id',
+            [reservationId],
+          )
+        : all<CreditLotAllocation>(
+            db,
+            'SELECT payload FROM resvary_credit_lot_allocations ORDER BY created_at, id',
+          );
+    },
+    async getGrantPolicyApplication(id) {
+      return one<GrantPolicyApplication>(
+        db,
+        'SELECT payload FROM resvary_grant_policy_applications WHERE id = ?',
+        [id],
+      );
+    },
+    async getGrantPolicyApplicationByIdentity(policyId, accountId, periodKey) {
+      return one<GrantPolicyApplication>(
+        db,
+        `SELECT payload FROM resvary_grant_policy_applications
+         WHERE policy_id = ? AND account_id = ? AND period_key = ?`,
+        [policyId, accountId, periodKey],
+      );
+    },
+    async listGrantPolicyApplications(filter = {}) {
+      return all<GrantPolicyApplication>(
+        db,
+        'SELECT payload FROM resvary_grant_policy_applications ORDER BY created_at, id',
+      ).filter(
+        (item) =>
+          matchesBalanceFilter(item, filter) &&
+          (!filter.policyId || item.policyId === filter.policyId) &&
+          (!filter.policyType || item.policyType === filter.policyType) &&
+          (!filter.periodKey || item.periodKey === filter.periodKey),
+      );
     },
   };
 }

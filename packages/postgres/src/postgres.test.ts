@@ -15,7 +15,7 @@ import {
   serializeReceiptStoreValue,
 } from '@resvary/sdk/receipts';
 import { createPostgresCreditStore } from './credit.js';
-import { applyV1, migratePostgres } from './migrations.js';
+import { applyV1, applyV2, migratePostgres } from './migrations.js';
 import { createPostgresReceiptStore } from './receipt.js';
 import { importSqliteDatabase, verifySqliteImport } from './import-sqlite.js';
 
@@ -52,7 +52,7 @@ suite('Postgres stores', () => {
 
   it('applies schema migrations idempotently', async () => {
     const status = await migratePostgres({ pool: pool!, schema });
-    expect(status).toMatchObject({ currentVersion: 2, latestVersion: 2, pendingVersions: [] });
+    expect(status).toMatchObject({ currentVersion: 3, latestVersion: 3, pendingVersions: [] });
   });
 
   it('upgrades a version 1 schema sequentially', async () => {
@@ -68,7 +68,7 @@ suite('Postgres stores', () => {
       `);
       await applyV1(client, upgradeSchema);
       const status = await migratePostgres({ pool: pool!, schema: upgradeSchema });
-      expect(status).toMatchObject({ currentVersion: 2, latestVersion: 2, pendingVersions: [] });
+      expect(status).toMatchObject({ currentVersion: 3, latestVersion: 3, pendingVersions: [] });
       const constraint = await pool!.query<{ exists: boolean }>(
         `SELECT EXISTS (
            SELECT 1 FROM pg_constraint
@@ -77,6 +77,95 @@ suite('Postgres stores', () => {
          ) AS exists`,
       );
       expect(constraint.rows[0]?.exists).toBe(true);
+    } finally {
+      client.release();
+      await pool!.query(`DROP SCHEMA IF EXISTS "${upgradeSchema}" CASCADE`);
+    }
+  });
+
+  it('upgrades v2 accounts and open reservations into verified legacy lots', async () => {
+    const upgradeSchema = `resvary_upgrade_v2_${randomUUID().replaceAll('-', '')}`;
+    const client = await pool!.connect();
+    try {
+      await client.query(`CREATE SCHEMA "${upgradeSchema}"`);
+      await client.query(`
+        CREATE TABLE "${upgradeSchema}".resvary_schema_migrations (
+          version INTEGER PRIMARY KEY,
+          applied_at BIGINT NOT NULL
+        )
+      `);
+      await applyV1(client, upgradeSchema);
+      await applyV2(client, upgradeSchema);
+      const account = {
+        id: 'acct_v2_backfill',
+        projectId: 'project_v2_backfill',
+        customerId: 'customer_v2_backfill',
+        currency: 'USD',
+        postedUnits: '10000000',
+        reservedUnits: '5000000',
+        availableUnits: '5000000',
+        postedAmount: '10',
+        reservedAmount: '5',
+        availableAmount: '5',
+        createdAt: 100,
+        updatedAt: 200,
+      };
+      await client.query(
+        `INSERT INTO "${upgradeSchema}".resvary_credit_accounts
+          (id, project_id, customer_id, currency, posted_units, reserved_units, updated_at, payload)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb)`,
+        [
+          account.id,
+          account.projectId,
+          account.customerId,
+          account.currency,
+          account.postedUnits,
+          account.reservedUnits,
+          account.updatedAt,
+          serializeReceiptStoreValue(account),
+        ],
+      );
+      for (const [id, units] of [
+        ['rsv_v2_a', '2000000'],
+        ['rsv_v2_b', '3000000'],
+      ] as const) {
+        const reservation = {
+          id,
+          accountId: account.id,
+          projectId: account.projectId,
+          customerId: account.customerId,
+          priceId: 'legacy_price',
+          status: 'open',
+          estimatedUsage: {},
+          reservedAmount: units === '2000000' ? '2' : '3',
+          reservedUnits: units,
+          createdAt: 150,
+          expiresAt: 10_000,
+        };
+        await client.query(
+          `INSERT INTO "${upgradeSchema}".resvary_credit_reservations
+            (id, account_id, project_id, customer_id, status, reserved_units, expires_at, created_at, payload)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb)`,
+          [
+            reservation.id,
+            reservation.accountId,
+            reservation.projectId,
+            reservation.customerId,
+            reservation.status,
+            reservation.reservedUnits,
+            reservation.expiresAt,
+            reservation.createdAt,
+            serializeReceiptStoreValue(reservation),
+          ],
+        );
+      }
+      const status = await migratePostgres({ pool: pool!, schema: upgradeSchema });
+      expect(status).toMatchObject({ currentVersion: 3, latestVersion: 3 });
+      const store = createPostgresCreditStore({ pool: pool!, schema: upgradeSchema });
+      await expect(store.listCreditLots({ customerId: account.customerId })).resolves.toMatchObject(
+        [{ kind: 'legacy', originalAmount: '10', availableAmount: '5', reservedAmount: '5' }],
+      );
+      await expect(store.listCreditLotAllocations()).resolves.toHaveLength(2);
     } finally {
       client.release();
       await pool!.query(`DROP SCHEMA IF EXISTS "${upgradeSchema}" CASCADE`);
@@ -118,6 +207,35 @@ suite('Postgres stores', () => {
     expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
     expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
     expect((await first.getBalance('customer')).availableAmount).toBe('0.25');
+  });
+
+  it('serializes allowance applications across independent store instances', async () => {
+    const firstStore = createPostgresCreditStore({ pool: pool!, schema });
+    const secondStore = createPostgresCreditStore({ pool: pool!, schema });
+    const first = new CreditLedger({ projectId: 'allowance_project', store: firstStore });
+    const second = new CreditLedger({ projectId: 'allowance_project', store: secondStore });
+    const policy = await first.createGrantPolicy({
+      type: 'allowance',
+      key: 'monthly-concurrent',
+      cadence: 'month',
+      amount: '5',
+      idempotencyKey: 'monthly-concurrent-policy',
+    });
+    const results = await Promise.all([
+      first.applyAllowance({
+        policyId: policy.id,
+        customerId: 'allowance-customer',
+        idempotencyKey: 'allowance-first',
+      }),
+      second.applyAllowance({
+        policyId: policy.id,
+        customerId: 'allowance-customer',
+        idempotencyKey: 'allowance-second',
+      }),
+    ]);
+    expect(new Set(results.map((result) => result.application.id)).size).toBe(1);
+    expect((await first.getBalance('allowance-customer')).postedAmount).toBe('5');
+    expect(await first.listGrantPolicyApplications('allowance-customer')).toHaveLength(1);
   });
 
   it('preserves funding intent ownership across projects', async () => {
@@ -267,7 +385,7 @@ suite('Postgres stores', () => {
     await expect(receipts.getInvoice(reusedInvoice.id)).resolves.toMatchObject({ status: 'open' });
   });
 
-  it('dry-runs, rolls back corruption, imports, and verifies a SQLite v2 fixture', async () => {
+  it('dry-runs, rolls back corruption, imports, and verifies a SQLite v5 fixture', async () => {
     const importSchema = `resvary_import_${randomUUID().replaceAll('-', '')}`;
     const directory = mkdtempSync(join(tmpdir(), 'resvary-import-'));
     const sqlitePath = join(directory, 'resvary-v2.sqlite');
@@ -298,19 +416,42 @@ suite('Postgres stores', () => {
       referenceId: 'grant_import',
       createdAt: account.createdAt,
     };
+    const legacyLot = {
+      id: `lot_legacy_${account.id}`,
+      accountId: account.id,
+      projectId: account.projectId,
+      customerId: account.customerId,
+      kind: 'legacy',
+      originalAmount: '1',
+      originalUnits: '1000000',
+      availableAmount: '1',
+      availableUnits: '1000000',
+      reservedAmount: '0',
+      reservedUnits: '0',
+      consumedAmount: '0',
+      consumedUnits: '0',
+      expiredAmount: '0',
+      expiredUnits: '0',
+      createdAt: account.createdAt,
+      updatedAt: account.updatedAt,
+    };
 
     try {
       await migratePostgres({ pool: pool!, schema: importSchema });
       const sqlite = new DatabaseSync(sqlitePath);
       sqlite.exec(`
         CREATE TABLE resvary_schema_migrations(version INTEGER PRIMARY KEY, applied_at INTEGER NOT NULL);
-        INSERT INTO resvary_schema_migrations(version, applied_at) VALUES (2, 1);
+        INSERT INTO resvary_schema_migrations(version, applied_at) VALUES (1, 1), (2, 1), (3, 1), (4, 1), (5, 1);
         CREATE TABLE resvary_credit_accounts(id TEXT PRIMARY KEY, payload TEXT NOT NULL);
+        CREATE TABLE resvary_credit_lots(id TEXT PRIMARY KEY, payload TEXT NOT NULL);
         CREATE TABLE resvary_ledger_entries(id TEXT PRIMARY KEY, payload TEXT NOT NULL);
       `);
       sqlite
         .prepare('INSERT INTO resvary_credit_accounts(id, payload) VALUES (?, ?)')
         .run(account.id, serializeReceiptStoreValue(account));
+      sqlite
+        .prepare('INSERT INTO resvary_credit_lots(id, payload) VALUES (?, ?)')
+        .run(legacyLot.id, serializeReceiptStoreValue(legacyLot));
       sqlite
         .prepare('INSERT INTO resvary_ledger_entries(id, payload) VALUES (?, ?)')
         .run(ledgerEntry.id, serializeReceiptStoreValue(ledgerEntry));
@@ -360,7 +501,11 @@ suite('Postgres stores', () => {
       expect(imported).toMatchObject({ committed: true, contentMismatches: [] });
       await expect(
         verifySqliteImport({ pool: pool!, schema: importSchema, sqlitePath }),
-      ).resolves.toMatchObject({ contentMismatches: [], balanceMismatches: [] });
+      ).resolves.toMatchObject({
+        contentMismatches: [],
+        balanceMismatches: [],
+        allocationMismatches: [],
+      });
     } finally {
       await pool!.query(`DROP SCHEMA IF EXISTS "${importSchema}" CASCADE`);
       rmSync(directory, { recursive: true, force: true });
