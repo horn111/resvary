@@ -881,10 +881,10 @@ export class CreditLedger {
           parseCreditUnits(current.reservedUnits) + reservedUnits,
           now,
         );
+        await tx.saveReservation(reservation);
         if (isPolicyTransaction(tx)) {
           await this.reserveCreditLots(tx, current, reservation.id, reservedUnits, now);
         }
-        await tx.saveReservation(reservation);
         await tx.saveAccount(account);
         await this.saveLedgerEntry(
           tx,
