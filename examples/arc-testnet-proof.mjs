@@ -27,7 +27,7 @@ const proofId = createProofId('arc-proof');
 const customerId = process.env.RESVARY_ARC_PROOF_CUSTOMER_ID?.trim() || 'arc_proof';
 const dbPath = process.env.RESVARY_CREDITS_DB_PATH?.trim() || '.resvary/proof.sqlite';
 const output =
-  process.env.RESVARY_ARC_EVIDENCE_PATH?.trim() || 'docs/evidence/arc-testnet-proof.json';
+  process.env.RESVARY_ARC_EVIDENCE_PATH?.trim() || 'docs/evidence/0.7.0/arc-testnet-proof.json';
 const confirmations = Number(process.env.RESVARY_ARC_CONFIRMATIONS?.trim() || '1');
 const recoverExisting = process.argv.includes('--recover');
 if (!Number.isSafeInteger(confirmations) || confirmations < 1) {
@@ -141,6 +141,13 @@ if (!storedReceipt) throw new Error('Arc worker did not persist the payment rece
 const grant = await ledger.store.getGrant(transaction.grantId);
 if (!grant) throw new Error('Arc worker funding transaction has no credit grant');
 const balanceBeforeReplay = await ledger.getBalance(customerId);
+const fundingLot = (await ledger.listCreditLots(customerId)).find(
+  (lot) => lot.grantId === grant.id,
+);
+if (!fundingLot || fundingLot.kind !== 'general' || fundingLot.expiresAt !== undefined) {
+  throw new Error('Arc funding did not create a non-expiring general credit lot');
+}
+const grantsBeforeReplay = await ledger.store.listGrants(balanceBeforeReplay.id);
 const cursors = await receiptStore.listWatcherCursors();
 if (cursors.length === 0) throw new Error('Arc worker did not persist a watcher cursor');
 
@@ -163,8 +170,12 @@ await funding.confirmPayment({
   metadata: { source: 'arc-proof-replay', proofId },
 });
 const balanceAfterReplay = await ledger.getBalance(customerId);
+const grantsAfterReplay = await ledger.store.listGrants(balanceAfterReplay.id);
 if (balanceAfterReplay.availableUnits !== balanceBeforeReplay.availableUnits) {
   throw new Error('Arc replay changed the account balance');
+}
+if (grantsAfterReplay.length !== grantsBeforeReplay.length) {
+  throw new Error('Arc replay created another credit grant');
 }
 
 const lifecycle = await runUsageLifecycle({
@@ -201,6 +212,11 @@ const evidence = {
   paymentReceiptId: storedReceipt.id,
   fundingTransactionId: transaction.id,
   creditGrantId: grant.id,
+  fundingLot: {
+    kind: fundingLot.kind,
+    expiresAt: fundingLot.expiresAt ?? null,
+    originalAmount: fundingLot.originalAmount,
+  },
   balanceAfterFunding,
   workerRecovery: {
     recoveredFromPersistedRun: recoverExisting,
@@ -216,6 +232,7 @@ const evidence = {
   },
   replay: {
     balanceUnchanged: balanceAfterReplay.availableUnits === balanceBeforeReplay.availableUnits,
+    grantCountUnchanged: grantsAfterReplay.length === grantsBeforeReplay.length,
     observedBalanceBeforeReplay: balanceBeforeReplay.availableAmount,
     observedBalanceAfterReplay: balanceAfterReplay.availableAmount,
   },

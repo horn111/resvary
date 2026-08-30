@@ -3,15 +3,20 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
+      mode:
+        description: Release phase
+        required: true
+        default: dry_run
+        type: choice
+        options: [dry_run, stage, finalize]
       version:
-        description: Stable version to release (for example, 0.6.1)
+        description: Stable version to release (for example, 0.7.0)
         required: true
         type: string
-      dry_run:
-        description: Run preflight, pack, and local smoke without npm or Git mutations
+      release_sha:
+        description: Full main commit SHA to release
         required: true
-        default: true
-        type: boolean
+        type: string
 
 concurrency:
   group: release
@@ -20,15 +25,17 @@ concurrency:
 permissions:
   contents: read
   actions: read
-  id-token: write
 
 jobs:
   preflight:
     name: Preflight and immutable artifacts
     runs-on: ubuntu-latest
+    env:
+      RELEASE_SHA: ${{ inputs.release_sha }}
+      RELEASE_MODE: ${{ inputs.mode }}
 
     steps:
-      - name: Require main
+      - name: Require main workflow ref
         env:
           RELEASE_REF: ${{ github.ref }}
         run: test "$RELEASE_REF" = refs/heads/main
@@ -36,8 +43,15 @@ jobs:
       - name: Checkout release commit
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          ref: ${{ inputs.release_sha }}
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Require release commit on main
+        run: |
+          git fetch origin main --no-tags
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          git merge-base --is-ancestor "$RELEASE_SHA" origin/main
 
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
@@ -45,6 +59,9 @@ jobs:
           node-version: 24
           cache: npm
           registry-url: https://registry.npmjs.org
+
+      - name: Pin npm CLI
+        run: npm install --global npm@11.19.1
 
       - name: Validate release metadata and successful CI
         env:
@@ -54,7 +71,7 @@ jobs:
       - name: Clean install
         run: npm ci
 
-      - name: Audit dependencies
+      - name: Audit dependencies and signatures
         run: |
           npm audit --audit-level=high
           npm audit signatures
@@ -82,21 +99,29 @@ jobs:
       - name: Upload checked release archives
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: release-${{ inputs.version }}-${{ github.sha }}
+          name: release-${{ inputs.version }}-${{ inputs.release_sha }}
           path: ${{ runner.temp }}/release-artifacts
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 14
 
-  publish_next:
-    name: Publish checked archives to next
-    if: ${{ !inputs.dry_run }}
+  stage:
+    name: Stage checked packages with npm OIDC
+    if: ${{ inputs.mode == 'stage' }}
     needs: preflight
     runs-on: ubuntu-latest
+    environment: Production
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    env:
+      RELEASE_SHA: ${{ inputs.release_sha }}
 
     steps:
       - name: Checkout release commit
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          ref: ${{ inputs.release_sha }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -105,56 +130,48 @@ jobs:
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
+
+      - name: Pin npm CLI
+        run: npm install --global npm@11.19.1
 
       - name: Download checked release archives
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
-          name: release-${{ inputs.version }}-${{ github.sha }}
+          name: release-${{ inputs.version }}-${{ inputs.release_sha }}
           path: ${{ runner.temp }}/release-artifacts
 
-      - name: Publish dependency levels with provenance
+      - name: Stage dependency levels with provenance
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           RELEASE_ARTIFACT_DIR: ${{ runner.temp }}/release-artifacts
-        run: node scripts/release/registry.mjs publish "${{ inputs.version }}"
+          RELEASE_STAGE_RECEIPT: ${{ runner.temp }}/stage-receipt.json
+        run: node scripts/release/staged-registry.mjs stage "${{ inputs.version }}"
 
-  registry_smoke:
-    name: Registry smoke before promotion
-    if: ${{ !inputs.dry_run }}
-    needs: publish_next
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout release commit
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Upload stage IDs and checksums
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          fetch-depth: 0
-          persist-credentials: false
+          name: stage-${{ inputs.version }}-${{ inputs.release_sha }}
+          path: ${{ runner.temp }}/stage-receipt.json
+          if-no-files-found: warn
+          retention-days: 30
 
-      - name: Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: 24
-          registry-url: https://registry.npmjs.org
-
-      - name: Verify exact registry packages, provenance, CLIs, and starters
-        run: node scripts/release/registry.mjs smoke "${{ inputs.version }}"
-
-  promote:
-    name: Promote stable release
-    if: ${{ !inputs.dry_run }}
-    needs: registry_smoke
+  finalize:
+    name: Verify approved packages and finalize release
+    if: ${{ inputs.mode == 'finalize' }}
+    needs: preflight
     runs-on: ubuntu-latest
     environment: Production
     permissions:
       contents: write
       actions: read
-      id-token: write
+    env:
+      RELEASE_SHA: ${{ inputs.release_sha }}
 
     steps:
       - name: Checkout release commit
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          ref: ${{ inputs.release_sha }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -164,15 +181,13 @@ jobs:
           node-version: 24
           registry-url: https://registry.npmjs.org
 
-      - name: Promote latest and restore stable dist-tags
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: node scripts/release/registry.mjs promote "${{ inputs.version }}"
+      - name: Pin npm CLI
+        run: npm install --global npm@11.19.1
 
-      - name: Verify latest installs and exact create-resvary execution
-        run: node scripts/release/registry.mjs post-smoke "${{ inputs.version }}"
+      - name: Verify registry metadata, provenance, installs, CLIs, and starters
+        run: node scripts/release/staged-registry.mjs finalize "${{ inputs.version }}"
 
       - name: Create annotated tag and stable GitHub Release
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/release/registry.mjs github-release "${{ inputs.version }}"
+        run: node scripts/release/staged-registry.mjs github-release "${{ inputs.version }}"

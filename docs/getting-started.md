@@ -15,7 +15,7 @@ Follow the quickstart in the root README to create a ledger, meter, and immutabl
 ## Scaffold an application
 
 ```bash
-npx create-resvary@0.6.1 my-ai-product
+npx create-resvary@0.7.0 my-ai-product
 ```
 
 Choose `AI prepaid credits` and either Next.js or Express. The legacy x402 paid API starter remains an explicit alternate template.

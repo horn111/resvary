@@ -58,7 +58,11 @@ function quoteWindowsArgument(value) {
 }
 
 export function currentSha() {
-  return process.env.GITHUB_SHA ?? run('git', ['rev-parse', 'HEAD'], { capture: true });
+  return (
+    process.env.RELEASE_SHA ??
+    process.env.GITHUB_SHA ??
+    run('git', ['rev-parse', 'HEAD'], { capture: true })
+  );
 }
 
 export async function registryPackage(name) {

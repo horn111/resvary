@@ -17,7 +17,7 @@ grant or top up credits
 → issue an auditable usage receipt
 ```
 
-Resvary keeps credit accounting separate from settlement. Arc is the reference network for external USDC funding: direct Arc transfers and Circle Gateway Nanopayments fund the same ledger. Resvary 0.6 adds fail-closed buyer payment policy and mandatory Arc RPC proof to the stable Postgres-backed release.
+Resvary keeps credit accounting separate from settlement. Arc is the reference network for external USDC funding: direct Arc transfers and Circle Gateway Nanopayments fund the same ledger. Resvary 0.7 adds recurring allowances, expiring promotional grants, and deterministic credit-lot allocation.
 
 ## Why Resvary
 
@@ -29,6 +29,8 @@ Resvary provides:
 - multi-dimensional prices for tokens, seconds, images, jobs, or tool calls;
 - atomic `reserve → commit/release` operations;
 - idempotency for grants, reservations, charges, and funding confirmations;
+- UTC allowance policies and one-time expiring promotional grants;
+- deterministic credit-lot priority and per-charge allocations;
 - immutable ledger entries and per-charge usage receipts;
 - transactional outbox events using the existing `x-resvary-signature` format;
 - in-memory, SQLite, and Postgres stores;
@@ -182,6 +184,7 @@ The old payment operations APIs remain under `/api/receipts`, `/api/receipts/pro
 - SQLite remains a local and single-node backend. Postgres 16–18 is the recommended backend for multi-process deployments.
 - Outbox delivery is at least once. Webhook consumers must deduplicate by `x-resvary-event-id`.
 - Postgres migrations are explicit deployment steps and never run when a store is constructed.
+- Expired promotional credits are excluded transactionally. Reserved promotional units may still commit after expiry; released expired units burn instead of returning to available.
 - Direct Arc and Gateway funding are Testnet-only and are not production money-flow claims.
 - Resvary stores authorization hashes and normalized evidence, never buyer private keys or full Gateway signatures.
 
@@ -192,6 +195,8 @@ The old payment operations APIs remain under `/api/receipts`, `/api/receipts/pro
 - [Architecture](docs/architecture.md)
 - [Persistence](docs/persistence.md)
 - [Production persistence deployment](docs/production-persistence.md)
+- [Grant policies and credit lots](docs/grant-policies.md)
+- [Migrate from 0.6 to 0.7](docs/migration-0.7.md)
 - [Migrate from 0.4 to 0.5](docs/migration-0.5.md)
 - [Direct Arc credit funding](docs/arc-credit-funding.md)
 - [Circle Gateway funding](docs/circle-gateway-funding.md)
@@ -202,6 +207,7 @@ The old payment operations APIs remain under `/api/receipts`, `/api/receipts/pro
 - [Security and legal model](docs/credit-security-model.md)
 - [Demo walkthrough](docs/demo-script.md)
 - [Roadmap](ROADMAP.md)
+- [Release publication](docs/releasing.md)
 
 ## Development
 

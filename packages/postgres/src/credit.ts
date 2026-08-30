@@ -4,15 +4,22 @@ import type {
   CreditAccount,
   CreditBalanceFilter,
   CreditGrant,
+  CreditGrantPolicy,
+  CreditLot,
+  CreditLotAllocation,
+  CreditLotFilter,
   CreditOutboxEvent,
   CreditReservation,
   CreditReservationFilter,
-  CreditStore,
   CreditStoreReader,
-  CreditStoreTransaction,
+  CreditPolicyStore,
+  CreditPolicyStoreReader,
+  CreditPolicyStoreTransaction,
   FailOutboxEventInput,
   FundingIntent,
   FundingTransaction,
+  GrantPolicyApplication,
+  GrantPolicyApplicationFilter,
   IdempotencyRecord,
   LedgerEntry,
   MeterDefinition,
@@ -53,14 +60,16 @@ type OutboxRow = PayloadRow & {
 
 export interface PostgresCreditStoreConfig extends PostgresConnectionConfig {}
 
-export class PostgresCreditStore implements CreditStore, OutboxDeliveryStore {
+export class PostgresCreditStore implements CreditPolicyStore, OutboxDeliveryStore {
   private readonly handle: PostgresHandle;
 
   constructor(config: PostgresCreditStoreConfig) {
     this.handle = createPostgresHandle(config);
   }
 
-  async transaction<T>(handler: (transaction: CreditStoreTransaction) => Promise<T>): Promise<T> {
+  async transaction<T>(
+    handler: (transaction: CreditPolicyStoreTransaction) => Promise<T>,
+  ): Promise<T> {
     for (let attempt = 0; ; attempt += 1) {
       const client = await this.handle.pool.connect();
       try {
@@ -160,6 +169,34 @@ export class PostgresCreditStore implements CreditStore, OutboxDeliveryStore {
   listFundingTransactions(fundingIntentId?: string) {
     return reader(this.handle.pool, this.handle).listFundingTransactions(fundingIntentId);
   }
+  getGrantPolicy(id: string) {
+    return reader(this.handle.pool, this.handle).getGrantPolicy(id);
+  }
+  listGrantPolicies(projectId?: string) {
+    return reader(this.handle.pool, this.handle).listGrantPolicies(projectId);
+  }
+  getCreditLot(id: string) {
+    return reader(this.handle.pool, this.handle).getCreditLot(id);
+  }
+  listCreditLots(filter?: CreditLotFilter) {
+    return reader(this.handle.pool, this.handle).listCreditLots(filter);
+  }
+  listCreditLotAllocations(reservationId?: string) {
+    return reader(this.handle.pool, this.handle).listCreditLotAllocations(reservationId);
+  }
+  getGrantPolicyApplication(id: string) {
+    return reader(this.handle.pool, this.handle).getGrantPolicyApplication(id);
+  }
+  getGrantPolicyApplicationByIdentity(policyId: string, accountId: string, periodKey: string) {
+    return reader(this.handle.pool, this.handle).getGrantPolicyApplicationByIdentity(
+      policyId,
+      accountId,
+      periodKey,
+    );
+  }
+  listGrantPolicyApplications(filter?: GrantPolicyApplicationFilter) {
+    return reader(this.handle.pool, this.handle).listGrantPolicyApplications(filter);
+  }
 
   async claimOutboxEvents(input: ClaimOutboxEventsInput): Promise<CreditOutboxEvent[]> {
     const outbox = table(this.handle, 'resvary_outbox_events');
@@ -242,7 +279,7 @@ export class PostgresCreditStore implements CreditStore, OutboxDeliveryStore {
   }
 }
 
-class PostgresCreditTransaction implements CreditStoreTransaction {
+class PostgresCreditTransaction implements CreditPolicyStoreTransaction {
   constructor(
     private readonly client: PoolClient,
     private readonly handle: PostgresHandle,
@@ -327,6 +364,34 @@ class PostgresCreditTransaction implements CreditStoreTransaction {
   }
   listFundingTransactions(fundingIntentId?: string) {
     return reader(this.client, this.handle).listFundingTransactions(fundingIntentId);
+  }
+  getGrantPolicy(id: string) {
+    return reader(this.client, this.handle).getGrantPolicy(id);
+  }
+  listGrantPolicies(projectId?: string) {
+    return reader(this.client, this.handle).listGrantPolicies(projectId);
+  }
+  getCreditLot(id: string) {
+    return reader(this.client, this.handle).getCreditLot(id);
+  }
+  listCreditLots(filter?: CreditLotFilter) {
+    return reader(this.client, this.handle).listCreditLots(filter);
+  }
+  listCreditLotAllocations(reservationId?: string) {
+    return reader(this.client, this.handle).listCreditLotAllocations(reservationId);
+  }
+  getGrantPolicyApplication(id: string) {
+    return reader(this.client, this.handle).getGrantPolicyApplication(id);
+  }
+  getGrantPolicyApplicationByIdentity(policyId: string, accountId: string, periodKey: string) {
+    return reader(this.client, this.handle).getGrantPolicyApplicationByIdentity(
+      policyId,
+      accountId,
+      periodKey,
+    );
+  }
+  listGrantPolicyApplications(filter?: GrantPolicyApplicationFilter) {
+    return reader(this.client, this.handle).listGrantPolicyApplications(filter);
   }
 
   saveAccount(value: CreditAccount) {
@@ -542,9 +607,120 @@ class PostgresCreditTransaction implements CreditStoreTransaction {
       value,
     );
   }
+  saveGrantPolicy(value: CreditGrantPolicy) {
+    return insert(
+      this.client,
+      this.handle,
+      'resvary_grant_policies',
+      ['id', 'project_id', 'policy_key', 'version', 'created_at'],
+      [value.id, value.projectId, value.key, value.version, value.createdAt],
+      value,
+    );
+  }
+  saveCreditLot(value: CreditLot) {
+    return upsert(
+      this.client,
+      this.handle,
+      'resvary_credit_lots',
+      [
+        'id',
+        'account_id',
+        'project_id',
+        'customer_id',
+        'kind',
+        'policy_id',
+        'original_units',
+        'available_units',
+        'reserved_units',
+        'consumed_units',
+        'expired_units',
+        'expires_at',
+        'created_at',
+      ],
+      [
+        value.id,
+        value.accountId,
+        value.projectId,
+        value.customerId,
+        value.kind,
+        value.policyId ?? null,
+        value.originalUnits,
+        value.availableUnits,
+        value.reservedUnits,
+        value.consumedUnits,
+        value.expiredUnits,
+        value.expiresAt ?? null,
+        value.createdAt,
+      ],
+      value,
+    );
+  }
+  saveCreditLotAllocation(value: CreditLotAllocation) {
+    return upsert(
+      this.client,
+      this.handle,
+      'resvary_credit_lot_allocations',
+      [
+        'id',
+        'reservation_id',
+        'lot_id',
+        'account_id',
+        'allocated_units',
+        'reserved_units',
+        'consumed_units',
+        'released_units',
+        'expired_units',
+        'created_at',
+      ],
+      [
+        value.id,
+        value.reservationId,
+        value.lotId,
+        value.accountId,
+        value.allocatedUnits,
+        value.reservedUnits,
+        value.consumedUnits,
+        value.releasedUnits,
+        value.expiredUnits,
+        value.createdAt,
+      ],
+      value,
+    );
+  }
+  saveGrantPolicyApplication(value: GrantPolicyApplication) {
+    return insert(
+      this.client,
+      this.handle,
+      'resvary_grant_policy_applications',
+      [
+        'id',
+        'policy_id',
+        'account_id',
+        'project_id',
+        'customer_id',
+        'policy_type',
+        'period_key',
+        'created_at',
+      ],
+      [
+        value.id,
+        value.policyId,
+        value.accountId,
+        value.projectId,
+        value.customerId,
+        value.policyType,
+        value.periodKey,
+        value.createdAt,
+      ],
+      value,
+    );
+  }
 }
 
-function reader(db: Queryable, handle: PostgresHandle): CreditStoreReader {
+function reader(
+  db: Queryable,
+  handle: PostgresHandle,
+): CreditStoreReader & CreditPolicyStoreReader {
   const t = (name: string) => table(handle, name);
   return {
     getAccount: (id) =>
@@ -689,6 +865,65 @@ function reader(db: Queryable, handle: PostgresHandle): CreditStoreReader {
         db,
         `SELECT payload::text AS payload FROM ${t('resvary_funding_transactions')} ${fundingIntentId ? 'WHERE funding_intent_id = $1' : ''} ORDER BY created_at ASC`,
         fundingIntentId ? [fundingIntentId] : [],
+      ),
+    getGrantPolicy: (id) =>
+      one(db, `SELECT payload::text AS payload FROM ${t('resvary_grant_policies')} WHERE id = $1`, [
+        id,
+      ]),
+    listGrantPolicies: (projectId) =>
+      all(
+        db,
+        `SELECT payload::text AS payload FROM ${t('resvary_grant_policies')}
+         ${projectId ? 'WHERE project_id = $1' : ''} ORDER BY created_at, version`,
+        projectId ? [projectId] : [],
+      ),
+    getCreditLot: (id) =>
+      one(db, `SELECT payload::text AS payload FROM ${t('resvary_credit_lots')} WHERE id = $1`, [
+        id,
+      ]),
+    listCreditLots: (filter = {}) =>
+      filteredAll(
+        db,
+        `SELECT payload::text AS payload FROM ${t('resvary_credit_lots')} ORDER BY created_at, id`,
+        [],
+        (value: CreditLot) =>
+          matchesBalanceFilter(value, filter) &&
+          (!filter.policyId || value.policyId === filter.policyId) &&
+          (!filter.kind || value.kind === filter.kind) &&
+          (filter.expiresBefore === undefined ||
+            (value.expiresAt !== undefined && value.expiresAt <= filter.expiresBefore)),
+      ),
+    listCreditLotAllocations: (reservationId) =>
+      all(
+        db,
+        `SELECT payload::text AS payload FROM ${t('resvary_credit_lot_allocations')}
+         ${reservationId ? 'WHERE reservation_id = $1' : ''} ORDER BY created_at, id`,
+        reservationId ? [reservationId] : [],
+      ),
+    getGrantPolicyApplication: (id) =>
+      one(
+        db,
+        `SELECT payload::text AS payload FROM ${t('resvary_grant_policy_applications')} WHERE id = $1`,
+        [id],
+      ),
+    getGrantPolicyApplicationByIdentity: (policyId, accountId, periodKey) =>
+      one(
+        db,
+        `SELECT payload::text AS payload FROM ${t('resvary_grant_policy_applications')}
+         WHERE policy_id = $1 AND account_id = $2 AND period_key = $3`,
+        [policyId, accountId, periodKey],
+      ),
+    listGrantPolicyApplications: (filter = {}) =>
+      filteredAll(
+        db,
+        `SELECT payload::text AS payload FROM ${t('resvary_grant_policy_applications')}
+         ORDER BY created_at, id`,
+        [],
+        (value: GrantPolicyApplication) =>
+          matchesBalanceFilter(value, filter) &&
+          (!filter.policyId || value.policyId === filter.policyId) &&
+          (!filter.policyType || value.policyType === filter.policyType) &&
+          (!filter.periodKey || value.periodKey === filter.periodKey),
       ),
   };
 }

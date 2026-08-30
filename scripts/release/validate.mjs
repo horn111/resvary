@@ -13,6 +13,15 @@ import {
 const version = process.argv[2];
 assertStableVersion(version);
 
+const releaseSha = process.env.RELEASE_SHA ?? currentSha();
+if (!/^[a-f0-9]{40}$/.test(releaseSha)) {
+  throw new Error(`release_sha must be a full lowercase commit SHA, received ${releaseSha}`);
+}
+const checkedOutSha = run('git', ['rev-parse', 'HEAD'], { capture: true });
+if (checkedOutSha !== releaseSha) {
+  throw new Error(`Checked out ${checkedOutSha}; expected release SHA ${releaseSha}`);
+}
+
 if (process.env.GITHUB_ACTIONS === 'true' && process.env.GITHUB_REF !== 'refs/heads/main') {
   throw new Error('Release workflows may run only from main');
 }
@@ -74,7 +83,7 @@ for (const name of ['@resvary/sdk', '@resvary/sqlite', '@resvary/postgres', '@re
   }
 }
 
-const sha = currentSha();
+const sha = releaseSha;
 const tag = `v${version}`;
 const tagResult = run('git', ['rev-parse', '-q', '--verify', `refs/tags/${tag}^{commit}`], {
   capture: true,

@@ -6,6 +6,8 @@
 - Never accept `projectId`, price IDs, amounts, or idempotency scope directly from an untrusted client without authorization.
 - Treat `CreditLedger` as the project-scoped tenant boundary. Raw `CreditStore` access, including `ledger.store`, is a trusted administrative primitive and must never be exposed to untrusted request data.
 - Keep grants and adjustments behind an admin or verified funding path.
+- Authorize policy creation and application separately. Check promotion eligibility, segments, and coupons before `claimPromotion`; Resvary only enforces one claim per customer and immutable policy version.
+- Run expiry sweeps from trusted maintenance infrastructure. There is no built-in scheduler or new worker mode.
 - Treat provider response IDs as untrusted until they are scoped to the correct project and request.
 - Keep metadata free of API keys, prompts containing sensitive data, and unnecessary personal information.
 - Protect SQLite files and webhook secrets with operating-system permissions and backups.
@@ -13,6 +15,8 @@
 - Rotate webhook secrets using an overlap window at the application layer.
 
 SQLite supports local and single-node deployments. Multi-process deployments should use the Postgres adapter with explicit migrations, serializable transactions, and at least one outbox worker. Resvary does not provide a hosted control plane, production SLA, or compliance certification.
+
+Promotion expiry is enforced inside balance transactions. An open reservation keeps its allocated units so already-authorized work can commit. Any expired remainder burns on release and never returns to available credits.
 
 ## Funding-specific controls
 

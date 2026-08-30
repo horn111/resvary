@@ -56,6 +56,7 @@ type DemoState = {
   arcFundingRequest: ArcFundingRequest | null;
   gatewayFundingRequest: GatewayFundingRequest | null;
   gatewayFundingTransaction: Record<string, unknown> | null;
+  policyScenario: Record<string, unknown>;
 };
 
 export function InteractiveCreditDemo() {
@@ -429,6 +430,10 @@ export function InteractiveCreditDemo() {
       ) : null}
 
       <div className={styles.records}>
+        <Record
+          title="0.7 allowance, promotion priority, and expiry scenario"
+          value={state?.policyScenario ?? { status: 'Loading policy scenario' }}
+        />
         <Record title="Latest reservation" value={latestReservation} />
         <Record title="Latest usage receipt" value={latestReceipt} />
         <Record title={`Ledger · ${ledger.length} recent entries`} value={ledger} />

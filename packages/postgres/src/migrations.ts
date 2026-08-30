@@ -1,7 +1,15 @@
 import type { PoolClient } from 'pg';
+import { creditUnitsToString, parseCreditUnits } from '@resvary/sdk/credits';
+import type {
+  CreditAccount,
+  CreditLot,
+  CreditLotAllocation,
+  CreditReservation,
+} from '@resvary/sdk/credits';
+import { parseReceiptStoreValue, serializeReceiptStoreValue } from '@resvary/sdk/receipts';
 import { createPostgresHandle, table, type PostgresConnectionConfig } from './connection.js';
 
-export const POSTGRES_SCHEMA_VERSION = 2;
+export const POSTGRES_SCHEMA_VERSION = 3;
 const MIGRATION_LOCK_ID = 7_226_519_918;
 
 export interface PostgresMigrationStatus {
@@ -64,6 +72,7 @@ export async function migratePostgres(
     const currentVersion = assertMigrationHistory(current.rows.map((row) => row.version));
     if (currentVersion < 1) await applyV1(client, handle.schema);
     if (currentVersion < 2) await applyV2(client, handle.schema);
+    if (currentVersion < 3) await applyV3(client, handle.schema);
   } finally {
     await client.query('SELECT pg_advisory_unlock($1)', [MIGRATION_LOCK_ID]).catch(() => undefined);
     client.release();
@@ -202,7 +211,8 @@ export async function applyV1(client: PoolClient, schema: string): Promise<void>
   }
 }
 
-async function applyV2(client: PoolClient, schema: string): Promise<void> {
+/** @internal Exported for sequential-migration verification. */
+export async function applyV2(client: PoolClient, schema: string): Promise<void> {
   const t = (name: string) => table({ schema }, name);
   await client.query('BEGIN');
   try {
@@ -287,6 +297,213 @@ async function applyV2(client: PoolClient, schema: string): Promise<void> {
     `);
     await client.query(
       `INSERT INTO ${t('resvary_schema_migrations')}(version, applied_at) VALUES (2, $1)`,
+      [Date.now()],
+    );
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  }
+}
+
+/** @internal Exported for sequential-migration verification. */
+export async function applyV3(client: PoolClient, schema: string): Promise<void> {
+  const t = (name: string) => table({ schema }, name);
+  await client.query('BEGIN');
+  try {
+    await client.query(`
+      CREATE TABLE ${t('resvary_grant_policies')} (
+        id TEXT PRIMARY KEY, project_id TEXT NOT NULL, policy_key TEXT NOT NULL,
+        version INTEGER NOT NULL CHECK (version > 0), created_at BIGINT NOT NULL,
+        payload JSONB NOT NULL, UNIQUE(project_id, policy_key, version)
+      );
+      CREATE INDEX resvary_grant_policies_project
+        ON ${t('resvary_grant_policies')}(project_id, created_at);
+
+      CREATE TABLE ${t('resvary_credit_lots')} (
+        id TEXT PRIMARY KEY, account_id TEXT NOT NULL, project_id TEXT NOT NULL,
+        customer_id TEXT NOT NULL, kind TEXT NOT NULL,
+        policy_id TEXT, original_units NUMERIC(78,0) NOT NULL,
+        available_units NUMERIC(78,0) NOT NULL, reserved_units NUMERIC(78,0) NOT NULL,
+        consumed_units NUMERIC(78,0) NOT NULL, expired_units NUMERIC(78,0) NOT NULL,
+        expires_at BIGINT, created_at BIGINT NOT NULL, payload JSONB NOT NULL,
+        CONSTRAINT resvary_credit_lots_kind
+          CHECK (kind IN ('legacy', 'general', 'allowance', 'promotion')),
+        CONSTRAINT resvary_credit_lots_balances_nonnegative
+          CHECK (original_units > 0 AND available_units >= 0 AND reserved_units >= 0
+            AND consumed_units >= 0 AND expired_units >= 0),
+        CONSTRAINT resvary_credit_lots_balance_total
+          CHECK (available_units + reserved_units + consumed_units + expired_units = original_units),
+        CONSTRAINT resvary_credit_lots_account_fk FOREIGN KEY (account_id)
+          REFERENCES ${t('resvary_credit_accounts')}(id),
+        CONSTRAINT resvary_credit_lots_policy_fk FOREIGN KEY (policy_id)
+          REFERENCES ${t('resvary_grant_policies')}(id)
+      );
+      CREATE INDEX resvary_credit_lots_account
+        ON ${t('resvary_credit_lots')}(account_id, created_at);
+      CREATE INDEX resvary_credit_lots_expiry
+        ON ${t('resvary_credit_lots')}(project_id, expires_at)
+        WHERE expires_at IS NOT NULL;
+
+      CREATE TABLE ${t('resvary_credit_lot_allocations')} (
+        id TEXT PRIMARY KEY, reservation_id TEXT NOT NULL, lot_id TEXT NOT NULL,
+        account_id TEXT NOT NULL, allocated_units NUMERIC(78,0) NOT NULL,
+        reserved_units NUMERIC(78,0) NOT NULL, consumed_units NUMERIC(78,0) NOT NULL,
+        released_units NUMERIC(78,0) NOT NULL, expired_units NUMERIC(78,0) NOT NULL,
+        created_at BIGINT NOT NULL, payload JSONB NOT NULL,
+        CONSTRAINT resvary_credit_lot_allocations_balances_nonnegative
+          CHECK (allocated_units > 0 AND reserved_units >= 0 AND consumed_units >= 0
+            AND released_units >= 0 AND expired_units >= 0),
+        CONSTRAINT resvary_credit_lot_allocations_balance_total
+          CHECK (reserved_units + consumed_units + released_units + expired_units = allocated_units),
+        CONSTRAINT resvary_credit_lot_allocations_reservation_fk FOREIGN KEY (reservation_id)
+          REFERENCES ${t('resvary_credit_reservations')}(id),
+        CONSTRAINT resvary_credit_lot_allocations_lot_fk FOREIGN KEY (lot_id)
+          REFERENCES ${t('resvary_credit_lots')}(id),
+        CONSTRAINT resvary_credit_lot_allocations_account_fk FOREIGN KEY (account_id)
+          REFERENCES ${t('resvary_credit_accounts')}(id),
+        UNIQUE(reservation_id, lot_id)
+      );
+      CREATE INDEX resvary_credit_lot_allocations_reservation
+        ON ${t('resvary_credit_lot_allocations')}(reservation_id, created_at);
+
+      CREATE TABLE ${t('resvary_grant_policy_applications')} (
+        id TEXT PRIMARY KEY, policy_id TEXT NOT NULL, account_id TEXT NOT NULL,
+        project_id TEXT NOT NULL, customer_id TEXT NOT NULL, policy_type TEXT NOT NULL,
+        period_key TEXT NOT NULL, created_at BIGINT NOT NULL, payload JSONB NOT NULL,
+        CONSTRAINT resvary_grant_policy_applications_type
+          CHECK (policy_type IN ('allowance', 'promotion')),
+        CONSTRAINT resvary_grant_policy_applications_policy_fk FOREIGN KEY (policy_id)
+          REFERENCES ${t('resvary_grant_policies')}(id),
+        CONSTRAINT resvary_grant_policy_applications_account_fk FOREIGN KEY (account_id)
+          REFERENCES ${t('resvary_credit_accounts')}(id),
+        UNIQUE(policy_id, account_id, period_key)
+      );
+      CREATE INDEX resvary_grant_policy_applications_customer
+        ON ${t('resvary_grant_policy_applications')}(project_id, customer_id, created_at);
+    `);
+
+    const accounts = await client.query<{ payload: string }>(
+      `SELECT payload::text AS payload FROM ${t('resvary_credit_accounts')} ORDER BY id`,
+    );
+    for (const accountRow of accounts.rows) {
+      const account = parseReceiptStoreValue<CreditAccount>(accountRow.payload);
+      const posted = parseCreditUnits(account.postedUnits);
+      const reserved = parseCreditUnits(account.reservedUnits);
+      if (reserved > posted) {
+        throw new Error(
+          `Cannot migrate Postgres credit lots: account invariant failed for ${account.id}`,
+        );
+      }
+      const reservations = await client.query<{ payload: string }>(
+        `SELECT payload::text AS payload FROM ${t('resvary_credit_reservations')}
+         WHERE account_id = $1 AND status = 'open' ORDER BY created_at, id`,
+        [account.id],
+      );
+      const open = reservations.rows.map((item) =>
+        parseReceiptStoreValue<CreditReservation>(item.payload),
+      );
+      const reservationTotal = open.reduce(
+        (total, reservation) => total + parseCreditUnits(reservation.reservedUnits),
+        0n,
+      );
+      if (reservationTotal !== reserved) {
+        throw new Error(
+          `Cannot migrate Postgres credit lots: open reservations do not match account ${account.id}`,
+        );
+      }
+      if (posted === 0n) continue;
+      const available = posted - reserved;
+      const lot: CreditLot = {
+        id: `lot_legacy_${account.id}`,
+        accountId: account.id,
+        projectId: account.projectId,
+        customerId: account.customerId,
+        kind: 'legacy',
+        originalAmount: creditUnitsToString(posted),
+        originalUnits: posted.toString(),
+        availableAmount: creditUnitsToString(available),
+        availableUnits: available.toString(),
+        reservedAmount: creditUnitsToString(reserved),
+        reservedUnits: reserved.toString(),
+        consumedAmount: '0',
+        consumedUnits: '0',
+        expiredAmount: '0',
+        expiredUnits: '0',
+        createdAt: account.createdAt,
+        updatedAt: account.updatedAt,
+        metadata: { migratedFrom: 'postgres-v2' },
+      };
+      await client.query(
+        `INSERT INTO ${t('resvary_credit_lots')} (
+          id, account_id, project_id, customer_id, kind, policy_id,
+          original_units, available_units, reserved_units, consumed_units, expired_units,
+          expires_at, created_at, payload
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::jsonb)`,
+        [
+          lot.id,
+          lot.accountId,
+          lot.projectId,
+          lot.customerId,
+          lot.kind,
+          null,
+          lot.originalUnits,
+          lot.availableUnits,
+          lot.reservedUnits,
+          lot.consumedUnits,
+          lot.expiredUnits,
+          null,
+          lot.createdAt,
+          serializeReceiptStoreValue(lot),
+        ],
+      );
+      for (const reservation of open) {
+        const units = parseCreditUnits(reservation.reservedUnits);
+        if (units === 0n) continue;
+        const allocation: CreditLotAllocation = {
+          id: `cla_legacy_${reservation.id}`,
+          reservationId: reservation.id,
+          lotId: lot.id,
+          accountId: account.id,
+          projectId: account.projectId,
+          customerId: account.customerId,
+          allocatedAmount: creditUnitsToString(units),
+          allocatedUnits: units.toString(),
+          reservedAmount: creditUnitsToString(units),
+          reservedUnits: units.toString(),
+          consumedAmount: '0',
+          consumedUnits: '0',
+          releasedAmount: '0',
+          releasedUnits: '0',
+          expiredAmount: '0',
+          expiredUnits: '0',
+          createdAt: reservation.createdAt,
+          updatedAt: account.updatedAt,
+        };
+        await client.query(
+          `INSERT INTO ${t('resvary_credit_lot_allocations')} (
+            id, reservation_id, lot_id, account_id, allocated_units, reserved_units,
+            consumed_units, released_units, expired_units, created_at, payload
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb)`,
+          [
+            allocation.id,
+            allocation.reservationId,
+            allocation.lotId,
+            allocation.accountId,
+            allocation.allocatedUnits,
+            allocation.reservedUnits,
+            allocation.consumedUnits,
+            allocation.releasedUnits,
+            allocation.expiredUnits,
+            allocation.createdAt,
+            serializeReceiptStoreValue(allocation),
+          ],
+        );
+      }
+    }
+
+    await client.query(
+      `INSERT INTO ${t('resvary_schema_migrations')}(version, applied_at) VALUES (3, $1)`,
       [Date.now()],
     );
     await client.query('COMMIT');

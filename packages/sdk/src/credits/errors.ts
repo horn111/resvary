@@ -40,3 +40,9 @@ export class InvalidCreditStateError extends CreditError {
     super(message, 'invalid_state');
   }
 }
+
+export class UnsupportedCreditStoreCapabilityError extends CreditError {
+  constructor(capability = 'credit policies') {
+    super(`Credit store does not support ${capability}`, 'unsupported_store_capability');
+  }
+}

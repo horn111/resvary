@@ -26,6 +26,7 @@ export interface SqliteImportReport {
   contentMismatches: string[];
   balanceMismatches: string[];
   ledgerMismatches: string[];
+  allocationMismatches: string[];
   sourceOpenReservations: number;
   targetOpenReservations: number;
 }
@@ -56,6 +57,44 @@ const TABLES: TableDefinition[] = [
     p.amountUnits,
     p.createdAt,
   ]),
+  define(
+    'resvary_grant_policies',
+    ['id', 'project_id', 'policy_key', 'version', 'created_at'],
+    (p) => [p.id, p.projectId, p.key, p.version, p.createdAt],
+  ),
+  define(
+    'resvary_credit_lots',
+    [
+      'id',
+      'account_id',
+      'project_id',
+      'customer_id',
+      'kind',
+      'policy_id',
+      'original_units',
+      'available_units',
+      'reserved_units',
+      'consumed_units',
+      'expired_units',
+      'expires_at',
+      'created_at',
+    ],
+    (p) => [
+      p.id,
+      p.accountId,
+      p.projectId,
+      p.customerId,
+      p.kind,
+      p.policyId ?? null,
+      p.originalUnits,
+      p.availableUnits,
+      p.reservedUnits,
+      p.consumedUnits,
+      p.expiredUnits,
+      p.expiresAt ?? null,
+      p.createdAt,
+    ],
+  ),
   define('resvary_meters', ['id', 'project_id', 'meter_key'], (p) => [p.id, p.projectId, p.key]),
   define('resvary_price_versions', ['id', 'meter_id', 'version', 'created_at'], (p) => [
     p.id,
@@ -95,6 +134,56 @@ const TABLES: TableDefinition[] = [
     'resvary_usage_receipts',
     ['id', 'account_id', 'reservation_id', 'usage_event_id', 'charged_units', 'created_at'],
     (p) => [p.id, p.accountId, p.reservationId, p.usageEventId, p.amountUnits, p.createdAt],
+  ),
+  define(
+    'resvary_credit_lot_allocations',
+    [
+      'id',
+      'reservation_id',
+      'lot_id',
+      'account_id',
+      'allocated_units',
+      'reserved_units',
+      'consumed_units',
+      'released_units',
+      'expired_units',
+      'created_at',
+    ],
+    (p) => [
+      p.id,
+      p.reservationId,
+      p.lotId,
+      p.accountId,
+      p.allocatedUnits,
+      p.reservedUnits,
+      p.consumedUnits,
+      p.releasedUnits,
+      p.expiredUnits,
+      p.createdAt,
+    ],
+  ),
+  define(
+    'resvary_grant_policy_applications',
+    [
+      'id',
+      'policy_id',
+      'account_id',
+      'project_id',
+      'customer_id',
+      'policy_type',
+      'period_key',
+      'created_at',
+    ],
+    (p) => [
+      p.id,
+      p.policyId,
+      p.accountId,
+      p.projectId,
+      p.customerId,
+      p.policyType,
+      p.periodKey,
+      p.createdAt,
+    ],
   ),
   define(
     'resvary_ledger_entries',
@@ -213,10 +302,8 @@ export async function importSqliteDatabase(
   const client = await handle.pool.connect();
   try {
     const sqliteSchemaVersion = readSqliteSchemaVersion(source);
-    if (sqliteSchemaVersion < 2 || sqliteSchemaVersion > 4) {
-      throw new Error(
-        `Unsupported SQLite schema version ${sqliteSchemaVersion}; expected 2, 3, or 4`,
-      );
+    if (sqliteSchemaVersion !== 5) {
+      throw new Error(`Unsupported SQLite schema version ${sqliteSchemaVersion}; expected 5`);
     }
     const postgresSchemaVersion = await readPostgresSchemaVersion(client, handle.schema);
     if (postgresSchemaVersion !== POSTGRES_SCHEMA_VERSION) {
@@ -257,13 +344,15 @@ export async function importSqliteDatabase(
     if (
       report.contentMismatches.length > 0 ||
       report.balanceMismatches.length > 0 ||
-      report.ledgerMismatches.length > 0
+      report.ledgerMismatches.length > 0 ||
+      report.allocationMismatches.length > 0
     ) {
       throw new Error(
         `Import verification failed: ${[
           ...report.contentMismatches.map((name) => `content:${name}`),
           ...report.balanceMismatches.map((id) => `balance:${id}`),
           ...report.ledgerMismatches.map((key) => `ledger:${key}`),
+          ...report.allocationMismatches.map((key) => `allocation:${key}`),
         ].join(', ')}`,
       );
     }
@@ -294,10 +383,8 @@ export async function verifySqliteImport(config: SqliteImportConfig): Promise<Sq
   try {
     const sqliteSchemaVersion = readSqliteSchemaVersion(source);
     const postgresSchemaVersion = await readPostgresSchemaVersion(client, handle.schema);
-    if (sqliteSchemaVersion < 2 || sqliteSchemaVersion > 4) {
-      throw new Error(
-        `Unsupported SQLite schema version ${sqliteSchemaVersion}; expected 2, 3, or 4`,
-      );
+    if (sqliteSchemaVersion !== 5) {
+      throw new Error(`Unsupported SQLite schema version ${sqliteSchemaVersion}; expected 5`);
     }
     if (postgresSchemaVersion !== POSTGRES_SCHEMA_VERSION) {
       throw new Error(
@@ -422,6 +509,7 @@ async function buildReport(
   }
   const balanceMismatches: string[] = [];
   const ledgerMismatches: string[] = [];
+  const allocationMismatches: string[] = [];
   if (sourceTables(source).has('resvary_credit_accounts')) {
     const rows = source.prepare('SELECT payload FROM resvary_credit_accounts').all() as SourceRow[];
     for (const row of rows) {
@@ -477,6 +565,48 @@ async function buildReport(
     `SELECT COUNT(*)::int AS count FROM ${table({ schema }, 'resvary_credit_reservations')} WHERE status = 'open'`,
   );
   const targetOpenReservations = openResult.rows[0]?.count ?? 0;
+
+  const accountLotResult = await client.query<{
+    account_id: string;
+    posted_units: string;
+    reserved_units: string;
+    lot_posted_units: string;
+    lot_reserved_units: string;
+  }>(
+    `SELECT account.id AS account_id,
+       account.posted_units::text, account.reserved_units::text,
+       COALESCE(SUM(lot.available_units + lot.reserved_units), 0)::text AS lot_posted_units,
+       COALESCE(SUM(lot.reserved_units), 0)::text AS lot_reserved_units
+     FROM ${table({ schema }, 'resvary_credit_accounts')} account
+     LEFT JOIN ${table({ schema }, 'resvary_credit_lots')} lot ON lot.account_id = account.id
+     GROUP BY account.id, account.posted_units, account.reserved_units`,
+  );
+  for (const row of accountLotResult.rows) {
+    if (
+      BigInt(row.posted_units) !== BigInt(row.lot_posted_units) ||
+      BigInt(row.reserved_units) !== BigInt(row.lot_reserved_units)
+    ) {
+      allocationMismatches.push(`account:${row.account_id}`);
+    }
+  }
+  const reservationAllocationResult = await client.query<{
+    reservation_id: string;
+    reserved_units: string;
+    allocation_units: string;
+  }>(
+    `SELECT reservation.id AS reservation_id, reservation.reserved_units::text,
+       COALESCE(SUM(allocation.reserved_units), 0)::text AS allocation_units
+     FROM ${table({ schema }, 'resvary_credit_reservations')} reservation
+     LEFT JOIN ${table({ schema }, 'resvary_credit_lot_allocations')} allocation
+       ON allocation.reservation_id = reservation.id
+     WHERE reservation.status = 'open'
+     GROUP BY reservation.id, reservation.reserved_units`,
+  );
+  for (const row of reservationAllocationResult.rows) {
+    if (BigInt(row.reserved_units) !== BigInt(row.allocation_units)) {
+      allocationMismatches.push(`reservation:${row.reservation_id}`);
+    }
+  }
   return {
     sqliteSchemaVersion,
     postgresSchemaVersion,
@@ -486,6 +616,7 @@ async function buildReport(
     contentMismatches,
     balanceMismatches,
     ledgerMismatches,
+    allocationMismatches,
     sourceOpenReservations,
     targetOpenReservations,
   };
