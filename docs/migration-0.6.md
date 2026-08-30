@@ -1,6 +1,6 @@
 # Migrating to Resvary 0.6
 
-Resvary 0.6 changes payment verification defaults, not stored data. Upgrade all `@resvary/*` packages and `create-resvary` together to `0.6.0`. No SQLite or PostgreSQL migration runs, and the database schemas, outbox/webhook events, and CLI flags remain unchanged.
+Resvary 0.6 changes payment verification defaults, not stored data. Upgrade all `@resvary/*` packages and `create-resvary` together to `0.6.1`. No SQLite or PostgreSQL migration runs, and the database schemas, outbox/webhook events, and CLI flags remain unchanged.
 
 ## BuyerClient payment policy
 

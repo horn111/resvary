@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Stable version to release (for example, 0.6.0)
+        description: Stable version to release (for example, 0.6.1)
         required: true
         type: string
       dry_run:

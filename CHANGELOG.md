@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-08-30
+
+### Fixed
+
+- Added exact GitHub repository metadata to every public package so npm can verify GitHub Actions provenance for the synchronized release.
+- Extended release preflight and archive inspection to reject missing or mismatched provenance repository metadata before publication.
+
+### Compatibility
+
+- `0.6.1` contains the same runtime API, CLI flags, database schemas, events, and migration requirements as `0.6.0`. No database migration is required.
+
 ## [0.6.0] - 2026-08-30
 
 ### Security
@@ -175,8 +186,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI/CD pipeline with GitHub Actions
 - Security policy and contribution guidelines
 
-[unreleased]: https://github.com/horn111/resvary/compare/v0.6.0...HEAD
-[0.6.0]: https://github.com/horn111/resvary/compare/v0.5.0...v0.6.0
+[unreleased]: https://github.com/horn111/resvary/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/horn111/resvary/compare/v0.5.0...v0.6.1
+[0.6.0]: https://github.com/horn111/resvary/compare/v0.5.0...18692d548fabd48387c789f568c02868f3a681dc
 [0.5.0]: https://github.com/horn111/resvary/compare/v0.5.0-alpha.3...v0.5.0
 [0.5.0-alpha.3]: https://github.com/horn111/resvary/compare/v0.5.0-alpha.2...v0.5.0-alpha.3
 [0.5.0-alpha.2]: https://github.com/horn111/resvary/compare/v0.5.0-alpha.0...v0.5.0-alpha.2
