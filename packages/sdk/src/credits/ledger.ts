@@ -41,6 +41,7 @@ import type {
   LedgerEntryType,
   MeterDefinition,
   OutboxEventFilter,
+  PriceComponentInput,
   PriceRateInput,
   PriceVersion,
   PromotionGrantPolicy,
@@ -132,6 +133,14 @@ export interface RegisterMeterInput {
 export interface CreatePriceVersionInput {
   meterKey: string;
   rates: PriceRateInput[];
+  idempotencyKey: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface CreateAdvancedPriceVersionInput {
+  meterKey: string;
+  components: PriceComponentInput[];
+  rates?: PriceRateInput[];
   idempotencyKey: string;
   metadata?: Record<string, unknown>;
 }
@@ -547,21 +556,32 @@ export class CreditLedger {
     );
   }
 
-  async createPriceVersion(input: CreatePriceVersionInput): Promise<PriceVersion> {
+  async createPriceVersion(input: CreatePriceVersionInput): Promise<PriceVersion>;
+  async createPriceVersion(input: CreateAdvancedPriceVersionInput): Promise<PriceVersion>;
+  async createPriceVersion(
+    input: CreatePriceVersionInput | CreateAdvancedPriceVersionInput,
+  ): Promise<PriceVersion> {
     return this.store.transaction((tx) =>
       this.idempotent(tx, 'create_price_version', input.idempotencyKey, input, async () => {
         const meter = await tx.getMeterByKey(this.projectId, input.meterKey);
         if (!meter) throw new CreditNotFoundError('Meter', input.meterKey);
         const versions = await tx.listPriceVersions(meter.id);
-        const price = createPriceVersion({
+        const base = {
           id: createId('price'),
           projectId: this.projectId,
           meter,
           version: versions.reduce((max, item) => Math.max(max, item.version), 0) + 1,
-          rates: input.rates,
           createdAt: this.now(),
           metadata: input.metadata,
-        });
+        };
+        const price =
+          'components' in input
+            ? createPriceVersion({
+                ...base,
+                rates: input.rates,
+                components: input.components,
+              })
+            : createPriceVersion({ ...base, rates: input.rates });
         await tx.savePriceVersion(price);
         return price;
       }),

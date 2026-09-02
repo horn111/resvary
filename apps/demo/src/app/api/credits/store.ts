@@ -23,18 +23,26 @@ export async function getDemoCredits(): Promise<{ ledger: CreditLedger; price: P
   }
   if (!demoGlobal.__resvaryCreditPrice) {
     const meter = await demoGlobal.__resvaryCreditLedger.registerMeter({
-      key: 'llm_tokens',
-      name: 'LLM tokens',
-      dimensions: ['input_tokens', 'output_tokens'],
-      idempotencyKey: 'demo-meter-v1',
+      key: 'llm_multimodal',
+      name: 'LLM tokens and images',
+      dimensions: ['input_tokens', 'output_tokens', 'images'],
+      idempotencyKey: 'demo-meter-v2',
     });
     demoGlobal.__resvaryCreditPrice = await demoGlobal.__resvaryCreditLedger.createPriceVersion({
       meterKey: meter.key,
-      rates: [
-        { dimension: 'input_tokens', unitSize: '1000', amount: '0.002' },
-        { dimension: 'output_tokens', unitSize: '1000', amount: '0.008' },
+      rates: [{ dimension: 'output_tokens', unitSize: '1000', amount: '0.008' }],
+      components: [
+        {
+          model: 'graduated',
+          dimension: 'input_tokens',
+          tiers: [
+            { upTo: '1000', unitSize: '1000', amount: '0.002' },
+            { unitSize: '1000', amount: '0.0015' },
+          ],
+        },
+        { model: 'package', dimension: 'images', packageSize: '10', amount: '0.5' },
       ],
-      idempotencyKey: 'demo-price-v1',
+      idempotencyKey: 'demo-price-v2',
     });
   }
   return { ledger: demoGlobal.__resvaryCreditLedger, price: demoGlobal.__resvaryCreditPrice };

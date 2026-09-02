@@ -16,8 +16,8 @@ Open [http://localhost:3004](http://localhost:3004) and enter the token in **Dem
 ## Shared credit lifecycle
 
 1. Click **Grant $5**.
-2. Click **Run simulated AI**. Resvary reserves the maximum cost, commits actual token usage, and releases the remainder.
-3. Inspect the reservation, usage receipt, ledger entries, and outbox events.
+2. Click **Run simulated AI**. Resvary reserves the maximum cost, rates input tokens through graduated tiers and images through started packages, commits actual usage, and releases the remainder.
+3. Inspect the advanced price, tier/package line items, reservation, usage receipt, ledger entries, and outbox events.
 4. Click **Replay same request**. The stored result returns without another charge.
 5. Click **Simulate failure**. The full reservation is released.
 

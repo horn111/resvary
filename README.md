@@ -17,7 +17,7 @@ grant or top up credits
 → issue an auditable usage receipt
 ```
 
-Resvary keeps credit accounting separate from settlement. Arc is the reference network for external USDC funding: direct Arc transfers and Circle Gateway Nanopayments fund the same ledger. Resvary 0.7 adds recurring allowances, expiring promotional grants, and deterministic credit-lot allocation.
+Resvary keeps credit accounting separate from settlement. Arc is the reference network for external USDC funding: direct Arc transfers and Circle Gateway Nanopayments fund the same ledger. Resvary 0.8 adds graduated usage tiers and package-priced dimensions while preserving linear prices.
 
 ## Why Resvary
 
@@ -27,6 +27,7 @@ Resvary provides:
 
 - USD-denominated credits with six-decimal integer arithmetic;
 - multi-dimensional prices for tokens, seconds, images, jobs, or tool calls;
+- mixed linear, graduated, and package pricing with integer-only rating;
 - atomic `reserve → commit/release` operations;
 - idempotency for grants, reservations, charges, and funding confirmations;
 - UTC allowance policies and one-time expiring promotional grants;
@@ -163,7 +164,7 @@ The old payment operations APIs remain under `/api/receipts`, `/api/receipts/pro
 | Import                     | Responsibility                                                              |
 | -------------------------- | --------------------------------------------------------------------------- |
 | `@resvary/sdk/credits`     | Accounts, grants, reservations, usage receipts, ledger, idempotency, outbox |
-| `@resvary/sdk/pricing`     | Meters, immutable price versions, integer usage rating                      |
+| `@resvary/sdk/pricing`     | Immutable linear, graduated, and package usage rating                       |
 | `@resvary/sdk/funding/arc` | Direct Arc invoice/payment receipt to credit grant adapter                  |
 | `@resvary/sdk/funding`     | Durable Arc funding worker                                                  |
 | `@resvary/circle`          | Circle Gateway Nanopayments and HTTP handlers                               |
@@ -196,6 +197,7 @@ The old payment operations APIs remain under `/api/receipts`, `/api/receipts/pro
 - [Persistence](docs/persistence.md)
 - [Production persistence deployment](docs/production-persistence.md)
 - [Grant policies and credit lots](docs/grant-policies.md)
+- [Migrate from 0.7 to 0.8](docs/migration-0.8.md)
 - [Migrate from 0.6 to 0.7](docs/migration-0.7.md)
 - [Migrate from 0.4 to 0.5](docs/migration-0.5.md)
 - [Direct Arc credit funding](docs/arc-credit-funding.md)

@@ -209,6 +209,59 @@ suite('Postgres stores', () => {
     expect((await first.getBalance('customer')).availableAmount).toBe('0.25');
   });
 
+  it('round-trips advanced prices and receipt breakdowns on schema v3', async () => {
+    const store = createPostgresCreditStore({ pool: pool!, schema });
+    const ledger = new CreditLedger({ projectId: 'postgres_advanced', store });
+    const meter = await ledger.registerMeter({
+      key: 'advanced-pricing',
+      dimensions: ['tokens', 'images'],
+      idempotencyKey: 'postgres-advanced-meter',
+    });
+    const price = await ledger.createPriceVersion({
+      meterKey: meter.key,
+      components: [
+        {
+          model: 'graduated',
+          dimension: 'tokens',
+          tiers: [
+            { upTo: '1000', unitSize: '1000', amount: '0.001' },
+            { unitSize: '1000', amount: '0.0005' },
+          ],
+        },
+        { model: 'package', dimension: 'images', packageSize: '10', amount: '1' },
+      ],
+      idempotencyKey: 'postgres-advanced-price',
+    });
+    await ledger.grantCredits({
+      customerId: 'postgres-advanced-customer',
+      amount: '5',
+      idempotencyKey: 'postgres-advanced-grant',
+    });
+    const reservation = await ledger.reserveCredits({
+      customerId: 'postgres-advanced-customer',
+      priceId: price.id,
+      estimatedUsage: { tokens: '1500', images: '11' },
+      idempotencyKey: 'postgres-advanced-reserve',
+    });
+    const committed = await ledger.commitUsage({
+      reservationId: reservation.id,
+      usageEventId: 'postgres-advanced-usage',
+      actualUsage: { tokens: '1001', images: '10' },
+      idempotencyKey: 'postgres-advanced-commit',
+    });
+
+    const reloaded = createPostgresCreditStore({ pool: pool!, schema });
+    await expect(reloaded.getPriceVersion(price.id)).resolves.toEqual(price);
+    await expect(reloaded.getUsageReceipt(committed.receipt.id)).resolves.toEqual(
+      committed.receipt,
+    );
+    expect(committed.receipt.lineItems).toMatchObject([
+      { pricingModel: 'graduated', tierIndex: 0, amountUnits: '1000' },
+      { pricingModel: 'graduated', tierIndex: 1, amountUnits: '1' },
+      { pricingModel: 'package', packageCount: '1', amountUnits: '1000000' },
+    ]);
+  });
+
   it('serializes allowance applications across independent store instances', async () => {
     const firstStore = createPostgresCreditStore({ pool: pool!, schema });
     const secondStore = createPostgresCreditStore({ pool: pool!, schema });
@@ -435,6 +488,39 @@ suite('Postgres stores', () => {
       createdAt: account.createdAt,
       updatedAt: account.updatedAt,
     };
+    const meter = {
+      id: 'meter_import',
+      projectId: account.projectId,
+      key: 'advanced_import',
+      name: 'Advanced import',
+      dimensions: ['tokens'],
+      createdAt: account.createdAt,
+    };
+    const price = {
+      id: 'price_import',
+      projectId: account.projectId,
+      meterId: meter.id,
+      meterKey: meter.key,
+      version: 1,
+      currency: 'USD',
+      rates: [],
+      components: [
+        {
+          model: 'graduated',
+          dimension: 'tokens',
+          tiers: [
+            {
+              upTo: '1000',
+              unitSize: '1000',
+              amount: '0.001',
+              amountUnits: '1000',
+            },
+            { unitSize: '1000', amount: '0.0005', amountUnits: '500' },
+          ],
+        },
+      ],
+      createdAt: account.createdAt,
+    };
 
     try {
       await migratePostgres({ pool: pool!, schema: importSchema });
@@ -444,6 +530,8 @@ suite('Postgres stores', () => {
         INSERT INTO resvary_schema_migrations(version, applied_at) VALUES (1, 1), (2, 1), (3, 1), (4, 1), (5, 1);
         CREATE TABLE resvary_credit_accounts(id TEXT PRIMARY KEY, payload TEXT NOT NULL);
         CREATE TABLE resvary_credit_lots(id TEXT PRIMARY KEY, payload TEXT NOT NULL);
+        CREATE TABLE resvary_meters(id TEXT PRIMARY KEY, payload TEXT NOT NULL);
+        CREATE TABLE resvary_price_versions(id TEXT PRIMARY KEY, payload TEXT NOT NULL);
         CREATE TABLE resvary_ledger_entries(id TEXT PRIMARY KEY, payload TEXT NOT NULL);
       `);
       sqlite
@@ -452,6 +540,12 @@ suite('Postgres stores', () => {
       sqlite
         .prepare('INSERT INTO resvary_credit_lots(id, payload) VALUES (?, ?)')
         .run(legacyLot.id, serializeReceiptStoreValue(legacyLot));
+      sqlite
+        .prepare('INSERT INTO resvary_meters(id, payload) VALUES (?, ?)')
+        .run(meter.id, serializeReceiptStoreValue(meter));
+      sqlite
+        .prepare('INSERT INTO resvary_price_versions(id, payload) VALUES (?, ?)')
+        .run(price.id, serializeReceiptStoreValue(price));
       sqlite
         .prepare('INSERT INTO resvary_ledger_entries(id, payload) VALUES (?, ?)')
         .run(ledgerEntry.id, serializeReceiptStoreValue(ledgerEntry));
@@ -506,6 +600,9 @@ suite('Postgres stores', () => {
         balanceMismatches: [],
         allocationMismatches: [],
       });
+      await expect(
+        createPostgresCreditStore({ pool: pool!, schema: importSchema }).getPriceVersion(price.id),
+      ).resolves.toEqual(price);
     } finally {
       await pool!.query(`DROP SCHEMA IF EXISTS "${importSchema}" CASCADE`);
       rmSync(directory, { recursive: true, force: true });

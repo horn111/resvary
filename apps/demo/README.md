@@ -6,7 +6,7 @@ Interactive Next.js demo for:
 $5 grant → reserve → simulated AI usage → commit → release → usage receipt
 ```
 
-It also demonstrates idempotent replay, provider failure, SQLite restart persistence, ledger entries, transactional outbox events, and compatible webhook signatures.
+It also demonstrates graduated token tiers, package-priced images, idempotent replay, provider failure, SQLite restart persistence, ledger entries, transactional outbox events, and compatible webhook signatures.
 
 ```bash
 npm run dev --workspace=apps/demo

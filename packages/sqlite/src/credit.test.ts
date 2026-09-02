@@ -76,6 +76,71 @@ describe('SqliteCreditStore', () => {
     secondStore.close();
   });
 
+  it('round-trips advanced price components and receipt breakdowns without a schema change', async () => {
+    const path = tempDatabasePath();
+    const firstStore = createSqliteCreditStore({ path });
+    const first = new CreditLedger({ projectId: 'advanced_sqlite', store: firstStore });
+    const meter = await first.registerMeter({
+      key: 'multimodal',
+      dimensions: ['tokens', 'images'],
+      idempotencyKey: 'advanced-meter',
+    });
+    const price = await first.createPriceVersion({
+      meterKey: meter.key,
+      components: [
+        {
+          model: 'graduated',
+          dimension: 'tokens',
+          tiers: [
+            { upTo: '1000', unitSize: '1000', amount: '0.001' },
+            { unitSize: '1000', amount: '0.0005' },
+          ],
+        },
+        { model: 'package', dimension: 'images', packageSize: '10', amount: '1' },
+      ],
+      idempotencyKey: 'advanced-price',
+    });
+    await first.grantCredits({
+      customerId: 'advanced-customer',
+      amount: '5',
+      idempotencyKey: 'advanced-grant',
+    });
+    const reservation = await first.reserveCredits({
+      customerId: 'advanced-customer',
+      priceId: price.id,
+      estimatedUsage: { tokens: '1500', images: '11' },
+      idempotencyKey: 'advanced-reserve',
+    });
+    const committed = await first.commitUsage({
+      reservationId: reservation.id,
+      usageEventId: 'advanced-usage',
+      actualUsage: { tokens: '1001', images: '10' },
+      idempotencyKey: 'advanced-commit',
+    });
+    firstStore.close();
+
+    const secondStore = createSqliteCreditStore({ path });
+    const second = new CreditLedger({ projectId: 'advanced_sqlite', store: secondStore });
+    await expect(secondStore.getPriceVersion(price.id)).resolves.toEqual(price);
+    await expect(second.getUsageReceipt(committed.receipt.id)).resolves.toEqual(committed.receipt);
+    expect(committed.receipt.lineItems).toMatchObject([
+      { pricingModel: 'graduated', tierIndex: 0, amountUnits: '1000' },
+      { pricingModel: 'graduated', tierIndex: 1, amountUnits: '1' },
+      { pricingModel: 'package', packageCount: '1', amountUnits: '1000000' },
+    ]);
+    secondStore.close();
+
+    const database = new DatabaseSync(path);
+    expect(
+      (
+        database.prepare('SELECT MAX(version) AS version FROM resvary_schema_migrations').get() as {
+          version: number;
+        }
+      ).version,
+    ).toBe(5);
+    database.close();
+  });
+
   it('migrates v1 funding records to the v2 rail and settlement model', async () => {
     const path = tempDatabasePath();
     const database = new DatabaseSync(path);

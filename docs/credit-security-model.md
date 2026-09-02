@@ -4,6 +4,7 @@
 
 - Use unpredictable server-generated application customer IDs.
 - Never accept `projectId`, price IDs, amounts, or idempotency scope directly from an untrusted client without authorization.
+- Create meters, tier boundaries, package sizes, and immutable price versions only through trusted administrative paths. Never accept pricing components from an end-user request.
 - Treat `CreditLedger` as the project-scoped tenant boundary. Raw `CreditStore` access, including `ledger.store`, is a trusted administrative primitive and must never be exposed to untrusted request data.
 - Keep grants and adjustments behind an admin or verified funding path.
 - Authorize policy creation and application separately. Check promotion eligibility, segments, and coupons before `claimPromotion`; Resvary only enforces one claim per customer and immutable policy version.

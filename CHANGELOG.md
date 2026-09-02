@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-09-02
+
+### Added
+
+- Added immutable graduated price components with cumulative quantity boundaries and independent integer rounding for every tier.
+- Added package price components that charge every started block and expose the billed package count in usage receipts.
+- Added optional pricing breakdown fields to `RatedLineItem` and support for mixing linear, graduated, and package models across different meter dimensions.
+
+### Changed
+
+- The demo now rates input tokens through graduated tiers and images through package pricing while preserving the reserve, commit, release, and replay lifecycle.
+- Release publication now uses direct npm OIDC publishing behind one GitHub `Production` approval instead of separate npm staged-package approvals.
+
+### Compatibility
+
+- Existing `PriceRateInput`, `PriceRate`, `CreatePriceVersionInput`, `PriceVersion.rates`, linear calculations, CLI flags, and event names remain unchanged.
+- SQLite remains on schema v5 and PostgreSQL remains on schema v3. Advanced price definitions and receipt breakdowns use existing payload columns, so no database migration is required.
+- See [docs/migration-0.8.md](docs/migration-0.8.md) and [docs/usage-rating.md](docs/usage-rating.md).
+
+### Limits
+
+- Tiered pricing is graduated rather than volume-based. Package pricing charges started blocks and does not create reusable entitlements or bundle-overage state.
+- Resvary remains self-hosted without hosted SLA or compliance certification. SQLite is local/single-node, PostgreSQL 16–18 is multi-process, and Arc/Gateway remain Testnet-only.
+
 ## [0.7.0] - 2026-08-30
 
 ### Added
@@ -213,7 +237,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI/CD pipeline with GitHub Actions
 - Security policy and contribution guidelines
 
-[unreleased]: https://github.com/horn111/resvary/compare/v0.7.0...HEAD
+[unreleased]: https://github.com/horn111/resvary/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/horn111/resvary/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/horn111/resvary/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/horn111/resvary/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/horn111/resvary/compare/v0.5.0...18692d548fabd48387c789f568c02868f3a681dc

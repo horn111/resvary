@@ -19,6 +19,9 @@ Pass either `connectionString` or an existing `pg.Pool`. A store created from a 
 
 Credit transactions and bundled receipt ledger operations run at `SERIALIZABLE` isolation with bounded retry. Schema v3 adds grant policies, credit lots, reservation allocations, and guarded legacy backfill. Apply migrations before starting application or worker processes.
 
+Resvary 0.8 keeps schema v3. Graduated/package price definitions and their receipt line items use
+the existing JSONB payloads, so upgrading from 0.7 requires no database migration.
+
 CLI commands:
 
 ```text

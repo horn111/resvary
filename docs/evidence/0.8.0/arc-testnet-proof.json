@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "rail": "arc_direct",
+  "testnetOnly": true,
+  "proofId": "arc-proof-20260902104504",
+  "observedAt": "2026-09-02T10:45:11.800Z",
+  "network": "arc-testnet",
+  "chainId": 5042002,
+  "txHash": "0x6c9a5ec85c20233dfd9e2ae797b7983af6f3312870a59059219801a194ec5e1d",
+  "explorerUrl": "https://testnet.arcscan.app/tx/0x6c9a5ec85c20233dfd9e2ae797b7983af6f3312870a59059219801a194ec5e1d",
+  "blockNumber": "60083244",
+  "confirmations": 1,
+  "payer": "0x1E3f8Fab778Eb5035f629Ac94a80bFf181557985",
+  "recipient": "0x4ae8B4E11b05380d0B122D99C1A29050Cf8Eba2d",
+  "amount": "0.01",
+  "amountUnits": "10000",
+  "memoId": "0x7e665fca2d31ec95f165bc9744b99cd3f4ae6fd71eae3f5931c6903d9f708a6f",
+  "callDataHash": "0x6e79426b370da1f555eecc6e8f7f7657929c1f9314bc7befd27f2a9acb00a56b",
+  "fundingIntentId": "fund_806af3f9a17f2b7aa57ca2cc",
+  "paymentReceiptId": "rcpt_3574f731bbb75724ef2c0244",
+  "fundingTransactionId": "ftx_f66850e9dc5fc7e2051042b4",
+  "creditGrantId": "grant_0459c47fde3e67bb5a29fcf1",
+  "fundingLot": {
+    "kind": "general",
+    "expiresAt": null,
+    "originalAmount": "0.01"
+  },
+  "balanceAfterFunding": "0.028",
+  "workerRecovery": {
+    "recoveredFromPersistedRun": false,
+    "pendingIntentWasDurable": true,
+    "recoveredIntentAfterRestart": true,
+    "observedReceiptCount": 1,
+    "persistedCursorCount": 3,
+    "pendingAfterFinalRestart": 0,
+    "reconciledAfterFinalRestart": 0
+  },
+  "replay": {
+    "balanceUnchanged": true,
+    "grantCountUnchanged": true,
+    "observedBalanceBeforeReplay": "0.028",
+    "observedBalanceAfterReplay": "0.028"
+  },
+  "lifecycle": {
+    "reservationId": "rsv_059d75142d3b0d753c0fa825",
+    "usageReceiptId": "urcpt_ffa2cfdeee53b4faf3d11a33",
+    "priceVersionId": "price_9287b8dcb8bd9d212a144d48",
+    "pricingModels": ["graduated", "package"],
+    "lineItems": [
+      {
+        "dimension": "graduated_units",
+        "quantity": "1",
+        "unitSize": "1",
+        "rateAmount": "0.001",
+        "rateUnits": "1000",
+        "amount": "0.001",
+        "amountUnits": "1000",
+        "pricingModel": "graduated",
+        "tierIndex": 0,
+        "tierFrom": "0",
+        "tierUpTo": "1"
+      },
+      {
+        "dimension": "graduated_units",
+        "quantity": "0",
+        "unitSize": "1",
+        "rateAmount": "0.0005",
+        "rateUnits": "500",
+        "amount": "0",
+        "amountUnits": "0",
+        "pricingModel": "graduated",
+        "tierIndex": 1,
+        "tierFrom": "1"
+      },
+      {
+        "dimension": "package_units",
+        "quantity": "2",
+        "unitSize": "2",
+        "rateAmount": "0.001",
+        "rateUnits": "1000",
+        "amount": "0.001",
+        "amountUnits": "1000",
+        "pricingModel": "package",
+        "packageSize": "2",
+        "packageCount": "1"
+      }
+    ],
+    "chargedAmount": "0.002",
+    "releasedAmount": "0.0015",
+    "balanceBeforeUsage": "0.028",
+    "balanceAfterUsage": "0.026",
+    "reservedAfterCommit": "0",
+    "allocations": [
+      {
+        "lotKind": "legacy",
+        "allocatedAmount": "0.0035",
+        "consumedAmount": "0.002",
+        "releasedAmount": "0.0015",
+        "expiredAmount": "0"
+      }
+    ]
+  },
+  "privacy": {
+    "privateKeyRecorded": false
+  }
+}

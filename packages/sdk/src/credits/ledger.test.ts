@@ -539,6 +539,123 @@ describe('CreditLedger', () => {
     expect((await ledger.listOutboxEvents()).map((event) => event.type)).toContain('usage.charged');
   });
 
+  it('persists mixed advanced pricing and records its receipt breakdown', async () => {
+    const ledger = new CreditLedger({ projectId: 'project_advanced', now: () => 5_000 });
+    const meter = await ledger.registerMeter({
+      key: 'multimodal',
+      dimensions: ['input_tokens', 'images'],
+      idempotencyKey: 'advanced-meter',
+    });
+    const priceInput = {
+      meterKey: meter.key,
+      idempotencyKey: 'advanced-price',
+      components: [
+        {
+          model: 'graduated' as const,
+          dimension: 'input_tokens',
+          tiers: [
+            { upTo: '1000', unitSize: '1000', amount: '0.001' },
+            { unitSize: '1000', amount: '0.0005' },
+          ],
+        },
+        {
+          model: 'package' as const,
+          dimension: 'images',
+          packageSize: '10',
+          amount: '1',
+        },
+      ],
+    };
+    const price = await ledger.createPriceVersion(priceInput);
+    await expect(ledger.createPriceVersion(priceInput)).resolves.toEqual(price);
+    await expect(
+      ledger.createPriceVersion({
+        ...priceInput,
+        components: [
+          ...priceInput.components.slice(0, 1),
+          { ...priceInput.components[1]!, amount: '2' },
+        ],
+      }),
+    ).rejects.toBeInstanceOf(IdempotencyConflictError);
+
+    await ledger.grantCredits({
+      customerId: 'advanced-customer',
+      amount: '10',
+      idempotencyKey: 'advanced-grant',
+    });
+    const reservation = await ledger.reserveCredits({
+      customerId: 'advanced-customer',
+      priceId: price.id,
+      estimatedUsage: { input_tokens: '1500', images: '11' },
+      idempotencyKey: 'advanced-reserve',
+    });
+    expect(reservation.reservedAmount).toBe('2.00125');
+
+    const committed = await ledger.commitUsage({
+      reservationId: reservation.id,
+      usageEventId: 'advanced-usage',
+      actualUsage: { input_tokens: '1001', images: '10' },
+      idempotencyKey: 'advanced-commit',
+    });
+    expect(committed.receipt).toMatchObject({
+      amount: '1.001001',
+      releasedAmount: '1.000249',
+      lineItems: [
+        { pricingModel: 'graduated', tierIndex: 0, quantity: '1000', amountUnits: '1000' },
+        { pricingModel: 'graduated', tierIndex: 1, quantity: '1', amountUnits: '1' },
+        { pricingModel: 'package', quantity: '10', packageCount: '1', amountUnits: '1000000' },
+      ],
+    });
+    expect(committed.balance).toMatchObject({
+      postedAmount: '8.998999',
+      reservedAmount: '0',
+      availableAmount: '8.998999',
+    });
+    expect(await ledger.listCreditLots('advanced-customer')).toMatchObject([
+      { availableAmount: '8.998999', consumedAmount: '1.001001', reservedAmount: '0' },
+    ]);
+  });
+
+  it('rejects a package charge above its reservation without partial writes', async () => {
+    const ledger = new CreditLedger({ projectId: 'project_packages', now: () => 7_000 });
+    const meter = await ledger.registerMeter({
+      key: 'images',
+      dimensions: ['images'],
+      idempotencyKey: 'package-meter',
+    });
+    const price = await ledger.createPriceVersion({
+      meterKey: meter.key,
+      idempotencyKey: 'package-price',
+      components: [{ model: 'package', dimension: 'images', packageSize: '10', amount: '1' }],
+    });
+    await ledger.grantCredits({
+      customerId: 'package-customer',
+      amount: '3',
+      idempotencyKey: 'package-grant',
+    });
+    const reservation = await ledger.reserveCredits({
+      customerId: 'package-customer',
+      priceId: price.id,
+      estimatedUsage: { images: '10' },
+      idempotencyKey: 'package-reserve',
+    });
+    await expect(
+      ledger.commitUsage({
+        reservationId: reservation.id,
+        usageEventId: 'package-overage',
+        actualUsage: { images: '11' },
+        idempotencyKey: 'package-overage-commit',
+      }),
+    ).rejects.toThrow('Actual charge exceeds reservation');
+    await expect(ledger.getReservation(reservation.id)).resolves.toMatchObject({ status: 'open' });
+    await expect(ledger.getBalance('package-customer')).resolves.toMatchObject({
+      postedAmount: '3',
+      reservedAmount: '1',
+      availableAmount: '2',
+    });
+    await expect(ledger.listUsageReceipts('package-customer')).resolves.toEqual([]);
+  });
+
   it('serializes concurrent reservations and never overdraws the account', async () => {
     const { ledger, price } = await createFixture();
     await ledger.grantCredits({ customerId: 'cus_1', amount: '0.012', idempotencyKey: 'grant-1' });

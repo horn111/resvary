@@ -27,7 +27,7 @@ export function ClaudeDesignController() {
     const textWalker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     for (let node = textWalker.nextNode(); node; node = textWalker.nextNode()) {
       if (node.textContent?.includes('0.5 stable')) {
-        node.textContent = node.textContent.replaceAll('0.5 stable', '0.7 stable');
+        node.textContent = node.textContent.replaceAll('0.5 stable', '0.8 stable');
       }
     }
     setDemoTarget(root.querySelector<HTMLElement>('[data-claude-demo-root]'));

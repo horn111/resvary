@@ -9,7 +9,7 @@
 
 ## Prepaid credits
 
-The `0.7.0` credit engine supports self-hosted deployments. SQLite is a local or single-node backend. Postgres 16–18 supports multi-process deployments. Resvary does not provide a hosted control plane, production SLA, or compliance certification. Arc and Circle Gateway integrations remain Testnet-only.
+The `0.8.0` credit engine supports self-hosted deployments. SQLite is a local or single-node backend. Postgres 16–18 supports multi-process deployments. Resvary does not provide a hosted control plane, production SLA, or compliance certification. Arc and Circle Gateway integrations remain Testnet-only.
 
 - Authorize `customerId`, grants, adjustments, price IDs, and project scope on the server.
 - Never expose admin grant or adjustment operations directly to an untrusted client.

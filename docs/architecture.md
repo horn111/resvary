@@ -68,6 +68,12 @@ Each grant in a policy-capable store creates a credit lot. Reservations consume 
 
 `reserveCredits` rates estimated usage and moves that amount into the reserved bucket. `commitUsage` rates actual usage, subtracts the actual charge from posted credits, and releases the full reservation in the same transaction. The receipt records actual line items, released amount, price version, and before/after available balance.
 
+An immutable price version can mix one pricing model per meter dimension. Legacy linear rates use
+one proportional rate, graduated components apply independently rounded rates to cumulative
+quantity ranges, and package components charge every started block. All quantities and amounts use
+integer strings and `BigInt`; unknown dimensions fail closed. SQLite and PostgreSQL persist the
+complete price and receipt breakdown in their existing payload columns.
+
 `runMetered` is a convenience orchestrator. Provider exceptions release the reservation. Commit failures do not: the caller can retry the same commit without giving away completed usage.
 
 ## Payment compatibility
