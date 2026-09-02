@@ -8,7 +8,7 @@ on:
         required: true
         default: dry_run
         type: choice
-        options: [dry_run, stage, finalize]
+        options: [dry_run, publish]
       version:
         description: Stable version to release (for example, 0.7.0)
         required: true
@@ -104,14 +104,14 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  stage:
-    name: Stage checked packages with npm OIDC
-    if: ${{ inputs.mode == 'stage' }}
+  publish:
+    name: Publish checked packages with npm OIDC and finalize release
+    if: ${{ inputs.mode == 'publish' }}
     needs: preflight
     runs-on: ubuntu-latest
     environment: Production
     permissions:
-      contents: read
+      contents: write
       actions: read
       id-token: write
     env:
@@ -140,54 +140,15 @@ jobs:
           name: release-${{ inputs.version }}-${{ inputs.release_sha }}
           path: ${{ runner.temp }}/release-artifacts
 
-      - name: Stage dependency levels with provenance
+      - name: Publish dependency levels with provenance
         env:
           RELEASE_ARTIFACT_DIR: ${{ runner.temp }}/release-artifacts
-          RELEASE_STAGE_RECEIPT: ${{ runner.temp }}/stage-receipt.json
-        run: node scripts/release/staged-registry.mjs stage "${{ inputs.version }}"
-
-      - name: Upload stage IDs and checksums
-        if: ${{ always() }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: stage-${{ inputs.version }}-${{ inputs.release_sha }}
-          path: ${{ runner.temp }}/stage-receipt.json
-          if-no-files-found: warn
-          retention-days: 30
-
-  finalize:
-    name: Verify approved packages and finalize release
-    if: ${{ inputs.mode == 'finalize' }}
-    needs: preflight
-    runs-on: ubuntu-latest
-    environment: Production
-    permissions:
-      contents: write
-      actions: read
-    env:
-      RELEASE_SHA: ${{ inputs.release_sha }}
-
-    steps:
-      - name: Checkout release commit
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          ref: ${{ inputs.release_sha }}
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: 24
-          registry-url: https://registry.npmjs.org
-
-      - name: Pin npm CLI
-        run: npm install --global npm@11.19.1
+        run: node scripts/release/registry.mjs publish "${{ inputs.version }}"
 
       - name: Verify registry metadata, provenance, installs, CLIs, and starters
-        run: node scripts/release/staged-registry.mjs finalize "${{ inputs.version }}"
+        run: node scripts/release/registry.mjs finalize "${{ inputs.version }}"
 
       - name: Create annotated tag and stable GitHub Release
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/release/staged-registry.mjs github-release "${{ inputs.version }}"
+        run: node scripts/release/registry.mjs github-release "${{ inputs.version }}"

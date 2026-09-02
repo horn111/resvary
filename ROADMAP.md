@@ -49,7 +49,7 @@ The published evidence is pinned to `v0.4.0-alpha.0` and records an external Arc
 - [x] Credit-lot priority, reservation allocations, and expiry-safe commit/release behavior
 - [x] SQLite schema v5 automatic migration and PostgreSQL schema v3 explicit migration
 - [x] Legacy balance and open-reservation backfill with invariant checks
-- [x] OIDC trusted publishing with npm staged approval and provenance
+- [x] Direct OIDC trusted publishing with one GitHub `Production` approval and provenance
 
 ## Later
 

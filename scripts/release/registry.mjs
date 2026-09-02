@@ -11,6 +11,7 @@ import {
   registryPackage,
   run,
 } from './common.mjs';
+import { createPublicationPlan } from './publication-plan.mjs';
 
 const command = process.argv[2];
 const version = process.argv[3];
@@ -19,10 +20,10 @@ const artifactDirectory = resolve(
   process.env.RELEASE_ARTIFACT_DIR ?? join(tmpdir(), 'resvary-release-artifacts'),
 );
 
-if (command === 'stage') await stagePackages();
+if (command === 'publish') await publishPackages();
 else if (command === 'finalize') await finalizeRelease();
 else if (command === 'github-release') await createGitHubRelease();
-else throw new Error('Usage: staged-registry.mjs <stage|finalize|github-release> <version>');
+else throw new Error('Usage: registry.mjs <publish|finalize|github-release> <version>');
 
 async function loadArtifactManifest() {
   const manifest = JSON.parse(
@@ -42,81 +43,65 @@ async function loadArtifactManifest() {
   return manifest;
 }
 
-async function stagePackages() {
+async function publishPackages() {
   const manifest = await loadArtifactManifest();
   const artifacts = new Map(manifest.packages.map((entry) => [entry.name, entry]));
-  for (const { name } of publicPackages) {
-    const packument = await registryPackage(name);
-    if (packument?.versions?.[version]) {
-      throw new Error(`${name}@${version} is already public and cannot be staged again`);
-    }
-    if (packument?.['dist-tags']?.latest !== '0.6.1') {
-      throw new Error(`${name} latest must remain 0.6.1 before npm approval`);
-    }
-    if (packument?.['dist-tags']?.alpha !== '0.5.0-alpha.3') {
-      throw new Error(`${name} alpha must remain 0.5.0-alpha.3`);
-    }
-    if (packument?.['dist-tags']?.next !== undefined) {
-      throw new Error(`${name} must not have a next dist-tag`);
-    }
-  }
-
-  const receipt = {
+  const packageStates = await Promise.all(
+    publicPackages.map(async ({ name }) => ({ name, packument: await registryPackage(name) })),
+  );
+  const plan = createPublicationPlan({
     version,
     releaseSha: currentSha(),
-    createdAt: new Date().toISOString(),
-    approvalOrder: publishLevels,
-    packages: [],
-  };
-  const receiptPath = resolve(
-    process.env.RELEASE_STAGE_RECEIPT ?? join(artifactDirectory, 'stage-receipt.json'),
+    packageStates,
+    publishLevels,
+  });
+  console.log(
+    plan.previousLatest
+      ? `Publishing ${version} over synchronized latest ${plan.previousLatest}.`
+      : `All packages for ${version} are already public; verifying the existing publication.`,
   );
-  await persistReceipt(receiptPath, receipt);
 
-  for (const level of publishLevels) {
-    for (const name of level) {
+  for (const level of plan.levels) {
+    for (const { name, action } of level) {
       const artifact = artifacts.get(name);
       if (!artifact) throw new Error(`No checked artifact found for ${name}`);
-      const output = run(
-        'npm',
-        [
-          'stage',
-          'publish',
-          join(artifactDirectory, artifact.file),
-          '--tag',
-          'latest',
-          '--access',
-          'public',
-          '--provenance',
-        ],
-        { capture: true },
-      );
-      receipt.packages.push({
-        name,
-        version,
-        file: artifact.file,
-        sha256: artifact.sha256,
-        stageId: extractStageId(output),
-        output,
-      });
-      await persistReceipt(receiptPath, receipt);
+      if (action === 'skip') {
+        console.log(`Skipping ${name}@${version}; matching release is already public.`);
+        continue;
+      }
+      run('npm', [
+        'publish',
+        join(artifactDirectory, artifact.file),
+        '--tag',
+        'latest',
+        '--access',
+        'public',
+        '--provenance',
+      ]);
     }
+    for (const { name } of level) await waitForPublishedPackage(name);
   }
-  console.log(
-    'All packages are staged. Review and approve them in npm by dependency level: SDK; SQLite/Postgres/Circle; Worker; create-resvary.',
-  );
+  console.log('All packages are public with matching provenance and release metadata.');
 }
 
-function extractStageId(output) {
-  return (
-    output.match(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i)?.[0] ??
-    output.match(/stage(?:d)?(?: package)?(?: id)?\s*[:#]?\s*([A-Za-z0-9_-]{8,})/i)?.[1] ??
-    null
-  );
-}
-
-async function persistReceipt(path, receipt) {
-  await writeFile(path, `${JSON.stringify(receipt, null, 2)}\n`, 'utf8');
+async function waitForPublishedPackage(name, timeoutMs = 300_000) {
+  const deadline = Date.now() + timeoutMs;
+  const sha = currentSha();
+  while (Date.now() < deadline) {
+    const packument = await registryPackage(name);
+    const published = packument?.versions?.[version];
+    if (
+      packument?.['dist-tags']?.latest === version &&
+      packument?.['dist-tags']?.alpha === '0.5.0-alpha.3' &&
+      packument?.['dist-tags']?.next === undefined &&
+      published?.gitHead === sha &&
+      published?.dist?.attestations?.url
+    ) {
+      return;
+    }
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 5_000));
+  }
+  throw new Error(`${name}@${version} did not become fully visible in npm within ${timeoutMs} ms`);
 }
 
 async function finalizeRelease() {
