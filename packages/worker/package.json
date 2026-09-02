@@ -1,6 +1,6 @@
 {
   "name": "@resvary/worker",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Durable outbox delivery worker for Resvary",
   "type": "module",
   "main": "./dist/index.js",
@@ -37,8 +37,8 @@
     "directory": "packages/worker"
   },
   "dependencies": {
-    "@resvary/postgres": "0.7.0",
-    "@resvary/sdk": "0.7.0",
+    "@resvary/postgres": "0.8.0",
+    "@resvary/sdk": "0.8.0",
     "pg": "^8.16.3"
   },
   "devDependencies": {

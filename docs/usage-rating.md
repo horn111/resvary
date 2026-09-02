@@ -1,32 +1,85 @@
 # Usage Rating
 
-Resvary prices integer usage dimensions without JavaScript floating point.
+Resvary prices integer usage dimensions without JavaScript floating point. One immutable price
+version can combine legacy linear rates with graduated and package components, provided each
+dimension appears once.
+
+## Linear rates
 
 ```typescript
-const meter = await credits.registerMeter({
-  key: 'llm_tokens',
-  dimensions: ['input_tokens', 'output_tokens'],
-  idempotencyKey: 'meter-v1',
-});
-
 const price = await credits.createPriceVersion({
   meterKey: meter.key,
-  rates: [
-    { dimension: 'input_tokens', unitSize: '1000', amount: '0.002' },
-    { dimension: 'output_tokens', unitSize: '1000', amount: '0.008' },
-  ],
+  rates: [{ dimension: 'output_tokens', unitSize: '1000', amount: '0.008' }],
   idempotencyKey: 'price-v1',
 });
 ```
 
-Each line item uses:
+Each linear line item uses:
 
 ```text
 ceil(quantity × rateAmountUnits / unitSize)
 ```
 
-The receipt total is the sum of the individually rounded line items. Quantities and unit sizes are non-negative integer strings. Credit amounts support at most six decimal places.
+The existing `PriceRateInput`, `PriceRate`, and linear receipt shape remain unchanged.
 
-Meters and price versions are immutable after creation. Changing rates creates a new version; existing receipts continue to reference the version used for their charge.
+## Graduated tiers and packages
 
-Version 0.5 supports linear multi-dimensional rates. Tiering, packages, monthly minimums, subscriptions, and allowances are intentionally deferred.
+```typescript
+const meter = await credits.registerMeter({
+  key: 'multimodal',
+  dimensions: ['input_tokens', 'output_tokens', 'images'],
+  idempotencyKey: 'multimodal-meter-v1',
+});
+
+const price = await credits.createPriceVersion({
+  meterKey: meter.key,
+  rates: [{ dimension: 'output_tokens', unitSize: '1000', amount: '0.008' }],
+  components: [
+    {
+      model: 'graduated',
+      dimension: 'input_tokens',
+      tiers: [
+        { upTo: '1000000', unitSize: '1000', amount: '0.002' },
+        { upTo: '5000000', unitSize: '1000', amount: '0.0015' },
+        { unitSize: '1000', amount: '0.001' },
+      ],
+    },
+    {
+      model: 'package',
+      dimension: 'images',
+      packageSize: '10',
+      amount: '0.5',
+    },
+  ],
+  idempotencyKey: 'multimodal-price-v1',
+});
+```
+
+Graduated tiers use cumulative `upTo` boundaries. Boundaries must be positive, strictly
+increasing integer strings, and the final tier must omit `upTo`. Each tier charges only the
+quantity inside its range and rounds up independently:
+
+```text
+ceil(tierQuantity × tierAmountUnits / tierUnitSize)
+```
+
+Package pricing charges every started block:
+
+```text
+packageCount = ceil(quantity / packageSize)
+charge = packageCount × packageAmountUnits
+```
+
+Zero quantity produces zero packages and a zero charge. Package pricing does not grant reusable
+units and is not a subscription or bundle-with-overage model.
+
+`RatedLineItem` and `UsageReceipt.lineItems` expose the calculation. Graduated items include the
+tier index and range; package items include `packageSize` and `packageCount`. Legacy linear items
+do not gain these optional fields.
+
+Receipt totals sum the individually rounded line items. Quantities, boundaries, and unit sizes are
+integer strings. Credit amounts support at most six decimal places. Unknown usage dimensions fail
+closed instead of being ignored.
+
+Meters and price versions are immutable. Changing a rate, tier boundary, or package creates a new
+version. Existing price versions and receipts remain valid.

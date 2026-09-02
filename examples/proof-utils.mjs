@@ -62,27 +62,42 @@ export async function runUsageLifecycle({ dbPath, projectId, customerId, proofId
   try {
     const balanceBefore = await ledger.getBalance(customerId);
     const meter = await ledger.registerMeter({
-      key: 'proof_units',
-      name: 'Proof usage units',
-      dimensions: ['units'],
-      idempotencyKey: 'proof-meter-v1',
+      key: 'advanced_proof_units',
+      name: 'Advanced proof usage units',
+      dimensions: ['graduated_units', 'package_units'],
+      idempotencyKey: 'proof-meter-v2',
     });
     const price = await ledger.createPriceVersion({
       meterKey: meter.key,
-      rates: [{ dimension: 'units', unitSize: '1', amount: '0.001' }],
-      idempotencyKey: 'proof-price-v1',
+      components: [
+        {
+          model: 'graduated',
+          dimension: 'graduated_units',
+          tiers: [
+            { upTo: '1', unitSize: '1', amount: '0.001' },
+            { unitSize: '1', amount: '0.0005' },
+          ],
+        },
+        {
+          model: 'package',
+          dimension: 'package_units',
+          packageSize: '2',
+          amount: '0.001',
+        },
+      ],
+      idempotencyKey: 'proof-price-v2',
     });
     const result = await ledger.runMetered(
       {
         customerId,
         priceId: price.id,
-        estimatedUsage: { units: '2' },
+        estimatedUsage: { graduated_units: '2', package_units: '3' },
         idempotencyKey: `proof-reserve:${proofId}`,
         metadata: { proofId },
       },
       async () => ({
         value: { ok: true },
-        actualUsage: { units: '1' },
+        actualUsage: { graduated_units: '1', package_units: '2' },
         usageEventId: `proof-usage:${proofId}`,
         metadata: { proofId },
       }),
@@ -105,6 +120,9 @@ export async function runUsageLifecycle({ dbPath, projectId, customerId, proofId
     return {
       reservationId: result.reservation.id,
       usageReceiptId: result.receipt.id,
+      priceVersionId: price.id,
+      pricingModels: price.components?.map((component) => component.model),
+      lineItems: result.receipt.lineItems,
       chargedAmount: result.receipt.amount,
       releasedAmount: result.receipt.releasedAmount,
       balanceBeforeUsage: balanceBefore.availableAmount,

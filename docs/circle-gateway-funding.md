@@ -1,6 +1,6 @@
 # Circle Gateway Nanopayment Funding
 
-Resvary 0.7 accepts Circle Gateway Nanopayments as a Testnet top-up rail. The payment funds a non-expiring general credit lot. It does not replace reserve, commit, release, pricing, or usage receipts.
+Resvary accepts Circle Gateway Nanopayments as a Testnet top-up rail. The payment funds a non-expiring general credit lot. It does not replace reserve, commit, release, pricing, or usage receipts.
 
 ## Install
 
@@ -83,7 +83,7 @@ share one persistent SQLite database.
 
 The runner uses Circle's `GatewayClient`, optionally deposits Testnet USDC, pays the live route,
 replays the same authorization, and executes one reserve/commit usage lifecycle. It writes
-`docs/evidence/0.7.0/gateway-nanopayment-proof.json` without the buyer private key or full payment
+`docs/evidence/0.8.0/gateway-nanopayment-proof.json` without the buyer private key or full payment
 signature. It also verifies the non-expiring funding lot, replay-safe grant count, and
 allocation-based lifecycle. Review the JSON before committing it.
 

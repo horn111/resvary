@@ -27,6 +27,13 @@ const result = await credits.commitUsage({
 
 Use `runMetered` when provider execution and billing happen in the same process. Use the individual commands when a queue or worker separates reservation from execution.
 
+## Pricing
+
+Price versions are immutable and can mix linear rates, graduated tiers, and package-priced
+dimensions. Graduated tiers charge only the quantity inside each cumulative range. Packages charge
+every started block and do not create reusable entitlements. Reserve and commit use the same
+deterministic integer rating rules; see [Usage rating](usage-rating.md).
+
 ## Idempotency
 
 Every mutating command requires an idempotency key. A repeated key with the same normalized payload returns the original result. The same key with different input throws `IdempotencyConflictError`.

@@ -5,8 +5,8 @@ export function packageTemplate(config: ProjectConfig): string {
   const persistenceDependency =
     config.template === 'ai-credits'
       ? config.database === 'postgres'
-        ? `,\n    "@resvary/postgres": "0.7.0",\n    "@resvary/worker": "0.7.0"`
-        : `,\n    "@resvary/sqlite": "0.7.0"`
+        ? `,\n    "@resvary/postgres": "0.8.0",\n    "@resvary/worker": "0.8.0"`
+        : `,\n    "@resvary/sqlite": "0.8.0"`
       : '';
   const minimumNode =
     config.template === 'ai-credits' && config.database === 'sqlite' ? '24' : '20';
@@ -33,7 +33,7 @@ export function packageTemplate(config: ProjectConfig): string {
     }
   },
   "dependencies": {
-    "@resvary/sdk": "0.7.0"${persistenceDependency},
+    "@resvary/sdk": "0.8.0"${persistenceDependency},
     ${
       isExpress
         ? `"express": "^4.21.2"`

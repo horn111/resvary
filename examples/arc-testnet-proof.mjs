@@ -27,7 +27,7 @@ const proofId = createProofId('arc-proof');
 const customerId = process.env.RESVARY_ARC_PROOF_CUSTOMER_ID?.trim() || 'arc_proof';
 const dbPath = process.env.RESVARY_CREDITS_DB_PATH?.trim() || '.resvary/proof.sqlite';
 const output =
-  process.env.RESVARY_ARC_EVIDENCE_PATH?.trim() || 'docs/evidence/0.7.0/arc-testnet-proof.json';
+  process.env.RESVARY_ARC_EVIDENCE_PATH?.trim() || 'docs/evidence/0.8.0/arc-testnet-proof.json';
 const confirmations = Number(process.env.RESVARY_ARC_CONFIRMATIONS?.trim() || '1');
 const recoverExisting = process.argv.includes('--recover');
 if (!Number.isSafeInteger(confirmations) || confirmations < 1) {

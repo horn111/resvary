@@ -21,7 +21,7 @@ const proofId = createProofId('gateway-proof');
 const dbPath = process.env.RESVARY_CREDITS_DB_PATH?.trim() || '.resvary/proof.sqlite';
 const output =
   process.env.RESVARY_GATEWAY_EVIDENCE_PATH?.trim() ||
-  'docs/evidence/0.7.0/gateway-nanopayment-proof.json';
+  'docs/evidence/0.8.0/gateway-nanopayment-proof.json';
 const demoAdminToken = process.env.RESVARY_DEMO_ADMIN_TOKEN?.trim();
 if (!demoAdminToken) {
   throw new Error('RESVARY_DEMO_ADMIN_TOKEN is required by the demo Gateway proof route');

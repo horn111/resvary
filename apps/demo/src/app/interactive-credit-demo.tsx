@@ -40,6 +40,7 @@ type GatewayFundingRequest = {
 };
 
 type DemoState = {
+  price: Record<string, unknown>;
   balance: null | {
     postedAmount: string;
     reservedAmount: string;
@@ -431,8 +432,12 @@ export function InteractiveCreditDemo() {
 
       <div className={styles.records}>
         <Record
-          title="0.7 allowance, promotion priority, and expiry scenario"
+          title="Allowance, promotion priority, and expiry scenario"
           value={state?.policyScenario ?? { status: 'Loading policy scenario' }}
+        />
+        <Record
+          title="0.8 graduated tiers and package pricing"
+          value={state?.price ?? { status: 'Loading advanced price' }}
         />
         <Record title="Latest reservation" value={latestReservation} />
         <Record title="Latest usage receipt" value={latestReceipt} />

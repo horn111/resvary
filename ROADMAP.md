@@ -1,6 +1,6 @@
 # Roadmap
 
-> Last updated: August 2026
+> Last updated: September 2026
 
 Resvary is an embedded, open-source prepaid credit ledger and usage billing SDK for AI products. Arc is the reference settlement network for external USDC funding. The ledger keeps settlement separate from usage accounting so manual grants and future payment sources can fund the same credit lifecycle.
 
@@ -51,9 +51,17 @@ The published evidence is pinned to `v0.4.0-alpha.0` and records an external Arc
 - [x] Legacy balance and open-reservation backfill with invariant checks
 - [x] Direct OIDC trusted publishing with one GitHub `Production` approval and provenance
 
+## 0.8 stable: graduated and package pricing
+
+- [x] Preserve legacy linear price definitions and receipt line items
+- [x] Add cumulative graduated tiers with independent integer rounding
+- [x] Add started-block package pricing without reusable entitlements
+- [x] Mix linear, graduated, and package models across meter dimensions
+- [x] Persist advanced price and receipt payloads without a database migration
+- [x] Demonstrate mixed pricing with reserve, commit, and release
+
 ## Later
 
-- tiered and package pricing;
 - dashboard and audit explorer;
 - Fastify, Hono, Python, and Go clients;
 - product-level refunds and compensating adjustments;

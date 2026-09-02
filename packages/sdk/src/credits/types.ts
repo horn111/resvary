@@ -188,6 +188,42 @@ export interface PriceRate extends PriceRateInput {
   amountUnits: string;
 }
 
+export interface GraduatedPriceTierInput {
+  unitSize: string;
+  amount: string;
+  upTo?: string;
+}
+
+export interface GraduatedPriceTier extends GraduatedPriceTierInput {
+  amountUnits: string;
+}
+
+export interface GraduatedPriceComponentInput {
+  model: 'graduated';
+  dimension: string;
+  tiers: GraduatedPriceTierInput[];
+}
+
+export interface GraduatedPriceComponent {
+  model: 'graduated';
+  dimension: string;
+  tiers: GraduatedPriceTier[];
+}
+
+export interface PackagePriceComponentInput {
+  model: 'package';
+  dimension: string;
+  packageSize: string;
+  amount: string;
+}
+
+export interface PackagePriceComponent extends PackagePriceComponentInput {
+  amountUnits: string;
+}
+
+export type PriceComponentInput = GraduatedPriceComponentInput | PackagePriceComponentInput;
+export type PriceComponent = GraduatedPriceComponent | PackagePriceComponent;
+
 export interface PriceVersion {
   id: string;
   projectId: string;
@@ -196,6 +232,7 @@ export interface PriceVersion {
   version: number;
   currency: CreditCurrency;
   rates: PriceRate[];
+  components?: PriceComponent[];
   createdAt: number;
   metadata?: Record<string, unknown>;
 }
@@ -210,6 +247,12 @@ export interface RatedLineItem {
   rateUnits: string;
   amount: string;
   amountUnits: string;
+  pricingModel?: 'graduated' | 'package';
+  tierIndex?: number;
+  tierFrom?: string;
+  tierUpTo?: string;
+  packageSize?: string;
+  packageCount?: string;
 }
 
 export interface RatedUsage {
