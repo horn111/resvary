@@ -122,6 +122,49 @@ jobs:
       - name: Run browser tests
         run: npm run test:e2e --workspace=@resvary/console
 
+  console-image-smoke:
+    name: Operator Console image smoke and scan
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Build Operator Console image
+        run: docker build --tag resvary-console:ci --file apps/console/Dockerfile .
+
+      - name: Smoke test authenticated health and read-only demo mode
+        env:
+          SMOKE_SECRET: ci-smoke-secret-with-at-least-32-characters
+        run: |
+          docker run --detach --name resvary-console-ci --publish 3011:3000 \
+            --env RESVARY_PROJECT_ID=project_demo \
+            --env RESVARY_CONSOLE_ADMIN_SECRET="$SMOKE_SECRET" \
+            --env RESVARY_CONSOLE_DEMO_MODE=true \
+            resvary-console:ci
+          trap 'docker logs resvary-console-ci; docker rm --force resvary-console-ci' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent \
+              --header "Authorization: Bearer $SMOKE_SECRET" \
+              http://127.0.0.1:3011/api/health | grep --quiet '"ok":true'; then
+              exit 0
+            fi
+            sleep 2
+          done
+          exit 1
+
+      - name: Scan Operator Console image
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          image-ref: resvary-console:ci
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
   sqlite:
     name: SQLite durability
     runs-on: ubuntu-latest
