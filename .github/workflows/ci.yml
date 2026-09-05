@@ -157,7 +157,7 @@ jobs:
           exit 1
 
       - name: Scan Operator Console image
-        uses: aquasecurity/trivy-action@0.33.1
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: resvary-console:ci
           format: table
