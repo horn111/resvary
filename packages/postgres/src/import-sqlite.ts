@@ -40,7 +40,16 @@ type TableDefinition = {
 const TABLES: TableDefinition[] = [
   define(
     'resvary_credit_accounts',
-    ['id', 'project_id', 'customer_id', 'currency', 'posted_units', 'reserved_units', 'updated_at'],
+    [
+      'id',
+      'project_id',
+      'customer_id',
+      'currency',
+      'posted_units',
+      'reserved_units',
+      'created_at',
+      'updated_at',
+    ],
     (p) => [
       p.id,
       p.projectId,
@@ -48,6 +57,7 @@ const TABLES: TableDefinition[] = [
       p.currency,
       p.postedUnits,
       p.reservedUnits,
+      p.createdAt,
       p.updatedAt,
     ],
   ),
