@@ -247,7 +247,8 @@ jobs:
           sarif_file: trivy-console.sarif
 
       - name: Record immutable Operator Console digest
-        run: echo "Published digest: ${{ steps.console-image.outputs.digest }}" >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          echo "Published digest: ${{ steps.console-image.outputs.digest }}" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Create annotated tag and GitHub Release
         env:

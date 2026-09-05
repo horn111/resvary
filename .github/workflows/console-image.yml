@@ -76,4 +76,5 @@ jobs:
           sarif_file: trivy-results.sarif
 
       - name: Record immutable digest
-        run: echo "Published digest: ${{ steps.build.outputs.digest }}" >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          echo "Published digest: ${{ steps.build.outputs.digest }}" >> "$GITHUB_STEP_SUMMARY"
