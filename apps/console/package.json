@@ -1,6 +1,6 @@
 {
   "name": "@resvary/console",
-  "version": "1.0.0",
+  "version": "1.0.0-rc.1",
   "private": true,
   "description": "Self-hosted Resvary Operator Console",
   "scripts": {
@@ -16,9 +16,9 @@
     "node": ">=24.0.0"
   },
   "dependencies": {
-    "@resvary/postgres": "1.0.0",
-    "@resvary/sdk": "1.0.0",
-    "@resvary/sqlite": "1.0.0",
+    "@resvary/postgres": "1.0.0-rc.1",
+    "@resvary/sdk": "1.0.0-rc.1",
+    "@resvary/sqlite": "1.0.0-rc.1",
     "next": "^16.3.3",
     "pg": "^8.16.3",
     "react": "^19.2.8",

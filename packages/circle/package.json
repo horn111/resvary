@@ -1,6 +1,6 @@
 {
   "name": "@resvary/circle",
-  "version": "1.0.0",
+  "version": "1.0.0-rc.1",
   "description": "Circle-native Arc and Gateway funding adapters for Resvary prepaid credits",
   "type": "module",
   "main": "./dist/index.js",
@@ -62,7 +62,7 @@
   },
   "dependencies": {
     "@circle-fin/x402-batching": "^3.4.0",
-    "@resvary/sdk": "1.0.0",
+    "@resvary/sdk": "1.0.0-rc.1",
     "@x402/core": "^2.24.0",
     "@x402/evm": "^2.24.0",
     "viem": "^2.56.0"
