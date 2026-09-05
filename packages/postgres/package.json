@@ -1,6 +1,6 @@
 {
   "name": "@resvary/postgres",
-  "version": "1.0.0",
+  "version": "1.0.0-rc.1",
   "description": "Postgres persistence and migration tooling for Resvary",
   "type": "module",
   "main": "./dist/index.js",
@@ -45,7 +45,7 @@
     "directory": "packages/postgres"
   },
   "dependencies": {
-    "@resvary/sdk": "1.0.0",
+    "@resvary/sdk": "1.0.0-rc.1",
     "pg": "^8.16.3"
   },
   "devDependencies": {

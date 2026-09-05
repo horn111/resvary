@@ -1,6 +1,6 @@
 {
   "name": "@resvary/demo",
-  "version": "1.0.0",
+  "version": "1.0.0-rc.1",
   "private": true,
   "description": "Resvary prepaid AI credits and usage billing demo",
   "scripts": {
@@ -14,9 +14,9 @@
     "node": ">=24.0.0"
   },
   "dependencies": {
-    "@resvary/circle": "1.0.0",
-    "@resvary/sdk": "1.0.0",
-    "@resvary/sqlite": "1.0.0",
+    "@resvary/circle": "1.0.0-rc.1",
+    "@resvary/sdk": "1.0.0-rc.1",
+    "@resvary/sqlite": "1.0.0-rc.1",
     "@vercel/analytics": "^2.0.1",
     "next": "^16.3.3",
     "react": "^19.2.8",

@@ -1,6 +1,6 @@
 {
   "name": "create-resvary",
-  "version": "1.0.0",
+  "version": "1.0.0-rc.1",
   "description": "CLI to scaffold Resvary prepaid AI credit applications",
   "bin": {
     "create-resvary": "dist/index.js"

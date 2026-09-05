@@ -1,6 +1,6 @@
 {
   "name": "resvary",
-  "version": "1.0.0",
+  "version": "1.0.0-rc.1",
   "private": true,
   "description": "Open-source prepaid credits and usage billing for AI products",
   "repository": {
