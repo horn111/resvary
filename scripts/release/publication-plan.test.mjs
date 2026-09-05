@@ -169,3 +169,10 @@ test('release workflow uses one protected direct-publish job', async () => {
   assert.match(workflow, /1\.0\.0-rc\.1/);
   assert.doesNotMatch(workflow, /npm stage|stage-receipt|inputs\.mode == 'stage'/);
 });
+
+test('release Docker context excludes generated build state', async () => {
+  const dockerignore = await readFile(new URL('../../.dockerignore', import.meta.url), 'utf8');
+
+  assert.match(dockerignore, /^\.resvary$/m);
+  assert.match(dockerignore, /^\*\*\/\*\.tsbuildinfo$/m);
+});

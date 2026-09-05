@@ -2,10 +2,12 @@
 .github
 .impeccable
 .local
+.resvary
 **/.next
 **/dist
 **/node_modules
 **/coverage
 **/*.log
+**/*.tsbuildinfo
 apps/console/fixtures/*.sqlite-wal
 apps/console/fixtures/*.sqlite-shm
