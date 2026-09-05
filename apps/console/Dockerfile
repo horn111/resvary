@@ -25,8 +25,12 @@ ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     HOSTNAME=0.0.0.0 \
     PORT=3000
+# Apply Debian security updates even when the upstream Node image has not been rebuilt yet.
 # The runtime starts the standalone server directly and does not need the npm toolchain.
-RUN rm -rf /usr/local/lib/node_modules/npm \
+RUN apt-get update \
+    && apt-get upgrade --yes \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /usr/local/lib/node_modules/npm \
     && rm -f /usr/local/bin/npm /usr/local/bin/npx \
     && groupadd --system --gid 1001 resvary \
     && useradd --system --uid 1001 --gid resvary console

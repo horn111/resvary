@@ -25,8 +25,8 @@ describe('starter templates', () => {
     };
     expect(ai.type).toBe('module');
     expect(ai.engines.node).toBe('>=24');
-    expect(ai.dependencies['@resvary/sdk']).toBe('1.0.0-rc.1');
-    expect(ai.dependencies['@resvary/sqlite']).toBe('1.0.0-rc.1');
+    expect(ai.dependencies['@resvary/sdk']).toBe('1.0.0-rc.2');
+    expect(ai.dependencies['@resvary/sqlite']).toBe('1.0.0-rc.2');
     expect(ai.dependencies.next).toBe('16.3.3');
     expect(ai.devDependencies['@types/node']).toBe('^22.20.1');
     expect(ai.devDependencies['@types/react-dom']).toBe('^19.2.5');
@@ -69,10 +69,10 @@ describe('starter templates', () => {
     const postgres = { ...base, database: 'postgres' as const };
     expect(nextTemplate(postgres)).toContain('createPostgresCreditStore');
     expect(JSON.parse(packageTemplate(postgres)).dependencies['@resvary/postgres']).toBe(
-      '1.0.0-rc.1',
+      '1.0.0-rc.2',
     );
     expect(JSON.parse(packageTemplate(postgres)).dependencies['@resvary/worker']).toBe(
-      '1.0.0-rc.1',
+      '1.0.0-rc.2',
     );
     expect(JSON.parse(packageTemplate(postgres)).scripts['resvary:migrate']).toBe(
       'resvary-postgres migrate',
