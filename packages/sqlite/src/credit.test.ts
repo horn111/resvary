@@ -137,7 +137,7 @@ describe('SqliteCreditStore', () => {
           version: number;
         }
       ).version,
-    ).toBe(5);
+    ).toBe(6);
     database.close();
   });
 
@@ -145,6 +145,20 @@ describe('SqliteCreditStore', () => {
     const path = tempDatabasePath();
     const database = new DatabaseSync(path);
     const txHash = `0x${'ab'.repeat(32)}`;
+    const account = {
+      id: 'account_v1',
+      projectId: 'project_v1',
+      customerId: 'customer_v1',
+      currency: 'USD',
+      postedUnits: '2000000',
+      reservedUnits: '0',
+      availableUnits: '2000000',
+      postedAmount: '2',
+      reservedAmount: '0',
+      availableAmount: '2',
+      createdAt: 100,
+      updatedAt: 200,
+    };
     const intent = {
       id: 'fund_v1',
       projectId: 'project_v1',
@@ -179,6 +193,14 @@ describe('SqliteCreditStore', () => {
         applied_at INTEGER NOT NULL
       );
       INSERT INTO resvary_schema_migrations(version, applied_at) VALUES (1, 1);
+      CREATE TABLE resvary_credit_accounts (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL,
+        customer_id TEXT NOT NULL,
+        updated_at INTEGER NOT NULL,
+        payload TEXT NOT NULL,
+        UNIQUE(project_id, customer_id)
+      );
       CREATE TABLE resvary_funding_intents (
         id TEXT PRIMARY KEY,
         project_id TEXT NOT NULL,
@@ -197,6 +219,17 @@ describe('SqliteCreditStore', () => {
         UNIQUE(network, tx_hash_norm)
       );
     `);
+    database
+      .prepare(
+        'INSERT INTO resvary_credit_accounts(id, project_id, customer_id, updated_at, payload) VALUES (?, ?, ?, ?, ?)',
+      )
+      .run(
+        account.id,
+        account.projectId,
+        account.customerId,
+        account.updatedAt,
+        JSON.stringify(account),
+      );
     database
       .prepare(
         'INSERT INTO resvary_funding_intents(id, project_id, customer_id, status, created_at, payload) VALUES (?, ?, ?, ?, ?, ?)',
@@ -243,7 +276,7 @@ describe('SqliteCreditStore', () => {
           version: number;
         }
       ).version,
-    ).toBe(5);
+    ).toBe(6);
     migrated.close();
   });
 
@@ -286,7 +319,7 @@ describe('SqliteCreditStore', () => {
       DROP TABLE resvary_credit_lot_allocations;
       DROP TABLE resvary_credit_lots;
       DROP TABLE resvary_grant_policies;
-      DELETE FROM resvary_schema_migrations WHERE version = 5;
+      DELETE FROM resvary_schema_migrations WHERE version >= 5;
     `);
     v4.close();
 
@@ -342,7 +375,7 @@ describe('SqliteCreditStore', () => {
       DROP TABLE resvary_credit_lot_allocations;
       DROP TABLE resvary_credit_lots;
       DROP TABLE resvary_grant_policies;
-      DELETE FROM resvary_schema_migrations WHERE version = 5;
+      DELETE FROM resvary_schema_migrations WHERE version >= 5;
     `);
     v4.prepare('UPDATE resvary_credit_reservations SET status = ? WHERE id = ?').run(
       'released',
@@ -372,6 +405,45 @@ describe('SqliteCreditStore', () => {
           .get() as { count: number }
       ).count,
     ).toBe(0);
+    unchanged.close();
+  });
+
+  it('stops the v6 admin backfill on a project mismatch', async () => {
+    const path = tempDatabasePath();
+    const store = createSqliteCreditStore({ path });
+    const ledger = new CreditLedger({ projectId: 'v5_project', store });
+    await ledger.grantCredits({
+      customerId: 'v5_customer',
+      amount: '5',
+      idempotencyKey: 'v5-grant',
+    });
+    store.close();
+
+    const v5 = new DatabaseSync(path);
+    const row = v5.prepare('SELECT id, payload FROM resvary_credit_grants LIMIT 1').get() as {
+      id: string;
+      payload: string;
+    };
+    const grant = JSON.parse(row.payload) as { projectId: string };
+    grant.projectId = 'wrong_project';
+    v5.prepare('UPDATE resvary_credit_grants SET payload = ? WHERE id = ?').run(
+      JSON.stringify(grant),
+      row.id,
+    );
+    v5.exec('DELETE FROM resvary_schema_migrations WHERE version >= 6');
+    v5.close();
+
+    expect(() => createSqliteCreditStore({ path })).toThrow('project/customer mismatch');
+    const unchanged = new DatabaseSync(path);
+    expect(
+      (
+        unchanged
+          .prepare('SELECT MAX(version) AS version FROM resvary_schema_migrations')
+          .get() as {
+          version: number;
+        }
+      ).version,
+    ).toBe(5);
     unchanged.close();
   });
 

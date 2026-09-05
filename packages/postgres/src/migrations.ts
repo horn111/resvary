@@ -9,7 +9,7 @@ import type {
 import { parseReceiptStoreValue, serializeReceiptStoreValue } from '@resvary/sdk/receipts';
 import { createPostgresHandle, table, type PostgresConnectionConfig } from './connection.js';
 
-export const POSTGRES_SCHEMA_VERSION = 3;
+export const POSTGRES_SCHEMA_VERSION = 4;
 const MIGRATION_LOCK_ID = 7_226_519_918;
 
 export interface PostgresMigrationStatus {
@@ -73,6 +73,7 @@ export async function migratePostgres(
     if (currentVersion < 1) await applyV1(client, handle.schema);
     if (currentVersion < 2) await applyV2(client, handle.schema);
     if (currentVersion < 3) await applyV3(client, handle.schema);
+    if (currentVersion < 4) await applyV4(client, handle.schema);
   } finally {
     await client.query('SELECT pg_advisory_unlock($1)', [MIGRATION_LOCK_ID]).catch(() => undefined);
     client.release();
@@ -504,6 +505,172 @@ export async function applyV3(client: PoolClient, schema: string): Promise<void>
 
     await client.query(
       `INSERT INTO ${t('resvary_schema_migrations')}(version, applied_at) VALUES (3, $1)`,
+      [Date.now()],
+    );
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  }
+}
+
+/** @internal Exported for sequential-migration verification. */
+export async function applyV4(client: PoolClient, schema: string): Promise<void> {
+  const t = (name: string) => table({ schema }, name);
+  await client.query('BEGIN');
+  try {
+    await client.query(`
+      ALTER TABLE ${t('resvary_credit_accounts')} ADD COLUMN created_at BIGINT;
+      ALTER TABLE ${t('resvary_credit_grants')}
+        ADD COLUMN project_id TEXT,
+        ADD COLUMN customer_id TEXT,
+        ADD COLUMN source TEXT;
+      ALTER TABLE ${t('resvary_usage_events')}
+        ADD COLUMN project_id TEXT,
+        ADD COLUMN customer_id TEXT;
+      ALTER TABLE ${t('resvary_usage_receipts')}
+        ADD COLUMN project_id TEXT,
+        ADD COLUMN customer_id TEXT;
+      ALTER TABLE ${t('resvary_ledger_entries')}
+        ADD COLUMN project_id TEXT,
+        ADD COLUMN customer_id TEXT,
+        ADD COLUMN entry_type TEXT;
+      ALTER TABLE ${t('resvary_funding_transactions')}
+        ADD COLUMN project_id TEXT,
+        ADD COLUMN customer_id TEXT,
+        ADD COLUMN settlement_status TEXT;
+
+      CREATE TABLE ${t('resvary_operator_actions')} (
+        id TEXT NOT NULL,
+        sequence INTEGER NOT NULL CHECK (sequence >= 0),
+        project_id TEXT NOT NULL,
+        action_type TEXT NOT NULL,
+        target_type TEXT NOT NULL,
+        target_id TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('pending', 'succeeded', 'failed')),
+        created_at BIGINT NOT NULL,
+        payload JSONB NOT NULL,
+        PRIMARY KEY(id, sequence)
+      );
+    `);
+
+    for (const relation of [
+      'resvary_credit_grants',
+      'resvary_usage_events',
+      'resvary_usage_receipts',
+      'resvary_ledger_entries',
+    ]) {
+      const orphan = await client.query<{ id: string }>(
+        `SELECT child.id FROM ${t(relation)} child
+         LEFT JOIN ${t('resvary_credit_accounts')} account ON account.id = child.account_id
+         WHERE account.id IS NULL LIMIT 1`,
+      );
+      if (orphan.rows[0]) {
+        throw new Error(
+          `Cannot migrate Postgres admin schema: orphan ${relation} row ${orphan.rows[0].id}`,
+        );
+      }
+      const mismatch = await client.query<{ id: string }>(
+        `SELECT child.id FROM ${t(relation)} child
+         JOIN ${t('resvary_credit_accounts')} account ON account.id = child.account_id
+         WHERE (child.payload->>'projectId') IS DISTINCT FROM account.project_id
+            OR (child.payload->>'customerId') IS DISTINCT FROM account.customer_id
+         LIMIT 1`,
+      );
+      if (mismatch.rows[0]) {
+        throw new Error(
+          `Cannot migrate Postgres admin schema: project/customer mismatch in ${relation} row ${mismatch.rows[0].id}`,
+        );
+      }
+      await client.query(
+        `UPDATE ${t(relation)} child
+         SET project_id = account.project_id, customer_id = account.customer_id
+         FROM ${t('resvary_credit_accounts')} account
+         WHERE account.id = child.account_id`,
+      );
+    }
+
+    const fundingMismatch = await client.query<{ id: string }>(
+      `SELECT funding_tx.id FROM ${t('resvary_funding_transactions')} funding_tx
+       LEFT JOIN ${t('resvary_funding_intents')} intent
+         ON intent.id = funding_tx.funding_intent_id
+       WHERE intent.id IS NULL
+          OR (funding_tx.payload->>'projectId') IS DISTINCT FROM intent.project_id
+          OR (funding_tx.payload->>'customerId') IS DISTINCT FROM intent.customer_id
+       LIMIT 1`,
+    );
+    if (fundingMismatch.rows[0]) {
+      throw new Error(
+        `Cannot migrate Postgres admin schema: orphan or project/customer mismatch in funding transaction ${fundingMismatch.rows[0].id}`,
+      );
+    }
+
+    await client.query(`
+      UPDATE ${t('resvary_credit_accounts')}
+        SET created_at = (payload->>'createdAt')::bigint;
+      UPDATE ${t('resvary_credit_grants')}
+        SET source = payload->>'source';
+      UPDATE ${t('resvary_ledger_entries')}
+        SET entry_type = payload->>'type';
+      UPDATE ${t('resvary_funding_transactions')} funding_tx
+        SET project_id = intent.project_id,
+            customer_id = intent.customer_id,
+            settlement_status = funding_tx.payload->>'settlementStatus'
+        FROM ${t('resvary_funding_intents')} intent
+        WHERE intent.id = funding_tx.funding_intent_id;
+
+      ALTER TABLE ${t('resvary_credit_accounts')} ALTER COLUMN created_at SET NOT NULL;
+      ALTER TABLE ${t('resvary_credit_grants')}
+        ALTER COLUMN project_id SET NOT NULL,
+        ALTER COLUMN customer_id SET NOT NULL,
+        ALTER COLUMN source SET NOT NULL;
+      ALTER TABLE ${t('resvary_usage_events')}
+        ALTER COLUMN project_id SET NOT NULL,
+        ALTER COLUMN customer_id SET NOT NULL;
+      ALTER TABLE ${t('resvary_usage_receipts')}
+        ALTER COLUMN project_id SET NOT NULL,
+        ALTER COLUMN customer_id SET NOT NULL;
+      ALTER TABLE ${t('resvary_ledger_entries')}
+        ALTER COLUMN project_id SET NOT NULL,
+        ALTER COLUMN customer_id SET NOT NULL,
+        ALTER COLUMN entry_type SET NOT NULL;
+      ALTER TABLE ${t('resvary_funding_transactions')}
+        ALTER COLUMN project_id SET NOT NULL,
+        ALTER COLUMN customer_id SET NOT NULL,
+        ALTER COLUMN settlement_status SET NOT NULL;
+
+      CREATE INDEX resvary_credit_accounts_admin_timeline
+        ON ${t('resvary_credit_accounts')}(project_id, updated_at DESC, id DESC);
+      CREATE INDEX resvary_credit_grants_admin_timeline
+        ON ${t('resvary_credit_grants')}(project_id, customer_id, created_at DESC, id DESC);
+      CREATE INDEX resvary_credit_grants_admin_project_timeline
+        ON ${t('resvary_credit_grants')}(project_id, created_at DESC, id DESC);
+      CREATE INDEX resvary_credit_reservations_admin_timeline
+        ON ${t('resvary_credit_reservations')}(project_id, customer_id, created_at DESC, id DESC);
+      CREATE INDEX resvary_credit_reservations_admin_project_timeline
+        ON ${t('resvary_credit_reservations')}(project_id, created_at DESC, id DESC);
+      CREATE INDEX resvary_usage_receipts_admin_timeline
+        ON ${t('resvary_usage_receipts')}(project_id, customer_id, created_at DESC, id DESC);
+      CREATE INDEX resvary_usage_receipts_admin_project_timeline
+        ON ${t('resvary_usage_receipts')}(project_id, created_at DESC, id DESC);
+      CREATE INDEX resvary_ledger_entries_admin_timeline
+        ON ${t('resvary_ledger_entries')}(project_id, customer_id, created_at DESC, id DESC);
+      CREATE INDEX resvary_ledger_entries_admin_project_timeline
+        ON ${t('resvary_ledger_entries')}(project_id, created_at DESC, id DESC);
+      CREATE INDEX resvary_funding_intents_admin_timeline
+        ON ${t('resvary_funding_intents')}(project_id, customer_id, created_at DESC, id DESC);
+      CREATE INDEX resvary_funding_intents_admin_project_timeline
+        ON ${t('resvary_funding_intents')}(project_id, created_at DESC, id DESC);
+      CREATE INDEX resvary_funding_transactions_admin_timeline
+        ON ${t('resvary_funding_transactions')}(project_id, customer_id, created_at DESC, id DESC);
+      CREATE INDEX resvary_funding_transactions_admin_project_timeline
+        ON ${t('resvary_funding_transactions')}(project_id, created_at DESC, id DESC);
+      CREATE INDEX resvary_operator_actions_admin_timeline
+        ON ${t('resvary_operator_actions')}(project_id, created_at DESC, id DESC, sequence DESC);
+    `);
+
+    await client.query(
+      `INSERT INTO ${t('resvary_schema_migrations')}(version, applied_at) VALUES (4, $1)`,
       [Date.now()],
     );
     await client.query('COMMIT');

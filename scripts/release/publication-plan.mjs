@@ -1,4 +1,4 @@
-const stableVersionPattern = /^\d+\.\d+\.\d+$/;
+const releaseVersionPattern = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$/;
 
 export function createPublicationPlan({
   version,
@@ -7,8 +7,10 @@ export function createPublicationPlan({
   publishLevels,
   alphaVersion = '0.5.0-alpha.3',
 }) {
-  if (!stableVersionPattern.test(version)) throw new Error(`Invalid release version ${version}`);
+  if (!releaseVersionPattern.test(version)) throw new Error(`Invalid release version ${version}`);
   if (!/^[a-f0-9]{40}$/.test(releaseSha)) throw new Error('releaseSha must be a full commit SHA');
+
+  const channel = version.includes('-') ? 'next' : 'latest';
 
   const expectedNames = publishLevels.flat();
   if (new Set(expectedNames).size !== expectedNames.length) {
@@ -31,8 +33,6 @@ export function createPublicationPlan({
     if (tags.alpha !== alphaVersion) {
       throw new Error(`${name} alpha must resolve to ${alphaVersion}`);
     }
-    if (tags.next !== undefined) throw new Error(`${name} must not have a next dist-tag`);
-
     const published = packument.versions?.[version];
     if (published) {
       if (published.gitHead !== releaseSha) {
@@ -40,8 +40,8 @@ export function createPublicationPlan({
           `${name}@${version} has gitHead ${published.gitHead ?? '<missing>'}, expected ${releaseSha}`,
         );
       }
-      if (tags.latest !== version) {
-        throw new Error(`${name}@${version} is public but latest does not resolve to it`);
+      if (tags[channel] !== version) {
+        throw new Error(`${name}@${version} is public but ${channel} does not resolve to it`);
       }
       if (!published.dist?.attestations?.url) {
         throw new Error(`${name}@${version} is public without npm provenance`);
@@ -50,11 +50,14 @@ export function createPublicationPlan({
       continue;
     }
 
-    if (!stableVersionPattern.test(tags.latest ?? '')) {
+    if (!/^\d+\.\d+\.\d+$/.test(tags.latest ?? '')) {
       throw new Error(`${name} latest is missing or is not a stable version`);
     }
-    if (compareVersions(version, tags.latest) <= 0) {
+    if (compareVersions(version.split('-')[0], tags.latest) <= 0) {
       throw new Error(`${name} latest ${tags.latest} is not older than release ${version}`);
+    }
+    if (channel === 'next' && tags.next && compareVersions(version, tags.next) <= 0) {
+      throw new Error(`${name} next ${tags.next} is not older than prerelease ${version}`);
     }
     previousLatest.add(tags.latest);
     actions.set(name, 'publish');
@@ -68,6 +71,7 @@ export function createPublicationPlan({
 
   return {
     previousLatest: previousLatest.values().next().value ?? null,
+    channel,
     levels: publishLevels.map((level) =>
       level.map((name) => ({ name, action: actions.get(name) })),
     ),
@@ -75,10 +79,14 @@ export function createPublicationPlan({
 }
 
 function compareVersions(left, right) {
-  const leftParts = left.split('.').map(Number);
-  const rightParts = right.split('.').map(Number);
+  const [leftCore, leftPre = ''] = left.split('-', 2);
+  const [rightCore, rightPre = ''] = right.split('-', 2);
+  const leftParts = leftCore.split('.').map(Number);
+  const rightParts = rightCore.split('.').map(Number);
   for (let index = 0; index < 3; index += 1) {
     if (leftParts[index] !== rightParts[index]) return leftParts[index] - rightParts[index];
   }
-  return 0;
+  if (!leftPre && rightPre) return 1;
+  if (leftPre && !rightPre) return -1;
+  return leftPre.localeCompare(rightPre, undefined, { numeric: true });
 }

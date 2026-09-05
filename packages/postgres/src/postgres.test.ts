@@ -6,6 +6,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Pool } from 'pg';
 import { CreditLedger } from '@resvary/sdk/credits';
+import { OperatorService } from '@resvary/sdk/admin';
 import {
   PersistentReceiptLedger,
   PersistentWebhookInbox,
@@ -15,7 +16,8 @@ import {
   serializeReceiptStoreValue,
 } from '@resvary/sdk/receipts';
 import { createPostgresCreditStore } from './credit.js';
-import { applyV1, applyV2, migratePostgres } from './migrations.js';
+import { createPostgresAdminStore } from './admin.js';
+import { applyV1, applyV2, applyV3, migratePostgres } from './migrations.js';
 import { createPostgresReceiptStore } from './receipt.js';
 import { importSqliteDatabase, verifySqliteImport } from './import-sqlite.js';
 
@@ -52,7 +54,159 @@ suite('Postgres stores', () => {
 
   it('applies schema migrations idempotently', async () => {
     const status = await migratePostgres({ pool: pool!, schema });
-    expect(status).toMatchObject({ currentVersion: 3, latestVersion: 3, pendingVersions: [] });
+    expect(status).toMatchObject({ currentVersion: 4, latestVersion: 4, pendingVersions: [] });
+  });
+
+  it('matches the admin query and operator-action contract', async () => {
+    const suffix = randomUUID().replaceAll('-', '');
+    const projectId = `project_admin_${suffix}`;
+    let now = Date.UTC(2026, 8, 4, 12);
+    const store = createPostgresCreditStore({ pool: pool!, schema });
+    const ledger = new CreditLedger({ projectId, store, now: () => now });
+    const meter = await ledger.registerMeter({
+      key: `tokens_${suffix}`,
+      dimensions: ['tokens'],
+      idempotencyKey: 'meter',
+    });
+    const price = await ledger.createPriceVersion({
+      meterKey: meter.key,
+      rates: [{ dimension: 'tokens', unitSize: '1', amount: '0.01' }],
+      idempotencyKey: 'price',
+    });
+    for (const [index, customerId] of [
+      `customer_alpha_${suffix}`,
+      `customer_beta_${suffix}`,
+      `customer_gamma_${suffix}`,
+    ].entries()) {
+      now += index + 1;
+      await ledger.grantCredits({
+        customerId,
+        amount: '100',
+        idempotencyKey: `grant-${customerId}`,
+      });
+    }
+    const customerId = `customer_alpha_${suffix}`;
+    const reservation = await ledger.reserveCredits({
+      customerId,
+      priceId: price.id,
+      estimatedUsage: { tokens: '500' },
+      expiresAt: now + 60_000,
+      idempotencyKey: 'reservation',
+    });
+    const committed = await ledger.commitUsage({
+      reservationId: reservation.id,
+      usageEventId: `usage_${suffix}`,
+      actualUsage: { tokens: '400' },
+      idempotencyKey: 'commit',
+    });
+    await ledger.reserveCredits({
+      customerId,
+      priceId: price.id,
+      estimatedUsage: { tokens: '10' },
+      expiresAt: now + 100,
+      idempotencyKey: 'overdue',
+    });
+
+    const claimed = await store.claimOutboxEvents({
+      projectId,
+      workerId: 'admin-contract-worker',
+      now,
+      limit: 1,
+      leaseMs: 1_000,
+    });
+    expect(claimed[0]).toBeDefined();
+    await store.failOutboxEvent({
+      eventId: claimed[0]!.id,
+      workerId: 'admin-contract-worker',
+      error: 'synthetic delivery failure',
+      deadLetter: true,
+      nextAttemptAt: now,
+      attemptCount: claimed[0]!.attemptCount,
+    });
+
+    const admin = createPostgresAdminStore({ pool: pool!, schema });
+    const overview = await admin.getOverview(projectId, now);
+    expect(overview).toMatchObject({
+      projectId,
+      customerCount: 3,
+      charged24hUnits: committed.receipt.amountUnits,
+      deadLetterCount: 1,
+    });
+    const firstPage = await admin.listCustomers({ projectId, limit: 2 });
+    const secondPage = await admin.listCustomers({
+      projectId,
+      limit: 2,
+      cursor: firstPage.nextCursor,
+    });
+    expect(firstPage.items).toHaveLength(2);
+    expect(secondPage.items).toHaveLength(1);
+    expect(
+      new Set([...firstPage.items, ...secondPage.items].map((item) => item.account.id)).size,
+    ).toBe(3);
+    expect((await admin.listCustomers({ projectId, search: 'not-in-project' })).items).toHaveLength(
+      0,
+    );
+    const snapshot = await admin.listAuditItems({ projectId, limit: 100 });
+    const auditFirstPage = await admin.listAuditItems({ projectId, limit: 2 });
+    now += 1_000;
+    await ledger.grantCredits({
+      customerId: `customer_beta_${suffix}`,
+      amount: '1',
+      idempotencyKey: 'parallel-insert',
+    });
+    const pagedIds = auditFirstPage.items.map((item) => item.id);
+    let auditCursor = auditFirstPage.nextCursor;
+    while (auditCursor) {
+      const next = await admin.listAuditItems({ projectId, limit: 2, cursor: auditCursor });
+      pagedIds.push(...next.items.map((item) => item.id));
+      auditCursor = next.nextCursor;
+    }
+    expect(pagedIds).toEqual(snapshot.items.map((item) => item.id));
+    expect(new Set(pagedIds).size).toBe(pagedIds.length);
+    const audit = await admin.listAuditItems({ projectId, customerId });
+    expect(audit.items.every((item) => item.projectId === projectId)).toBe(true);
+    expect(audit.items.some((item) => item.kind === 'usage_receipt')).toBe(true);
+    await expect(admin.getUsageEvidence(projectId, committed.receipt.id)).resolves.toMatchObject({
+      receipt: { id: committed.receipt.id },
+      reservation: { id: reservation.id },
+      price: { id: price.id },
+    });
+
+    const operator = new OperatorService({
+      projectId,
+      ledger,
+      adminStore: admin,
+      deliveryStore: store,
+      now: () => now,
+    });
+    const actionId = randomUUID();
+    const input = {
+      actionId,
+      customerId,
+      amount: '3',
+      reason: 'Postgres admin contract replay verification',
+    };
+    const firstAction = await operator.grantCredits(input);
+    const replayedAction = await operator.grantCredits(input);
+    expect(replayedAction.action).toEqual(firstAction.action);
+
+    now += 200;
+    await operator.expireOverdueReservations({
+      actionId: randomUUID(),
+      reason: 'Postgres contract overdue sweep verification',
+      before: now,
+    });
+    expect(await admin.listOverdueReservations(projectId, now)).toHaveLength(0);
+    await operator.requeueDeadLetter({
+      actionId: randomUUID(),
+      reason: 'Postgres contract dead-letter recovery',
+      eventId: claimed[0]!.id,
+    });
+    expect((await store.getOutboxEvent(claimed[0]!.id))?.status).toBe('pending');
+    expect((await admin.listOperatorActions(projectId)).items).toHaveLength(3);
+
+    await admin.close();
+    await store.close();
   });
 
   it('upgrades a version 1 schema sequentially', async () => {
@@ -68,7 +222,7 @@ suite('Postgres stores', () => {
       `);
       await applyV1(client, upgradeSchema);
       const status = await migratePostgres({ pool: pool!, schema: upgradeSchema });
-      expect(status).toMatchObject({ currentVersion: 3, latestVersion: 3, pendingVersions: [] });
+      expect(status).toMatchObject({ currentVersion: 4, latestVersion: 4, pendingVersions: [] });
       const constraint = await pool!.query<{ exists: boolean }>(
         `SELECT EXISTS (
            SELECT 1 FROM pg_constraint
@@ -77,6 +231,90 @@ suite('Postgres stores', () => {
          ) AS exists`,
       );
       expect(constraint.rows[0]?.exists).toBe(true);
+    } finally {
+      client.release();
+      await pool!.query(`DROP SCHEMA IF EXISTS "${upgradeSchema}" CASCADE`);
+    }
+  });
+
+  it('rolls the v4 admin migration back on a project mismatch', async () => {
+    const upgradeSchema = `resvary_upgrade_v3_${randomUUID().replaceAll('-', '')}`;
+    const client = await pool!.connect();
+    try {
+      await client.query(`CREATE SCHEMA "${upgradeSchema}"`);
+      await client.query(`
+        CREATE TABLE "${upgradeSchema}".resvary_schema_migrations (
+          version INTEGER PRIMARY KEY,
+          applied_at BIGINT NOT NULL
+        )
+      `);
+      await applyV1(client, upgradeSchema);
+      await applyV2(client, upgradeSchema);
+      await applyV3(client, upgradeSchema);
+      const account = {
+        id: 'account_v3_mismatch',
+        projectId: 'project_v3',
+        customerId: 'customer_v3',
+        currency: 'USD',
+        postedUnits: '5000000',
+        reservedUnits: '0',
+        availableUnits: '5000000',
+        postedAmount: '5',
+        reservedAmount: '0',
+        availableAmount: '5',
+        createdAt: 100,
+        updatedAt: 100,
+      };
+      const grant = {
+        id: 'grant_v3_mismatch',
+        accountId: account.id,
+        projectId: 'wrong_project',
+        customerId: account.customerId,
+        amount: '5',
+        amountUnits: '5000000',
+        source: 'manual',
+        createdAt: 100,
+      };
+      await client.query(
+        `INSERT INTO "${upgradeSchema}".resvary_credit_accounts
+          (id, project_id, customer_id, currency, posted_units, reserved_units, updated_at, payload)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb)`,
+        [
+          account.id,
+          account.projectId,
+          account.customerId,
+          account.currency,
+          account.postedUnits,
+          account.reservedUnits,
+          account.updatedAt,
+          serializeReceiptStoreValue(account),
+        ],
+      );
+      await client.query(
+        `INSERT INTO "${upgradeSchema}".resvary_credit_grants
+          (id, account_id, amount_units, created_at, payload)
+         VALUES ($1,$2,$3,$4,$5::jsonb)`,
+        [
+          grant.id,
+          grant.accountId,
+          grant.amountUnits,
+          grant.createdAt,
+          serializeReceiptStoreValue(grant),
+        ],
+      );
+
+      await expect(migratePostgres({ pool: pool!, schema: upgradeSchema })).rejects.toThrow(
+        'project/customer mismatch',
+      );
+      const status = await pool!.query<{ version: number }>(
+        `SELECT MAX(version) AS version FROM "${upgradeSchema}".resvary_schema_migrations`,
+      );
+      expect(Number(status.rows[0]?.version)).toBe(3);
+      const actionTable = await pool!.query<{ exists: boolean }>(
+        `SELECT to_regclass($1) IS NOT NULL AS exists`,
+        [`${upgradeSchema}.resvary_operator_actions`],
+      );
+      expect(actionTable.rows[0]?.exists).toBe(false);
     } finally {
       client.release();
       await pool!.query(`DROP SCHEMA IF EXISTS "${upgradeSchema}" CASCADE`);
@@ -160,7 +398,7 @@ suite('Postgres stores', () => {
         );
       }
       const status = await migratePostgres({ pool: pool!, schema: upgradeSchema });
-      expect(status).toMatchObject({ currentVersion: 3, latestVersion: 3 });
+      expect(status).toMatchObject({ currentVersion: 4, latestVersion: 4 });
       const store = createPostgresCreditStore({ pool: pool!, schema: upgradeSchema });
       await expect(store.listCreditLots({ customerId: account.customerId })).resolves.toMatchObject(
         [{ kind: 'legacy', originalAmount: '10', availableAmount: '5', reservedAmount: '5' }],

@@ -60,9 +60,21 @@ The published evidence is pinned to `v0.4.0-alpha.0` and records an external Arc
 - [x] Persist advanced price and receipt payloads without a database migration
 - [x] Demonstrate mixed pricing with reserve, commit, and release
 
+## 1.0 stable: Operator Console
+
+- [x] Skip 0.9 and define the 1.x ledger API compatibility boundary
+- [x] Add project-scoped Overview, Customers, Audit Explorer, and Operations views
+- [x] Explain charges through receipts, reservations, price versions, and ledger entries
+- [x] Add positive grants, reasoned adjustments, overdue sweeps, and dead-letter requeue
+- [x] Record operator commands as append-only, replay-safe actions
+- [x] Add optional admin contracts without expanding `CreditStore`
+- [x] Add SQLite schema v6 automatic migration and PostgreSQL schema v4 explicit migration
+- [x] Ship a read-only synthetic preview and a multi-platform GHCR image pipeline
+- [x] Support preview → RC on npm `next` → GA → post-launch follow-up
+
 ## Later
 
-- dashboard and audit explorer;
+- hosted control plane, RBAC/OIDC, and multi-project navigation;
 - Fastify, Hono, Python, and Go clients;
 - product-level refunds and compensating adjustments;
 - postpaid B2B usage.

@@ -35,8 +35,8 @@ jobs:
       - name: Check formatting
         run: npm run format:check
 
-      - name: Build SDK
-        run: npm run build --workspace=packages/sdk
+      - name: Build persistence packages
+        run: npm run build:core
 
       - name: Type check
         run: npm run typecheck
@@ -93,6 +93,35 @@ jobs:
       - name: Run workspace tests
         run: npm test
 
+  console-e2e:
+    name: Operator Console browser tests
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Operator Console
+        run: npm run build --workspace=@resvary/console
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run browser tests
+        run: npm run test:e2e --workspace=@resvary/console
+
   sqlite:
     name: SQLite durability
     runs-on: ubuntu-latest
@@ -113,11 +142,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build SDK
-        run: npm run build --workspace=packages/sdk
+      - name: Build persistence packages
+        run: npm run build:core
 
       - name: Run SQLite tests
-        run: npm run test --workspace=packages/sqlite
+        run: npm run test --workspace=@resvary/sqlite
+
+      - name: Generate fixed 10k customer / 1m activity profile
+        run: node scripts/generate-admin-load.mjs
+
+      - name: Enforce Operator Console query budgets
+        run: node scripts/benchmark-admin.mjs --samples 100
 
   postgres:
     name: Postgres concurrency and migrations

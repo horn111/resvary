@@ -7,12 +7,12 @@ const releaseSha = 'a'.repeat(40);
 const publishLevels = [['sdk'], ['sqlite', 'postgres', 'circle'], ['worker'], ['create']];
 const names = publishLevels.flat();
 
-function state(name, { latest = '0.7.0', published = null } = {}) {
+function state(name, { latest = '0.7.0', next, published = null, version = '0.8.0' } = {}) {
   return {
     name,
     packument: {
-      'dist-tags': { alpha: '0.5.0-alpha.3', latest },
-      versions: published ? { '0.8.0': published } : {},
+      'dist-tags': { alpha: '0.5.0-alpha.3', latest, ...(next ? { next } : {}) },
+      versions: published ? { [version]: published } : {},
     },
   };
 }
@@ -30,9 +30,72 @@ test('publishes a synchronized package set in dependency order', () => {
   });
 
   assert.equal(plan.previousLatest, '0.7.0');
+  assert.equal(plan.channel, 'latest');
   assert.deepEqual(
     plan.levels,
     publishLevels.map((level) => level.map((name) => ({ name, action: 'publish' }))),
+  );
+});
+
+test('publishes prereleases to next without moving latest', () => {
+  const plan = createPublicationPlan({
+    version: '1.0.0-rc.1',
+    releaseSha,
+    packageStates: names.map((name) => state(name, { latest: '0.8.0' })),
+    publishLevels,
+  });
+
+  assert.equal(plan.previousLatest, '0.8.0');
+  assert.equal(plan.channel, 'next');
+  assert.ok(plan.levels.flat().every(({ action }) => action === 'publish'));
+});
+
+test('advances next from an older release candidate', () => {
+  const plan = createPublicationPlan({
+    version: '1.0.0-rc.2',
+    releaseSha,
+    packageStates: names.map((name) =>
+      state(name, { latest: '0.8.0', next: '1.0.0-rc.1' }),
+    ),
+    publishLevels,
+  });
+
+  assert.equal(plan.channel, 'next');
+});
+
+test('safely resumes an existing prerelease with provenance', () => {
+  const plan = createPublicationPlan({
+    version: '1.0.0-rc.1',
+    releaseSha,
+    packageStates: names.map((name, index) =>
+      index === 0
+        ? state(name, {
+            latest: '0.8.0',
+            next: '1.0.0-rc.1',
+            published: matchingPublished(),
+            version: '1.0.0-rc.1',
+          })
+        : state(name, { latest: '0.8.0' }),
+    ),
+    publishLevels,
+  });
+
+  assert.equal(plan.levels[0][0].action, 'skip');
+  assert.equal(plan.channel, 'next');
+});
+
+test('rejects an older or equal prerelease channel', () => {
+  assert.throws(
+    () =>
+      createPublicationPlan({
+        version: '1.0.0-rc.1',
+        releaseSha,
+        packageStates: names.map((name) =>
+          state(name, { latest: '0.8.0', next: '1.0.0-rc.2' }),
+        ),
+        publishLevels,
+      }),
+    /is not older than prerelease/,
   );
 });
 
@@ -103,5 +166,6 @@ test('release workflow uses one protected direct-publish job', async () => {
   assert.equal(workflow.match(/environment: Production/g)?.length, 1);
   assert.match(workflow, /id-token: write/);
   assert.match(workflow, /registry\.mjs publish/);
+  assert.match(workflow, /1\.0\.0-rc\.1/);
   assert.doesNotMatch(workflow, /npm stage|stage-receipt|inputs\.mode == 'stage'/);
 });

@@ -4,18 +4,20 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
-  assertStableVersion,
+  assertReleaseVersion,
   currentSha,
   publicPackages,
   publishLevels,
   registryPackage,
+  releaseChannel,
   run,
 } from './common.mjs';
 import { createPublicationPlan } from './publication-plan.mjs';
 
 const command = process.argv[2];
 const version = process.argv[3];
-assertStableVersion(version);
+assertReleaseVersion(version);
+const channel = releaseChannel(version);
 const artifactDirectory = resolve(
   process.env.RELEASE_ARTIFACT_DIR ?? join(tmpdir(), 'resvary-release-artifacts'),
 );
@@ -57,7 +59,7 @@ async function publishPackages() {
   });
   console.log(
     plan.previousLatest
-      ? `Publishing ${version} over synchronized latest ${plan.previousLatest}.`
+      ? `Publishing ${version} to ${plan.channel} over synchronized latest ${plan.previousLatest}.`
       : `All packages for ${version} are already public; verifying the existing publication.`,
   );
 
@@ -73,11 +75,19 @@ async function publishPackages() {
         'publish',
         join(artifactDirectory, artifact.file),
         '--tag',
-        'latest',
+        channel,
         '--access',
         'public',
         '--provenance',
       ]);
+    }
+    if (channel === 'latest') {
+      for (const { name } of level) {
+        const packument = await registryPackage(name);
+        if (packument?.['dist-tags']?.next) {
+          run('npm', ['dist-tag', 'rm', name, 'next']);
+        }
+      }
     }
     for (const { name } of level) await waitForPublishedPackage(name);
   }
@@ -91,9 +101,9 @@ async function waitForPublishedPackage(name, timeoutMs = 300_000) {
     const packument = await registryPackage(name);
     const published = packument?.versions?.[version];
     if (
-      packument?.['dist-tags']?.latest === version &&
+      packument?.['dist-tags']?.[channel] === version &&
       packument?.['dist-tags']?.alpha === '0.5.0-alpha.3' &&
-      packument?.['dist-tags']?.next === undefined &&
+      (channel === 'next' || packument?.['dist-tags']?.next === undefined) &&
       published?.gitHead === sha &&
       published?.dist?.attestations?.url
     ) {
@@ -109,13 +119,13 @@ async function finalizeRelease() {
   for (const { name } of publicPackages) {
     const packument = await registryPackage(name);
     const published = packument?.versions?.[version];
-    if (packument?.['dist-tags']?.latest !== version) {
-      throw new Error(`${name} latest does not resolve to ${version}`);
+    if (packument?.['dist-tags']?.[channel] !== version) {
+      throw new Error(`${name} ${channel} does not resolve to ${version}`);
     }
     if (packument?.['dist-tags']?.alpha !== '0.5.0-alpha.3') {
       throw new Error(`${name} alpha does not resolve to 0.5.0-alpha.3`);
     }
-    if (packument?.['dist-tags']?.next !== undefined) {
+    if (channel === 'latest' && packument?.['dist-tags']?.next !== undefined) {
       throw new Error(`${name} still has a next dist-tag`);
     }
     if (published?.gitHead !== sha) {
@@ -128,7 +138,7 @@ async function finalizeRelease() {
 
   const root = await mkdtemp(join(tmpdir(), 'resvary-finalize-smoke-'));
   try {
-    const dependencies = Object.fromEntries(publicPackages.map(({ name }) => [name, 'latest']));
+    const dependencies = Object.fromEntries(publicPackages.map(({ name }) => [name, version]));
     dependencies.typescript = '5.9.3';
     await writeFile(
       join(root, 'package.json'),
@@ -170,9 +180,12 @@ async function writeRegistryChecks(root) {
       ['@resvary/sdk', 'CreditLedger'],
       ['@resvary/sdk/credits', 'InMemoryCreditStore'],
       ['@resvary/sdk/receipts', 'PersistentReceiptLedger'],
+      ['@resvary/sdk/admin', 'OperatorService'],
       ['@resvary/sqlite', 'createSqliteCreditStore'],
+      ['@resvary/sqlite/admin', 'createSqliteAdminStore'],
       ['@resvary/circle', 'GatewayNanopaymentFunding'],
       ['@resvary/postgres', 'createPostgresCreditStore'],
+      ['@resvary/postgres/admin', 'createPostgresAdminStore'],
       ['@resvary/worker', 'OutboxWorker'],
     ])};\nfor (const [specifier, name] of checks) { const module = await import(specifier); if (typeof module[name] !== 'function') throw new Error(\`${'${specifier}'} missing ${'${name}'}\`); }\n`,
     'utf8',
@@ -258,11 +271,12 @@ async function createGitHubRelease() {
   }
 
   const changelog = await readFile(resolve('CHANGELOG.md'), 'utf8');
-  const escaped = version.replaceAll('.', '\\.');
+  const changelogVersion = version.split('-')[0];
+  const escaped = changelogVersion.replaceAll('.', '\\.');
   const match = changelog.match(
     new RegExp(`## \\[${escaped}\\][^\\n]*\\n([\\s\\S]*?)(?=\\n## \\[)`),
   );
-  if (!match) throw new Error(`Could not extract CHANGELOG section for ${version}`);
+  if (!match) throw new Error(`Could not extract CHANGELOG section for ${changelogVersion}`);
   const releaseResponse = await fetch(`${api}/releases/tags/${tag}`, { headers });
   if (releaseResponse.status === 404) {
     await githubRequest(`${api}/releases`, headers, {
@@ -271,7 +285,7 @@ async function createGitHubRelease() {
       name: `Resvary ${version}`,
       body: match[1].trim(),
       draft: false,
-      prerelease: false,
+      prerelease: channel === 'next',
     });
   } else if (!releaseResponse.ok) {
     throw new Error(`Could not inspect GitHub Release: ${releaseResponse.status}`);

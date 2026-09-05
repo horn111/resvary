@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - Unreleased
+
+### Added
+
+- Added the self-hosted Operator Console with project-scoped Overview, Customers, Audit Explorer, and Operations views.
+- Added framework-neutral `AdminQueryStore`, `AdminPage<T>`, `AuditItem`, `OperatorAction`, and `OperatorService` contracts under `@resvary/sdk/admin`, with SQLite and PostgreSQL implementations under their `/admin` exports.
+- Added four guarded operator commands: positive manual grants, reasoned balance adjustments, overdue-reservation sweeps, and dead-letter requeue. Every command uses a UUID idempotency identity and an append-only action journal.
+- Added a read-only synthetic preview fixture and a multi-platform GHCR image workflow with SBOM, provenance, and vulnerability scanning.
+
+### Changed
+
+- SQLite now uses schema v6 and migrates automatically. PostgreSQL now uses schema v4 and requires an explicit migration before the console starts.
+- Admin timelines use normalized project/customer/query columns, dedicated indexes, newest-first opaque keyset cursors, a default page size of 50, and a maximum of 100.
+- Release automation now publishes prereleases to npm `next` and marks their GitHub Releases as prereleases while preserving synchronized package publication and npm provenance.
+
+### Security
+
+- Protected all console pages and mutation routes with a 32-character minimum admin secret, timing-safe verification, signed `Secure`/`HttpOnly`/`SameSite=Strict` cookies, same-origin checks, login throttling, and immediate session invalidation after secret rotation.
+- Locked public demo mode to the bundled synthetic SQLite fixture and disabled every mutation route.
+- Backfill now aborts on orphaned records and project/customer mismatches instead of guessing ownership.
+
+### Compatibility
+
+- Existing credit, pricing, funding, receipt, webhook APIs, and the required `CreditStore` interface are unchanged. The new admin store is optional.
+- The console's HTTP routes are internal implementation details, not a supported external Admin HTTP API.
+- See [docs/migration-1.0.md](docs/migration-1.0.md), [docs/operator-console.md](docs/operator-console.md), and [docs/operator-console-runbook.md](docs/operator-console-runbook.md).
+
+### Limits
+
+- One console instance serves one project. Hosted control plane, RBAC/OIDC, pricing/policy CRUD, refunds, postpaid billing, multi-project navigation, and new language SDKs remain outside 1.0.
+- SQLite remains local/single-node. PostgreSQL is the production backend.
+
 ## [0.8.0] - 2026-09-02
 
 ### Added

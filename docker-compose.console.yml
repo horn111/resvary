@@ -1,0 +1,40 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: resvary
+      POSTGRES_USER: resvary
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - resvary-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U resvary -d resvary"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  migrate:
+    image: ghcr.io/horn111/resvary-console:1.0.0
+    command: ["node", "../../node_modules/@resvary/postgres/dist/cli.js", "migrate"]
+    environment:
+      DATABASE_URL: postgres://resvary:${POSTGRES_PASSWORD}@postgres:5432/resvary
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  console:
+    image: ghcr.io/horn111/resvary-console:1.0.0
+    environment:
+      DATABASE_URL: postgres://resvary:${POSTGRES_PASSWORD}@postgres:5432/resvary
+      RESVARY_PROJECT_ID: ${RESVARY_PROJECT_ID:?set RESVARY_PROJECT_ID}
+      RESVARY_CONSOLE_ADMIN_SECRET: ${RESVARY_CONSOLE_ADMIN_SECRET:?set a 32+ character secret}
+    ports:
+      - "3000:3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  resvary-postgres:

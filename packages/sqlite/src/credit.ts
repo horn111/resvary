@@ -34,6 +34,8 @@ import type {
 import { parseReceiptStoreValue, serializeReceiptStoreValue } from '@resvary/sdk/receipts';
 import { hardenSqliteDatabaseFiles, prepareSqliteDatabasePath } from './filesystem.js';
 
+export const SQLITE_SCHEMA_VERSION = 6;
+
 export interface SqliteCreditStoreConfig {
   path: string;
   createDirectory?: boolean;
@@ -397,6 +399,7 @@ export class SqliteCreditStore implements CreditPolicyStore, OutboxDeliveryStore
     this.migrateOutboxV3();
     this.migrateFundingTransactionHashV4();
     this.migrateCreditLotsV5();
+    this.migrateAdminV6();
   }
 
   private migrateFundingV2(): void {
@@ -795,6 +798,315 @@ export class SqliteCreditStore implements CreditPolicyStore, OutboxDeliveryStore
       throw error;
     }
   }
+
+  private migrateAdminV6(): void {
+    const row = this.db
+      .prepare('SELECT MAX(version) AS version FROM resvary_schema_migrations')
+      .get() as { version?: number | null } | undefined;
+    if ((row?.version ?? 0) >= 6) return;
+
+    this.db.exec('BEGIN IMMEDIATE;');
+    try {
+      this.addColumnIfMissing('resvary_credit_accounts', 'posted_units', 'TEXT');
+      this.addColumnIfMissing('resvary_credit_accounts', 'reserved_units', 'TEXT');
+      this.addColumnIfMissing('resvary_credit_accounts', 'created_at', 'INTEGER');
+      this.addColumnIfMissing('resvary_credit_grants', 'project_id', 'TEXT');
+      this.addColumnIfMissing('resvary_credit_grants', 'customer_id', 'TEXT');
+      this.addColumnIfMissing('resvary_credit_grants', 'amount_units', 'TEXT');
+      this.addColumnIfMissing('resvary_credit_grants', 'source', 'TEXT');
+      this.addColumnIfMissing('resvary_credit_reservations', 'reserved_units', 'TEXT');
+      this.addColumnIfMissing('resvary_usage_events', 'project_id', 'TEXT');
+      this.addColumnIfMissing('resvary_usage_events', 'customer_id', 'TEXT');
+      this.addColumnIfMissing('resvary_usage_receipts', 'project_id', 'TEXT');
+      this.addColumnIfMissing('resvary_usage_receipts', 'customer_id', 'TEXT');
+      this.addColumnIfMissing('resvary_usage_receipts', 'charged_units', 'TEXT');
+      this.addColumnIfMissing('resvary_ledger_entries', 'project_id', 'TEXT');
+      this.addColumnIfMissing('resvary_ledger_entries', 'customer_id', 'TEXT');
+      this.addColumnIfMissing('resvary_ledger_entries', 'entry_type', 'TEXT');
+      this.addColumnIfMissing('resvary_ledger_entries', 'delta_units', 'TEXT');
+      this.addColumnIfMissing('resvary_funding_intents', 'requested_units', 'TEXT');
+      this.addColumnIfMissing('resvary_funding_transactions', 'project_id', 'TEXT');
+      this.addColumnIfMissing('resvary_funding_transactions', 'customer_id', 'TEXT');
+      this.addColumnIfMissing('resvary_funding_transactions', 'settlement_status', 'TEXT');
+      this.addColumnIfMissing('resvary_funding_transactions', 'amount_units', 'TEXT');
+      this.db.exec(`
+        CREATE TABLE IF NOT EXISTS resvary_operator_actions (
+          id TEXT NOT NULL,
+          sequence INTEGER NOT NULL,
+          project_id TEXT NOT NULL,
+          action_type TEXT NOT NULL,
+          target_type TEXT NOT NULL,
+          target_id TEXT NOT NULL,
+          status TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          payload TEXT NOT NULL,
+          PRIMARY KEY(id, sequence)
+        );
+
+        CREATE INDEX IF NOT EXISTS resvary_admin_accounts
+          ON resvary_credit_accounts(project_id, updated_at DESC, id DESC);
+        CREATE INDEX IF NOT EXISTS resvary_admin_grants
+          ON resvary_credit_grants(project_id, customer_id, created_at DESC, id DESC);
+        CREATE INDEX IF NOT EXISTS resvary_admin_grants_timeline
+          ON resvary_credit_grants(project_id, created_at DESC, id DESC);
+        CREATE INDEX IF NOT EXISTS resvary_admin_reservations
+          ON resvary_credit_reservations(project_id, status, expires_at, created_at DESC, id DESC);
+        CREATE INDEX IF NOT EXISTS resvary_admin_reservations_timeline
+          ON resvary_credit_reservations(project_id, created_at DESC, id DESC);
+        CREATE INDEX IF NOT EXISTS resvary_admin_receipts
+          ON resvary_usage_receipts(project_id, customer_id, created_at DESC, id DESC);
+        CREATE INDEX IF NOT EXISTS resvary_admin_receipts_timeline
+          ON resvary_usage_receipts(project_id, created_at DESC, id DESC);
+        CREATE INDEX IF NOT EXISTS resvary_admin_ledger
+          ON resvary_ledger_entries(project_id, customer_id, created_at DESC, id DESC);
+        CREATE INDEX IF NOT EXISTS resvary_admin_ledger_timeline
+          ON resvary_ledger_entries(project_id, created_at DESC, id DESC);
+        CREATE INDEX IF NOT EXISTS resvary_admin_funding_intents
+          ON resvary_funding_intents(project_id, customer_id, created_at DESC, id DESC);
+        CREATE INDEX IF NOT EXISTS resvary_admin_funding_intents_timeline
+          ON resvary_funding_intents(project_id, created_at DESC, id DESC);
+        CREATE INDEX IF NOT EXISTS resvary_admin_funding_transactions
+          ON resvary_funding_transactions(project_id, customer_id, created_at DESC, id DESC);
+        CREATE INDEX IF NOT EXISTS resvary_admin_funding_transactions_timeline
+          ON resvary_funding_transactions(project_id, created_at DESC, id DESC);
+        CREATE INDEX IF NOT EXISTS resvary_admin_outbox
+          ON resvary_outbox_events(project_id, created_at DESC, id DESC);
+        CREATE INDEX IF NOT EXISTS resvary_admin_operator_actions
+          ON resvary_operator_actions(project_id, created_at DESC, id DESC, sequence DESC);
+      `);
+
+      const accounts = this.db
+        .prepare('SELECT id, project_id, customer_id, payload FROM resvary_credit_accounts')
+        .all() as Array<{
+        id: string;
+        project_id: string;
+        customer_id: string;
+        payload: string;
+      }>;
+      const accountById = new Map<string, CreditAccount>();
+      for (const item of accounts) {
+        const account = parseReceiptStoreValue<CreditAccount>(item.payload);
+        if (
+          account.id !== item.id ||
+          account.projectId !== item.project_id ||
+          account.customerId !== item.customer_id
+        ) {
+          throw new Error(`Cannot migrate SQLite admin data: account scope mismatch ${item.id}`);
+        }
+        accountById.set(account.id, account);
+        this.db
+          .prepare(
+            `UPDATE resvary_credit_accounts
+             SET posted_units = ?, reserved_units = ?, created_at = ? WHERE id = ?`,
+          )
+          .run(account.postedUnits, account.reservedUnits, account.createdAt, item.id);
+      }
+
+      this.backfillAdminRows('resvary_credit_grants', accountById, (value: CreditGrant) => [
+        value.projectId,
+        value.customerId,
+        value.amountUnits,
+        value.source,
+      ]);
+      this.backfillAdminRows('resvary_usage_events', accountById, (value: UsageEvent) => [
+        value.projectId,
+        value.customerId,
+      ]);
+      this.backfillAdminRows('resvary_usage_receipts', accountById, (value: UsageReceipt) => [
+        value.projectId,
+        value.customerId,
+        value.amountUnits,
+      ]);
+      this.backfillAdminRows('resvary_ledger_entries', accountById, (value: LedgerEntry) => [
+        value.projectId,
+        value.customerId,
+        value.type,
+        value.deltaUnits,
+      ]);
+      const reservations = this.db
+        .prepare(
+          'SELECT id, account_id, project_id, customer_id, payload FROM resvary_credit_reservations',
+        )
+        .all() as Array<{
+        id: string;
+        account_id: string;
+        project_id: string;
+        customer_id: string;
+        payload: string;
+      }>;
+      for (const item of reservations) {
+        const reservation = parseReceiptStoreValue<CreditReservation>(item.payload);
+        const account = accountById.get(item.account_id);
+        if (!account) {
+          throw new Error(
+            `Cannot migrate SQLite admin data: reservation ${item.id} has no account`,
+          );
+        }
+        if (
+          reservation.accountId !== item.account_id ||
+          reservation.projectId !== item.project_id ||
+          reservation.customerId !== item.customer_id ||
+          reservation.projectId !== account.projectId ||
+          reservation.customerId !== account.customerId
+        ) {
+          throw new Error(
+            `Cannot migrate SQLite admin data: project/customer mismatch in reservation ${item.id}`,
+          );
+        }
+        this.db
+          .prepare('UPDATE resvary_credit_reservations SET reserved_units = ? WHERE id = ?')
+          .run(reservation.reservedUnits, item.id);
+      }
+
+      const intents = this.db
+        .prepare('SELECT id, project_id, customer_id, payload FROM resvary_funding_intents')
+        .all() as Array<{
+        id: string;
+        project_id: string;
+        customer_id: string;
+        payload: string;
+      }>;
+      const intentById = new Map<string, FundingIntent>();
+      for (const item of intents) {
+        const intent = parseReceiptStoreValue<FundingIntent>(item.payload);
+        const account = accountById.get(intent.accountId);
+        if (!account) {
+          throw new Error(
+            `Cannot migrate SQLite admin data: funding intent ${item.id} has no account`,
+          );
+        }
+        if (
+          intent.id !== item.id ||
+          intent.projectId !== item.project_id ||
+          intent.customerId !== item.customer_id ||
+          intent.projectId !== account.projectId ||
+          intent.customerId !== account.customerId
+        ) {
+          throw new Error(
+            `Cannot migrate SQLite admin data: project/customer mismatch in funding intent ${item.id}`,
+          );
+        }
+        intentById.set(intent.id, intent);
+        this.db
+          .prepare('UPDATE resvary_funding_intents SET requested_units = ? WHERE id = ?')
+          .run(intent.requestedUnits, item.id);
+      }
+      const transactions = this.db
+        .prepare('SELECT id, funding_intent_id, payload FROM resvary_funding_transactions')
+        .all() as Array<{ id: string; funding_intent_id: string; payload: string }>;
+      for (const item of transactions) {
+        const transaction = parseReceiptStoreValue<FundingTransaction>(item.payload);
+        const intent = intentById.get(item.funding_intent_id);
+        const account = accountById.get(transaction.accountId);
+        if (!intent || !account) {
+          throw new Error(
+            `Cannot migrate SQLite admin data: funding transaction ${item.id} has no intent or account`,
+          );
+        }
+        if (
+          transaction.id !== item.id ||
+          transaction.fundingIntentId !== item.funding_intent_id ||
+          transaction.projectId !== intent.projectId ||
+          transaction.customerId !== intent.customerId ||
+          transaction.projectId !== account.projectId ||
+          transaction.customerId !== account.customerId
+        ) {
+          throw new Error(
+            `Cannot migrate SQLite admin data: project/customer mismatch in funding transaction ${item.id}`,
+          );
+        }
+        this.db
+          .prepare(
+            `UPDATE resvary_funding_transactions
+             SET project_id = ?, customer_id = ?, settlement_status = ?, amount_units = ? WHERE id = ?`,
+          )
+          .run(
+            transaction.projectId,
+            transaction.customerId,
+            transaction.settlementStatus,
+            transaction.amountUnits,
+            item.id,
+          );
+      }
+
+      const invalid = this.db
+        .prepare(
+          `SELECT 'account' AS kind, id FROM resvary_credit_accounts
+             WHERE posted_units IS NULL OR reserved_units IS NULL OR created_at IS NULL
+           UNION ALL SELECT 'grant', id FROM resvary_credit_grants
+             WHERE project_id IS NULL OR customer_id IS NULL OR amount_units IS NULL OR source IS NULL
+           UNION ALL SELECT 'receipt', id FROM resvary_usage_receipts
+             WHERE project_id IS NULL OR customer_id IS NULL OR charged_units IS NULL
+           UNION ALL SELECT 'reservation', id FROM resvary_credit_reservations
+             WHERE reserved_units IS NULL
+           UNION ALL SELECT 'ledger', id FROM resvary_ledger_entries
+             WHERE project_id IS NULL OR customer_id IS NULL OR entry_type IS NULL OR delta_units IS NULL
+           LIMIT 1`,
+        )
+        .get() as { kind: string; id: string } | undefined;
+      if (invalid)
+        throw new Error(
+          `Cannot migrate SQLite admin data: incomplete ${invalid.kind} ${invalid.id}`,
+        );
+
+      this.db
+        .prepare('INSERT INTO resvary_schema_migrations(version, applied_at) VALUES (6, ?)')
+        .run(Date.now());
+      this.db.exec('COMMIT;');
+    } catch (error) {
+      this.db.exec('ROLLBACK;');
+      throw error;
+    }
+  }
+
+  private addColumnIfMissing(tableName: string, columnName: string, definition: string): void {
+    const columns = this.db.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{
+      name: string;
+    }>;
+    if (!columns.some((column) => column.name === columnName)) {
+      this.db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition}`);
+    }
+  }
+
+  private backfillAdminRows<T extends { accountId: string; projectId: string; customerId: string }>(
+    table: string,
+    accounts: Map<string, CreditAccount>,
+    values: (value: T) => unknown[],
+  ): void {
+    const columns: Record<string, string[]> = {
+      resvary_credit_grants: ['project_id', 'customer_id', 'amount_units', 'source'],
+      resvary_usage_events: ['project_id', 'customer_id'],
+      resvary_usage_receipts: ['project_id', 'customer_id', 'charged_units'],
+      resvary_ledger_entries: ['project_id', 'customer_id', 'entry_type', 'delta_units'],
+    };
+    const names = columns[table];
+    if (!names) throw new Error(`Unsupported admin backfill table: ${table}`);
+    const rows = this.db.prepare(`SELECT id, account_id, payload FROM ${table}`).all() as Array<{
+      id: string;
+      account_id: string;
+      payload: string;
+    }>;
+    const statement = this.db.prepare(
+      `UPDATE ${table} SET ${names.map((name) => `${name} = ?`).join(', ')} WHERE id = ?`,
+    );
+    for (const row of rows) {
+      const account = accounts.get(row.account_id);
+      if (!account) {
+        throw new Error(`Cannot migrate SQLite admin data: ${table} ${row.id} has no account`);
+      }
+      const value = parseReceiptStoreValue<T>(row.payload);
+      if (
+        value.accountId !== row.account_id ||
+        value.projectId !== account.projectId ||
+        value.customerId !== account.customerId
+      ) {
+        throw new Error(
+          `Cannot migrate SQLite admin data: project/customer mismatch in ${table} row ${row.id}`,
+        );
+      }
+      statement.run(...values(value), row.id);
+    }
+  }
 }
 
 class SqliteCreditTransaction implements CreditPolicyStoreTransaction {
@@ -904,8 +1216,24 @@ class SqliteCreditTransaction implements CreditPolicyStoreTransaction {
     upsert(
       this.db,
       'resvary_credit_accounts',
-      ['id', 'project_id', 'customer_id', 'updated_at'],
-      [value.id, value.projectId, value.customerId, value.updatedAt],
+      [
+        'id',
+        'project_id',
+        'customer_id',
+        'posted_units',
+        'reserved_units',
+        'created_at',
+        'updated_at',
+      ],
+      [
+        value.id,
+        value.projectId,
+        value.customerId,
+        value.postedUnits,
+        value.reservedUnits,
+        value.createdAt,
+        value.updatedAt,
+      ],
       value,
     );
   }
@@ -913,8 +1241,16 @@ class SqliteCreditTransaction implements CreditPolicyStoreTransaction {
     insert(
       this.db,
       'resvary_credit_grants',
-      ['id', 'account_id', 'created_at'],
-      [value.id, value.accountId, value.createdAt],
+      ['id', 'account_id', 'project_id', 'customer_id', 'amount_units', 'source', 'created_at'],
+      [
+        value.id,
+        value.accountId,
+        value.projectId,
+        value.customerId,
+        value.amountUnits,
+        value.source,
+        value.createdAt,
+      ],
       value,
     );
   }
@@ -940,13 +1276,23 @@ class SqliteCreditTransaction implements CreditPolicyStoreTransaction {
     upsert(
       this.db,
       'resvary_credit_reservations',
-      ['id', 'account_id', 'project_id', 'customer_id', 'status', 'expires_at', 'created_at'],
+      [
+        'id',
+        'account_id',
+        'project_id',
+        'customer_id',
+        'status',
+        'reserved_units',
+        'expires_at',
+        'created_at',
+      ],
       [
         value.id,
         value.accountId,
         value.projectId,
         value.customerId,
         value.status,
+        value.reservedUnits,
         value.expiresAt,
         value.createdAt,
       ],
@@ -957,8 +1303,8 @@ class SqliteCreditTransaction implements CreditPolicyStoreTransaction {
     insert(
       this.db,
       'resvary_usage_events',
-      ['id', 'account_id', 'received_at'],
-      [value.id, value.accountId, value.receivedAt],
+      ['id', 'account_id', 'project_id', 'customer_id', 'received_at'],
+      [value.id, value.accountId, value.projectId, value.customerId, value.receivedAt],
       value,
     );
   }
@@ -966,8 +1312,26 @@ class SqliteCreditTransaction implements CreditPolicyStoreTransaction {
     insert(
       this.db,
       'resvary_usage_receipts',
-      ['id', 'account_id', 'reservation_id', 'usage_event_id', 'created_at'],
-      [value.id, value.accountId, value.reservationId, value.usageEventId, value.createdAt],
+      [
+        'id',
+        'account_id',
+        'project_id',
+        'customer_id',
+        'reservation_id',
+        'usage_event_id',
+        'charged_units',
+        'created_at',
+      ],
+      [
+        value.id,
+        value.accountId,
+        value.projectId,
+        value.customerId,
+        value.reservationId,
+        value.usageEventId,
+        value.amountUnits,
+        value.createdAt,
+      ],
       value,
     );
   }
@@ -975,8 +1339,16 @@ class SqliteCreditTransaction implements CreditPolicyStoreTransaction {
     insert(
       this.db,
       'resvary_ledger_entries',
-      ['id', 'account_id', 'created_at'],
-      [value.id, value.accountId, value.createdAt],
+      ['id', 'account_id', 'project_id', 'customer_id', 'entry_type', 'delta_units', 'created_at'],
+      [
+        value.id,
+        value.accountId,
+        value.projectId,
+        value.customerId,
+        value.type,
+        value.deltaUnits,
+        value.createdAt,
+      ],
       value,
     );
   }
@@ -1023,8 +1395,15 @@ class SqliteCreditTransaction implements CreditPolicyStoreTransaction {
     upsert(
       this.db,
       'resvary_funding_intents',
-      ['id', 'project_id', 'customer_id', 'status', 'created_at'],
-      [value.id, value.projectId, value.customerId, value.status, value.createdAt],
+      ['id', 'project_id', 'customer_id', 'status', 'requested_units', 'created_at'],
+      [
+        value.id,
+        value.projectId,
+        value.customerId,
+        value.status,
+        value.requestedUnits,
+        value.createdAt,
+      ],
       value,
     );
   }
@@ -1035,19 +1414,27 @@ class SqliteCreditTransaction implements CreditPolicyStoreTransaction {
       [
         'id',
         'funding_intent_id',
+        'project_id',
+        'customer_id',
         'rail',
         'network',
         'external_payment_id_norm',
         'tx_hash_norm',
+        'settlement_status',
+        'amount_units',
         'created_at',
       ],
       [
         value.id,
         value.fundingIntentId,
+        value.projectId,
+        value.customerId,
         value.rail,
         value.network,
         value.externalPaymentId.toLowerCase(),
         value.txHash?.toLowerCase() ?? `external:${value.externalPaymentId.toLowerCase()}`,
+        value.settlementStatus,
+        value.amountUnits,
         value.createdAt,
       ],
       value,

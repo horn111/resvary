@@ -85,8 +85,13 @@ export async function waitForVersion(name, version, timeoutMs = 300_000) {
   throw new Error(`${name}@${version} did not become visible in npm within ${timeoutMs} ms`);
 }
 
-export function assertStableVersion(version) {
-  if (!/^\d+\.\d+\.\d+$/.test(version)) {
-    throw new Error(`Expected a stable semantic version, received ${JSON.stringify(version)}`);
+export function assertReleaseVersion(version) {
+  if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$/.test(version)) {
+    throw new Error(`Expected a semantic release version, received ${JSON.stringify(version)}`);
   }
+}
+
+export function releaseChannel(version) {
+  assertReleaseVersion(version);
+  return version.includes('-') ? 'next' : 'latest';
 }
