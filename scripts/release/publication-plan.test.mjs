@@ -176,3 +176,14 @@ test('release Docker context excludes generated build state', async () => {
   assert.match(dockerignore, /^\.resvary$/m);
   assert.match(dockerignore, /^\*\*\/\*\.tsbuildinfo$/m);
 });
+
+test('Operator Console runtime applies Debian security updates', async () => {
+  const dockerfile = await readFile(
+    new URL('../../apps/console/Dockerfile', import.meta.url),
+    'utf8',
+  );
+
+  assert.match(dockerfile, /RUN apt-get update/);
+  assert.match(dockerfile, /&& apt-get upgrade --yes/);
+  assert.match(dockerfile, /&& rm -rf \/var\/lib\/apt\/lists\/\*/);
+});
