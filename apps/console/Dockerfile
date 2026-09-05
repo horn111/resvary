@@ -25,7 +25,11 @@ ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     HOSTNAME=0.0.0.0 \
     PORT=3000
-RUN groupadd --system --gid 1001 resvary && useradd --system --uid 1001 --gid resvary console
+# The runtime starts the standalone server directly and does not need the npm toolchain.
+RUN rm -rf /usr/local/lib/node_modules/npm \
+    && rm -f /usr/local/bin/npm /usr/local/bin/npx \
+    && groupadd --system --gid 1001 resvary \
+    && useradd --system --uid 1001 --gid resvary console
 COPY --from=builder --chown=console:resvary /workspace/apps/console/.next/standalone /app
 COPY --from=builder --chown=console:resvary /workspace/apps/console/.next/static ./.next/static
 COPY --from=builder --chown=console:resvary /workspace/packages/postgres/package.json /app/node_modules/@resvary/postgres/package.json
