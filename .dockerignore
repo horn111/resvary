@@ -1,0 +1,11 @@
+.git
+.github
+.impeccable
+.local
+**/.next
+**/dist
+**/node_modules
+**/coverage
+**/*.log
+apps/console/fixtures/*.sqlite-wal
+apps/console/fixtures/*.sqlite-shm

@@ -1,6 +1,6 @@
 {
   "name": "@resvary/postgres",
-  "version": "0.8.0",
+  "version": "1.0.0",
   "description": "Postgres persistence and migration tooling for Resvary",
   "type": "module",
   "main": "./dist/index.js",
@@ -16,6 +16,10 @@
     "./import-sqlite": {
       "types": "./dist/import-sqlite.d.ts",
       "import": "./dist/import-sqlite.js"
+    },
+    "./admin": {
+      "types": "./dist/admin.d.ts",
+      "import": "./dist/admin.js"
     }
   },
   "files": [
@@ -41,7 +45,7 @@
     "directory": "packages/postgres"
   },
   "dependencies": {
-    "@resvary/sdk": "0.8.0",
+    "@resvary/sdk": "1.0.0",
     "pg": "^8.16.3"
   },
   "devDependencies": {

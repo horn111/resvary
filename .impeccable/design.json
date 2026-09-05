@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-08-14T00:00:00Z",
+  "generatedAt": "2026-09-04T19:14:13Z",
   "title": "Design System: Resvary",
   "extensions": {
     "colorMeta": {
@@ -62,6 +62,42 @@
       "label": {
         "displayName": "Ledger Label",
         "purpose": "Code, states, navigation, metadata, and measurements."
+      },
+      "operator-micro": {
+        "displayName": "Operator Micro",
+        "purpose": "Nine-pixel timestamps, metadata labels, chart ticks, and compact record annotations."
+      },
+      "operator-caption": {
+        "displayName": "Operator Caption",
+        "purpose": "Ten-pixel table headings, scope terms, evidence labels, and compact identifiers."
+      },
+      "operator-label": {
+        "displayName": "Operator Command Label",
+        "purpose": "Eleven-pixel command-ledger headings and dataset values."
+      },
+      "operator-body": {
+        "displayName": "Operator Interface Body",
+        "purpose": "Twelve-pixel interface copy, controls, and operational explanations."
+      },
+      "operator-data": {
+        "displayName": "Operator Ledger Data",
+        "purpose": "Fourteen-pixel chronological ledger rows and selected record values."
+      },
+      "operator-brand": {
+        "displayName": "Operator Wordmark",
+        "purpose": "Syncopate project identity in the full-width console rail."
+      },
+      "operator-metric": {
+        "displayName": "Operator Situation Metric",
+        "purpose": "Rubik balance and exception totals at 24px on desktop and 19px on phones."
+      },
+      "operator-section": {
+        "displayName": "Operator Section Title",
+        "purpose": "Rubik page headings that scale from 32px to 58px."
+      },
+      "operator-auth": {
+        "displayName": "Operator Authentication Title",
+        "purpose": "The 42px Rubik title on the admin-secret entry surface."
       }
     },
     "shadows": [],
@@ -71,11 +107,33 @@
         "value": "cubic-bezier(.2,.7,.2,1)",
         "purpose": "Authored hero and section arrival."
       },
-      { "name": "feedback", "value": "160ms ease", "purpose": "Control and status feedback." }
+      { "name": "feedback", "value": "160ms ease", "purpose": "Control and status feedback." },
+      {
+        "name": "operator-ledger-arrival",
+        "value": "520ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "One-time opacity, five-pixel translation, and blur settle for chronological ledger rows."
+      },
+      {
+        "name": "operator-row-stagger",
+        "value": "22ms per row",
+        "purpose": "Preserves chronological reading order during ledger arrival."
+      },
+      {
+        "name": "operator-chart-response",
+        "value": "500ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Height response for charged-amount trend bars."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "0.01ms; scroll-behavior: auto",
+        "purpose": "Collapses console animation and transition durations when reduced motion is requested."
+      }
     ],
     "breakpoints": [
       { "name": "phone", "value": "47.99rem" },
-      { "name": "compact-header", "value": "63.99rem" }
+      { "name": "compact-header", "value": "63.99rem" },
+      { "name": "operator-compact-rail", "value": "1100px" },
+      { "name": "operator-stacked-records", "value": "760px" }
     ]
   },
   "components": [
@@ -110,21 +168,50 @@
       "css": ".ds-record{border:1px solid var(--color-line);background:var(--color-canvas);color:var(--color-ink-body)}.ds-record h3{margin:0;padding:16px;border-bottom:1px solid var(--color-line-soft);font:400 11px var(--font-mono),monospace;letter-spacing:.1em}.ds-record pre{margin:0;padding:16px;background:var(--color-code-surface);font:400 12px/1.6 var(--font-mono),monospace}"
     },
     {
-      "name": "Compact Navigation",
+      "name": "Landing Compact Navigation",
       "kind": "nav",
       "description": "Tracked technical destinations with a disclosure treatment at compact widths.",
       "html": "<nav class=\"ds-nav\" aria-label=\"Primary\"><a href=\"#product\">PRODUCT</a><a href=\"#demo\">DEMO</a><a href=\"#pricing\">ACCESS</a></nav>",
       "css": ".ds-nav{display:flex;gap:24px;color:var(--color-ink-body);font:400 11px var(--font-mono),monospace;letter-spacing:.1em}.ds-nav a{min-height:44px;display:flex;align-items:center;color:inherit;text-decoration:none}.ds-nav a:hover{color:var(--color-white)}.ds-nav a:focus-visible{outline:1px solid var(--color-ink);outline-offset:4px}"
+    },
+    {
+      "name": "Operator Navigation",
+      "kind": "nav",
+      "description": "Persistent console destinations that retain accessible names and page state when the visible labels collapse.",
+      "html": "<aside class=\"ds-operator-rail\"><div class=\"ds-operator-brand\"><strong>RESVARY</strong><span>OPERATOR CONSOLE</span></div><nav class=\"ds-operator-nav\" aria-label=\"Primary\"><a class=\"ds-active\" href=\"#overview\" aria-label=\"Overview\" aria-current=\"page\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z\"/></svg><span>Overview</span></a><a href=\"#customers\" aria-label=\"Customers\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"8\" r=\"3.5\"/><path d=\"M5 20v-2.5A5.5 5.5 0 0 1 10.5 12h3a5.5 5.5 0 0 1 5.5 5.5V20z\"/></svg><span>Customers</span></a><a href=\"#audit\" aria-label=\"Audit\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M5 3h10l4 4v14H5zM15 3v5h4M8 12h8M8 16h6\"/></svg><span>Audit</span></a><a href=\"#operations\" aria-label=\"Operations\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"m14.7 6.3 3-3 3 3-3 3M9.3 17.7l-3 3-3-3 3-3M8 16l8-8\"/></svg><span>Operations</span></a></nav></aside>",
+      "css": ".ds-operator-rail{width:190px;border:1px solid var(--line-strong,rgb(242 242 240/28%));background:var(--canvas,#090a0a);color:var(--ink,#f2f2f0);font:400 12px var(--font-mono),'JetBrains Mono',monospace}.ds-operator-brand{min-height:92px;display:flex;flex-direction:column;justify-content:center;gap:4px;padding:12px 20px;border-bottom:1px solid var(--line,rgb(242 242 240/14%))}.ds-operator-brand strong{font:700 20px/1 var(--font-brand),Syncopate,sans-serif;letter-spacing:.16em}.ds-operator-brand span{color:var(--ink-strong,#c2c2c2);font-size:10px}.ds-operator-nav{padding:10px 8px}.ds-operator-nav a{min-height:38px;display:flex;align-items:center;gap:14px;padding:0 12px;border:1px solid transparent;color:var(--ink-strong,#c2c2c2);text-decoration:none;transition:background 160ms ease,color 160ms ease,border-color 160ms ease}.ds-operator-nav a:hover{border-color:var(--line,rgb(242 242 240/14%));color:var(--ink,#f2f2f0)}.ds-operator-nav a:focus-visible{outline:1px solid var(--focus,#f2f2f0);outline-offset:3px}.ds-operator-nav .ds-active{background:var(--surface-active,#222323);color:var(--ink,#f2f2f0)}.ds-operator-nav svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.5}@media(max-width:1100px){.ds-operator-rail{width:68px}.ds-operator-brand{padding:12px 9px}.ds-operator-brand strong{font-size:10px;letter-spacing:.08em}.ds-operator-brand span,.ds-operator-nav a span{display:none}.ds-operator-nav a{justify-content:center;padding:0}}@media(max-width:760px){.ds-operator-rail{position:sticky;top:0;width:100%;display:grid;grid-template-columns:120px 1fr}.ds-operator-brand{min-height:58px;border-right:1px solid var(--line,rgb(242 242 240/14%));border-bottom:0}.ds-operator-nav{display:grid;grid-template-columns:repeat(4,1fr);padding:6px}.ds-operator-nav a{min-height:44px}}"
+    },
+    {
+      "name": "Ledger Scope Metadata",
+      "kind": "custom",
+      "description": "The current events, statuses, customers, and time window stated before the refresh action.",
+      "html": "<dl class=\"ds-scope-row\" aria-label=\"Current activity scope\"><div><dt>Events</dt><dd>All activity</dd></div><div><dt>Statuses</dt><dd>All states</dd></div><div><dt>Customers</dt><dd>Entire project</dd></div><div><dt>Window</dt><dd>Latest 25 records</dd></div><button type=\"button\">Refresh</button></dl>",
+      "css": ".ds-scope-row{display:grid;grid-template-columns:repeat(3,minmax(120px,1fr)) minmax(160px,1fr) auto;gap:8px;margin:0;color:var(--ink-strong,#c2c2c2);font-family:var(--font-mono),'JetBrains Mono',monospace}.ds-scope-row>div{min-height:32px;display:grid;align-content:center;gap:3px;padding:2px 10px;border-left:1px solid var(--line-strong,rgb(242 242 240/28%))}.ds-scope-row dt{color:var(--ink-muted,#989999);font-size:9px;line-height:1;letter-spacing:.06em;text-transform:uppercase}.ds-scope-row dd{margin:0;font-size:10px}.ds-scope-row button{min-height:32px;padding:0 14px;border:1px solid var(--line-strong,rgb(242 242 240/28%));background:transparent;color:var(--ink,#f2f2f0);font:inherit}.ds-scope-row button:hover{border-color:var(--ink,#f2f2f0);background:var(--ink,#f2f2f0);color:var(--canvas,#090a0a)}.ds-scope-row button:focus-visible{outline:1px solid var(--focus,#f2f2f0);outline-offset:3px}@media(max-width:760px){.ds-scope-row{display:flex;overflow-x:auto}.ds-scope-row>div{min-width:145px}.ds-scope-row button{flex:none}}"
+    },
+    {
+      "name": "Command Ledger Record",
+      "kind": "card",
+      "description": "A chronological audit row that becomes a labelled record on phones without losing fields or accessible headers.",
+      "html": "<table class=\"ds-command-ledger\"><thead><tr><th>Timestamp (UTC)</th><th>Event type</th><th>Customer ID</th><th>Amount (USD)</th><th>Status</th><th>Ledger ID</th></tr></thead><tbody><tr class=\"ds-selected\"><td data-label=\"Timestamp (UTC)\">2026-09-02 14:43:47.780</td><td data-label=\"Event type\">usage.charged</td><td data-label=\"Customer ID\">cus_0001</td><td data-label=\"Amount (USD)\">-$0.56</td><td data-label=\"Status\"><span>posted</span></td><td data-label=\"Ledger ID\">urcpt_b68dd97b57bcd34efa9aa42d</td></tr></tbody></table>",
+      "css": ".ds-command-ledger{width:100%;border-collapse:collapse;table-layout:fixed;background:var(--canvas,#090a0a);color:var(--ink-muted,#989999);font:400 14px var(--font-mono),'JetBrains Mono',monospace;font-variant-numeric:tabular-nums}.ds-command-ledger th{padding:10px;background:var(--canvas,#090a0a);color:var(--ink-muted,#989999);font-size:10px;font-weight:400;text-align:left;text-transform:uppercase;border-bottom:1px solid var(--line-strong,rgb(242 242 240/28%))}.ds-command-ledger td{height:36px;padding:7px 10px;border-bottom:1px solid rgb(242 242 240/6%);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ds-command-ledger .ds-selected td{background:var(--surface-active,#222323);color:var(--ink,#f2f2f0);border-top:1px solid var(--ink-strong,#c2c2c2);border-bottom:1px solid var(--ink-strong,#c2c2c2)}.ds-command-ledger td span:before{content:'';display:inline-block;width:5px;height:5px;margin-right:6px;border:1px solid currentColor}.ds-command-ledger tbody tr{animation:ds-ledger-arrival 520ms cubic-bezier(.16,1,.3,1) both}@keyframes ds-ledger-arrival{from{opacity:.15;transform:translateY(5px);filter:blur(2px)}to{opacity:1;transform:translateY(0);filter:blur(0)}}@media(max-width:760px){.ds-command-ledger{table-layout:auto}.ds-command-ledger thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}.ds-command-ledger tbody,.ds-command-ledger tr,.ds-command-ledger td{display:block;width:auto}.ds-command-ledger tr{padding:10px 0;border-bottom:1px solid var(--line-strong,rgb(242 242 240/28%))}.ds-command-ledger td,.ds-command-ledger .ds-selected td{min-height:27px;height:auto;display:grid;grid-template-columns:112px minmax(0,1fr);gap:10px;padding:4px 10px;border:0;background:transparent;white-space:normal}.ds-command-ledger .ds-selected{background:var(--surface-active,#222323);border-top:1px solid var(--ink-strong,#c2c2c2);border-bottom-color:var(--ink-strong,#c2c2c2)}.ds-command-ledger td:before{content:attr(data-label);color:var(--ink-faint,#707070);font-size:9px;letter-spacing:.04em;text-transform:uppercase}.ds-command-ledger td:last-child{overflow-wrap:anywhere}}@media(prefers-reduced-motion:reduce){.ds-command-ledger tbody tr{animation-duration:.01ms}}"
+    },
+    {
+      "name": "Evidence Chain",
+      "kind": "custom",
+      "description": "Numbered, ordered proof linking a receipt to its reservation, price version, and ledger entries.",
+      "html": "<ol class=\"ds-evidence-chain\"><li><span class=\"ds-step\">1</span><article><header><strong>USAGE RECEIPT</strong><span>received</span></header><dl><div><dt>ID</dt><dd>urcpt_b68dd97b57bcd34efa9aa42d</dd></div><div><dt>Customer</dt><dd>cus_0001</dd></div></dl></article></li><li><span class=\"ds-step\">2</span><article><header><strong>RESERVATION</strong><span>committed</span></header><dl><div><dt>Amount (USD)</dt><dd>$0.72</dd></div><div><dt>Policy</dt><dd>bounded usage</dd></div></dl></article></li></ol>",
+      "css": ".ds-evidence-chain{margin:0;padding:0;color:var(--ink-strong,#c2c2c2);font:400 10.5px var(--font-mono),'JetBrains Mono',monospace;list-style:none}.ds-evidence-chain li{position:relative;display:grid;grid-template-columns:22px minmax(0,1fr);gap:9px;padding-bottom:8px}.ds-evidence-chain li:not(:last-child):before{content:'';position:absolute;left:10px;top:24px;bottom:-1px;width:1px;background:var(--line-strong,rgb(242 242 240/28%))}.ds-evidence-chain .ds-step{position:relative;z-index:1;width:20px;height:20px;display:grid;place-items:center;border:1px solid var(--ink-strong,#c2c2c2);background:var(--canvas,#090a0a)}.ds-evidence-chain article{border:1px solid var(--line-strong,rgb(242 242 240/28%))}.ds-evidence-chain article header{display:flex;justify-content:space-between;gap:12px;padding:8px 10px;border-bottom:1px solid var(--line,rgb(242 242 240/14%))}.ds-evidence-chain article header strong{font-size:10px;font-weight:500}.ds-evidence-chain article header span,.ds-evidence-chain dt{color:var(--ink-muted,#989999)}.ds-evidence-chain dl{margin:12px 0 0;padding:0 10px 8px}.ds-evidence-chain dl div{display:grid;grid-template-columns:minmax(80px,.7fr) minmax(0,1.3fr);gap:12px;padding:2px 0}.ds-evidence-chain dd{margin:0;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}"
     }
   ],
   "narrative": {
     "northStar": "The Settlement Instrument",
-    "overview": "Resvary looks like a precise instrument for inspecting credit movement, not a generic finance dashboard. The system uses a near-black field, restrained off-white hierarchy, square construction lines, and technical mono labels. Large editorial typography explains the product while receipts, code, balances, and lifecycle states provide operational proof. The hero mark, receipt printer, and particle word are the authored moments. Everything around them stays flat, quiet, and inspectable so motion and bright ink retain meaning.",
+    "overview": "Resvary looks like a precise instrument for inspecting credit movement, not a generic finance dashboard. The system uses a near-black field, restrained off-white hierarchy, square construction lines, and technical mono labels. Large editorial typography explains the product while receipts, code, balances, and lifecycle states provide operational proof. The hero mark, receipt printer, and particle word are the authored moments. The hero mark is a pair of clean settlement rails: they illuminate on direct hover while the bright settlement node follows the pointer inside their bounded corridor. The footer word preserves each glyph's local dot grid so repeated letters remain identical and counters stay legible. Everything around them stays flat, quiet, and inspectable so motion and bright ink retain meaning. The Operator Console extends this world into a high-density command ledger. A fixed project rail, situation strip, chronological activity field, evidence dossier, and guarded operations share the same monochrome hierarchy and construction-line logic. It is an operational expression of the landing-page system, not a replacement identity.",
     "keyCharacteristics": [
       "Monochrome hierarchy with no decorative accent palette.",
       "Large editorial headings paired with measurement-oriented mono labels.",
       "Square controls and thin construction lines instead of rounded SaaS cards.",
-      "Motion reserved for the settlement mark, receipt lifecycle, and direct feedback."
+      "Dense command-ledger layouts keep scope, provenance, consequence, and next action visible.",
+      "Motion reserved for the settlement mark, receipt lifecycle, ledger arrival, and direct feedback."
     ],
     "rules": [
       {
@@ -138,22 +225,42 @@
         "section": "typography"
       },
       {
+        "name": "The Evidence Density Rule",
+        "body": "Reduce size before reducing context: identifiers, timestamps, state, and units remain present, with contrast and line length calibrated to their role.",
+        "section": "typography"
+      },
+      {
+        "name": "The Responsive Evidence Rule",
+        "body": "Compact layouts may change geometry, never the accessible name, record identity, scope, units, or evidence order.",
+        "section": "layout"
+      },
+      {
         "name": "The Flat Ledger Rule",
         "body": "A border defines structure; a shadow appears only when it expresses light emitted by an animated particle or focused settlement node.",
         "section": "elevation"
+      },
+      {
+        "name": "The Ledger Arrival Rule",
+        "body": "Motion may reveal chronology once; it must not delay reading, reorder evidence, or survive a reduced-motion preference.",
+        "section": "components"
       }
     ],
     "dos": [
       "Do preserve the near-black continuous field and off-white hierarchy.",
       "Do use square controls, thin rules, and tabular numerals for balances.",
       "Do keep claims next to operational proof: code, receipts, states, or ledger records.",
-      "Do stop nonessential canvas motion when its scene leaves the viewport."
+      "Do stop nonessential canvas motion when its scene leaves the viewport.",
+      "Do preserve scope labels, units, timestamps, and record identifiers when data stacks on mobile.",
+      "Do keep compact navigation keyboard-visible and explicitly named when its text label is visually hidden.",
+      "Do honor reduced-motion preferences for ledger arrival and chart transitions."
     ],
     "donts": [
       "Don't add colored gradients, glass cards, rounded SaaS panels, or decorative icon grids.",
       "Don't use mono type as a costume for ordinary marketing prose.",
       "Don't hide core navigation or demo functionality on smaller screens.",
-      "Don't bind interactions to visible copy; use stable semantic hooks."
+      "Don't bind interactions to visible copy; use stable semantic hooks.",
+      "Don't use color alone to distinguish ledger status, selection, or recovery state.",
+      "Don't collapse dense records into unlabeled values or reorder their evidence chain on mobile."
     ]
   }
 }

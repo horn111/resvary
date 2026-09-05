@@ -10,7 +10,7 @@ on:
         type: choice
         options: [dry_run, publish]
       version:
-        description: Stable version to release (for example, 0.8.0)
+        description: Version to release (for example, 1.0.0-rc.1 or 1.0.0)
         required: true
         type: string
       release_sha:
@@ -86,6 +86,50 @@ jobs:
           npm run test:exports
           npm run test:starters
 
+      - name: Install Chromium for Operator Console tests
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Operator Console browser tests
+        run: npm run test:e2e --workspace=@resvary/console
+
+      - name: Generate fixed Operator Console load profile
+        run: node scripts/generate-admin-load.mjs
+
+      - name: Enforce Operator Console query budgets
+        run: node scripts/benchmark-admin.mjs --samples 100
+
+      - name: Build Operator Console smoke image
+        run: docker build --tag resvary-console:release-candidate --file apps/console/Dockerfile .
+
+      - name: Smoke test Operator Console image
+        env:
+          SMOKE_SECRET: release-smoke-secret-with-at-least-32-characters
+        run: |
+          docker run --detach --name resvary-console-smoke --publish 3011:3000 \
+            --env RESVARY_PROJECT_ID=project_demo \
+            --env RESVARY_CONSOLE_ADMIN_SECRET="$SMOKE_SECRET" \
+            --env RESVARY_CONSOLE_DEMO_MODE=true \
+            resvary-console:release-candidate
+          trap 'docker logs resvary-console-smoke; docker rm --force resvary-console-smoke' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent \
+              --header "Authorization: Bearer $SMOKE_SECRET" \
+              http://127.0.0.1:3011/api/health | grep --quiet '"ok":true'; then
+              exit 0
+            fi
+            sleep 2
+          done
+          exit 1
+
+      - name: Scan Operator Console candidate image
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: resvary-console:release-candidate
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
       - name: Pack and inspect release archives
         env:
           RELEASE_ARTIFACT_DIR: ${{ runner.temp }}/release-artifacts
@@ -114,6 +158,8 @@ jobs:
       contents: write
       actions: read
       id-token: write
+      packages: write
+      security-events: write
     env:
       RELEASE_SHA: ${{ inputs.release_sha }}
 
@@ -148,7 +194,63 @@ jobs:
       - name: Verify registry metadata, provenance, installs, CLIs, and starters
         run: node scripts/release/registry.mjs finalize "${{ inputs.version }}"
 
-      - name: Create annotated tag and stable GitHub Release
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Derive Operator Console image tags
+        id: console-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/resvary-console
+          tags: |
+            type=raw,value=${{ inputs.version }}
+            type=raw,value=rc,enable=${{ contains(inputs.version, '-rc.') }}
+            type=raw,value=latest,enable=${{ !contains(inputs.version, '-') }}
+
+      - name: Publish multi-architecture Operator Console image
+        id: console-image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/console/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.console-meta.outputs.tags }}
+          labels: ${{ steps.console-meta.outputs.labels }}
+          sbom: true
+          provenance: mode=max
+
+      - name: Scan immutable Operator Console image
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ghcr.io/${{ github.repository_owner }}/resvary-console@${{ steps.console-image.outputs.digest }}
+          format: sarif
+          output: trivy-console.sarif
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Upload Operator Console scan report
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-console.sarif
+
+      - name: Record immutable Operator Console digest
+        run: |
+          echo "Published digest: ${{ steps.console-image.outputs.digest }}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Create annotated tag and GitHub Release
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/release/registry.mjs github-release "${{ inputs.version }}"

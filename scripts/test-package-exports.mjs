@@ -6,9 +6,12 @@ const exportsToCheck = [
   ['@resvary/sdk', 'CreditLedger'],
   ['@resvary/sdk/credits', 'InMemoryCreditStore'],
   ['@resvary/sdk/receipts', 'PersistentReceiptLedger'],
+  ['@resvary/sdk/admin', 'OperatorService'],
   ['@resvary/sqlite', 'createSqliteCreditStore'],
+  ['@resvary/sqlite/admin', 'createSqliteAdminStore'],
   ['@resvary/circle', 'GatewayNanopaymentFunding'],
   ['@resvary/postgres', 'createPostgresCreditStore'],
+  ['@resvary/postgres/admin', 'createPostgresAdminStore'],
   ['@resvary/worker', 'OutboxWorker'],
 ];
 

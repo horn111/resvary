@@ -15,4 +15,9 @@ export {
   type PostgresMigrationStatus,
 } from './migrations.js';
 export { checkPostgresHealth, type PostgresHealth } from './health.js';
+export {
+  PostgresAdminStore,
+  createPostgresAdminStore,
+  type PostgresAdminStoreConfig,
+} from './admin.js';
 export type { PostgresConnectionConfig } from './connection.js';

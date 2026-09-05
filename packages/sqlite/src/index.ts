@@ -18,8 +18,10 @@ import { hardenSqliteDatabaseFiles, prepareSqliteDatabasePath } from './filesyst
 export {
   SqliteCreditStore,
   createSqliteCreditStore,
+  SQLITE_SCHEMA_VERSION,
   type SqliteCreditStoreConfig,
 } from './credit.js';
+export { SqliteAdminStore, createSqliteAdminStore, type SqliteAdminStoreConfig } from './admin.js';
 
 export interface SqliteReceiptStoreConfig {
   path: string;

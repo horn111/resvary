@@ -1,0 +1,35 @@
+{
+  "name": "@resvary/console",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Self-hosted Resvary Operator Console",
+  "scripts": {
+    "dev": "next dev",
+    "prebuild": "npm run build --workspace=@resvary/sdk && npm run build --workspace=@resvary/sqlite && npm run build --workspace=@resvary/postgres",
+    "build": "next build",
+    "start": "next start",
+    "fixture": "node scripts/generate-fixture.mjs",
+    "test": "vitest run src",
+    "test:e2e": "playwright test"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "dependencies": {
+    "@resvary/postgres": "1.0.0",
+    "@resvary/sdk": "1.0.0",
+    "@resvary/sqlite": "1.0.0",
+    "next": "^16.3.3",
+    "pg": "^8.16.3",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@types/node": "^22.20.1",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "typescript": "^5.6.0",
+    "vitest": "^4.1.11"
+  }
+}

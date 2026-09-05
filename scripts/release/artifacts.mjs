@@ -3,7 +3,7 @@ import { access, mkdtemp, mkdir, readFile, readdir, rm, stat, writeFile } from '
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import {
-  assertStableVersion,
+  assertReleaseVersion,
   currentSha,
   publicPackages,
   readJson,
@@ -13,7 +13,7 @@ import {
 
 const mode = process.argv[2];
 const version = process.argv[3];
-assertStableVersion(version);
+assertReleaseVersion(version);
 const artifactDirectory = resolve(
   process.env.RELEASE_ARTIFACT_DIR ?? join(tmpdir(), 'resvary-release-artifacts'),
 );
@@ -192,9 +192,12 @@ async function writeSmokeSources(root) {
       ['@resvary/sdk', 'CreditLedger'],
       ['@resvary/sdk/credits', 'InMemoryCreditStore'],
       ['@resvary/sdk/receipts', 'PersistentReceiptLedger'],
+      ['@resvary/sdk/admin', 'OperatorService'],
       ['@resvary/sqlite', 'createSqliteCreditStore'],
+      ['@resvary/sqlite/admin', 'createSqliteAdminStore'],
       ['@resvary/circle', 'GatewayNanopaymentFunding'],
       ['@resvary/postgres', 'createPostgresCreditStore'],
+      ['@resvary/postgres/admin', 'createPostgresAdminStore'],
       ['@resvary/worker', 'OutboxWorker'],
     ])};\nfor (const [specifier, name] of checks) { const module = await import(specifier); if (typeof module[name] !== 'function') throw new Error(\`${'${specifier}'} missing ${'${name}'}\`); }\n`,
     'utf8',

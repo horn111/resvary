@@ -158,6 +158,21 @@
     grid-template-columns: minmax(0, 1fr) !important;
   }
 
+  .claudeDesign :global([data-operator-console-metrics]),
+  .claudeDesign :global([data-operator-console-capabilities]) {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .claudeDesign :global([data-operator-console-metrics] > div) {
+    border-right: 0 !important;
+    border-bottom: 1px solid var(--color-line);
+  }
+
+  .claudeDesign :global([data-operator-console-section] [style*='justify-content:space-between']) {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
   .claudeDesign :global([data-credit-model-table]),
   .claudeDesign :global([data-credit-model-table] tbody),
   .claudeDesign :global([data-credit-model-table] tr),
@@ -213,7 +228,7 @@
   }
 
   .claudeDesign :global([data-credit-model-table] td:nth-child(3))::before {
-    content: 'Resvary 0.8 stable';
+    content: 'Resvary 1.0 stable';
   }
 
   .claudeDesign :global(#top) {

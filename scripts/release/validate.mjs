@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import {
-  assertStableVersion,
+  assertReleaseVersion,
   currentSha,
   publicPackages,
   readJson,
@@ -11,7 +11,7 @@ import {
 } from './common.mjs';
 
 const version = process.argv[2];
-assertStableVersion(version);
+assertReleaseVersion(version);
 
 const releaseSha = process.env.RELEASE_SHA ?? currentSha();
 if (!/^[a-f0-9]{40}$/.test(releaseSha)) {
@@ -29,6 +29,7 @@ if (process.env.GITHUB_ACTIONS === 'true' && process.env.GITHUB_REF !== 'refs/he
 const manifests = [
   ['package.json', await readJson('package.json')],
   ['apps/demo/package.json', await readJson('apps/demo/package.json')],
+  ['apps/console/package.json', await readJson('apps/console/package.json')],
 ];
 for (const packageInfo of publicPackages) {
   const path = `${packageInfo.directory}/package.json`;

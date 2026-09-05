@@ -48,6 +48,16 @@ npm-debug.log*
 /motion-reference-*.png
 /output/
 /tmp/
+/.local/generated-collateral/
+/apps/console/test-results/
+/apps/console/playwright-report/
+/apps/console/fixtures/*.sqlite-wal
+/apps/console/fixtures/*.sqlite-shm
+/.impeccable/mocks/
+/.impeccable/questions/
+/.impeccable/review/
+/.impeccable/operator-console-brief.md
+/.impeccable/operator-console-surface-options.json
 
 # Local product marketing context
 .agents/

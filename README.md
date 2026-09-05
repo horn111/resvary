@@ -17,7 +17,7 @@ grant or top up credits
 → issue an auditable usage receipt
 ```
 
-Resvary keeps credit accounting separate from settlement. Arc is the reference network for external USDC funding: direct Arc transfers and Circle Gateway Nanopayments fund the same ledger. Resvary 0.8 adds graduated usage tiers and package-priced dimensions while preserving linear prices.
+Resvary keeps credit accounting separate from settlement. Arc is the reference network for external USDC funding: direct Arc transfers and Circle Gateway Nanopayments fund the same ledger. Resvary 1.0 adds an Operator Console for explaining balances and safely recovering operational failures without manual SQL.
 
 ## Why Resvary
 
@@ -36,6 +36,7 @@ Resvary provides:
 - transactional outbox events using the existing `x-resvary-signature` format;
 - in-memory, SQLite, and Postgres stores;
 - a lease-based outbox worker with retry and dead-letter recovery;
+- a self-hosted, single-project Operator Console with an audit explorer and guarded recovery actions;
 - direct Arc Testnet USDC top-ups with durable watcher recovery;
 - Circle Gateway Nanopayment top-ups through the official batching facilitator;
 - an interactive Next.js demo and Express/Next.js starter generator.
@@ -114,6 +115,21 @@ DATABASE_URL=postgres://... npx resvary-postgres migrate
 
 See the production persistence guide before moving an existing SQLite database.
 
+## Operator Console
+
+The production path uses PostgreSQL and runs its migration as an explicit deployment step:
+
+```bash
+export POSTGRES_PASSWORD='replace-with-a-database-password'
+export RESVARY_PROJECT_ID='my_ai_product'
+export RESVARY_CONSOLE_ADMIN_SECRET='replace-with-at-least-32-random-characters'
+docker compose -f docker-compose.console.yml up -d
+```
+
+The console shows balances, customer timelines, usage evidence, overdue reservations, outbox failures, funding reconciliation, and the append-only operator action log. It permits only positive grants, reasoned adjustments, overdue sweeps, and dead-letter requeue. One instance serves one project.
+
+See the [Operator Console guide](docs/operator-console.md) and [1.0 migration guide](docs/migration-1.0.md).
+
 ## Arc settlement for external USDC funding
 
 Arc provides Resvary's reference settlement path for external USDC funding. Install the Circle integration package to accept direct Arc Testnet transfers and Circle Gateway Nanopayments on Arc:
@@ -164,6 +180,7 @@ The old payment operations APIs remain under `/api/receipts`, `/api/receipts/pro
 | Import                     | Responsibility                                                              |
 | -------------------------- | --------------------------------------------------------------------------- |
 | `@resvary/sdk/credits`     | Accounts, grants, reservations, usage receipts, ledger, idempotency, outbox |
+| `@resvary/sdk/admin`       | Framework-neutral admin queries and guarded operator command service        |
 | `@resvary/sdk/pricing`     | Immutable linear, graduated, and package usage rating                       |
 | `@resvary/sdk/funding/arc` | Direct Arc invoice/payment receipt to credit grant adapter                  |
 | `@resvary/sdk/funding`     | Durable Arc funding worker                                                  |
@@ -197,6 +214,9 @@ The old payment operations APIs remain under `/api/receipts`, `/api/receipts/pro
 - [Persistence](docs/persistence.md)
 - [Production persistence deployment](docs/production-persistence.md)
 - [Grant policies and credit lots](docs/grant-policies.md)
+- [Operator Console](docs/operator-console.md)
+- [Operator Console production runbook](docs/operator-console-runbook.md)
+- [Migrate from 0.8 to 1.0](docs/migration-1.0.md)
 - [Migrate from 0.7 to 0.8](docs/migration-0.8.md)
 - [Migrate from 0.6 to 0.7](docs/migration-0.7.md)
 - [Migrate from 0.4 to 0.5](docs/migration-0.5.md)
