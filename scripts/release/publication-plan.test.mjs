@@ -165,9 +165,19 @@ test('release workflow uses one protected direct-publish job', async () => {
   assert.match(workflow, /environment: Production/);
   assert.equal(workflow.match(/environment: Production/g)?.length, 1);
   assert.match(workflow, /id-token: write/);
-  assert.match(workflow, /registry\.mjs publish/);
+  const publishJob = workflow.match(/\n  publish:\n([\s\S]*)/)?.[1];
+  assert.ok(publishJob);
+  assert.match(publishJob, /Checkout trusted release controller/);
+  assert.match(publishJob, /\.local\/release-controller\/scripts\/release\/registry\.mjs publish/);
   assert.match(workflow, /1\.0\.0-rc\.1/);
   assert.doesNotMatch(workflow, /npm stage|stage-receipt|inputs\.mode == 'stage'/);
+});
+
+test('stable releases preserve the last prerelease dist-tag under npm OIDC', async () => {
+  const registry = await readFile(new URL('./registry.mjs', import.meta.url), 'utf8');
+
+  assert.doesNotMatch(registry, /dist-tag['\"]?,\s*['\"]rm/);
+  assert.doesNotMatch(registry, /still has a next dist-tag/);
 });
 
 test('release Docker context excludes generated build state', async () => {

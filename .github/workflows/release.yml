@@ -171,6 +171,14 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Checkout trusted release controller
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          path: .local/release-controller
+          sparse-checkout: scripts/release
+          persist-credentials: false
+
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
@@ -189,10 +197,10 @@ jobs:
       - name: Publish dependency levels with provenance
         env:
           RELEASE_ARTIFACT_DIR: ${{ runner.temp }}/release-artifacts
-        run: node scripts/release/registry.mjs publish "${{ inputs.version }}"
+        run: node .local/release-controller/scripts/release/registry.mjs publish "${{ inputs.version }}"
 
       - name: Verify registry metadata, provenance, installs, CLIs, and starters
-        run: node scripts/release/registry.mjs finalize "${{ inputs.version }}"
+        run: node .local/release-controller/scripts/release/registry.mjs finalize "${{ inputs.version }}"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -253,4 +261,4 @@ jobs:
       - name: Create annotated tag and GitHub Release
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/release/registry.mjs github-release "${{ inputs.version }}"
+        run: node .local/release-controller/scripts/release/registry.mjs github-release "${{ inputs.version }}"
