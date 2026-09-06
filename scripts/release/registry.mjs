@@ -13,6 +13,7 @@ import {
   run,
 } from './common.mjs';
 import { createPublicationPlan } from './publication-plan.mjs';
+import { normalizeReleaseNotes } from './release-notes.mjs';
 
 const command = process.argv[2];
 const version = process.argv[3];
@@ -293,7 +294,7 @@ async function expectedReleaseNotes() {
     new RegExp(`## \\[${escaped}\\][^\\n]*\\n([\\s\\S]*?)(?=\\n## \\[)`),
   );
   if (!match) throw new Error(`Could not extract CHANGELOG section for ${changelogVersion}`);
-  return match[1].trim();
+  return normalizeReleaseNotes(match[1]);
 }
 
 async function ensureGitHubRelease(context, create) {
@@ -321,7 +322,7 @@ async function ensureGitHubRelease(context, create) {
     if (release.draft || release.prerelease !== (channel === 'next')) {
       throw new Error(`GitHub Release ${tag} has unexpected publication state`);
     }
-    if ((release.body ?? '').trim() !== notes) {
+    if (normalizeReleaseNotes(release.body ?? '') !== notes) {
       throw new Error(`GitHub Release ${tag} notes do not match CHANGELOG.md`);
     }
   }
