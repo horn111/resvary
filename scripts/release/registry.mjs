@@ -81,14 +81,6 @@ async function publishPackages() {
         '--provenance',
       ]);
     }
-    if (channel === 'latest') {
-      for (const { name } of level) {
-        const packument = await registryPackage(name);
-        if (packument?.['dist-tags']?.next) {
-          run('npm', ['dist-tag', 'rm', name, 'next']);
-        }
-      }
-    }
     for (const { name } of level) await waitForPublishedPackage(name);
   }
   console.log('All packages are public with matching provenance and release metadata.');
@@ -103,7 +95,6 @@ async function waitForPublishedPackage(name, timeoutMs = 300_000) {
     if (
       packument?.['dist-tags']?.[channel] === version &&
       packument?.['dist-tags']?.alpha === '0.5.0-alpha.3' &&
-      (channel === 'next' || packument?.['dist-tags']?.next === undefined) &&
       published?.gitHead === sha &&
       published?.dist?.attestations?.url
     ) {
@@ -124,9 +115,6 @@ async function finalizeRelease() {
     }
     if (packument?.['dist-tags']?.alpha !== '0.5.0-alpha.3') {
       throw new Error(`${name} alpha does not resolve to 0.5.0-alpha.3`);
-    }
-    if (channel === 'latest' && packument?.['dist-tags']?.next !== undefined) {
-      throw new Error(`${name} still has a next dist-tag`);
     }
     if (published?.gitHead !== sha) {
       throw new Error(`${name}@${version} gitHead does not match ${sha}`);
