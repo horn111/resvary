@@ -25,7 +25,12 @@ const artifactDirectory = resolve(
 if (command === 'publish') await publishPackages();
 else if (command === 'finalize') await finalizeRelease();
 else if (command === 'github-release') await createGitHubRelease();
-else throw new Error('Usage: registry.mjs <publish|finalize|github-release> <version>');
+else if (command === 'verify-github-release') await verifyGitHubRelease();
+else {
+  throw new Error(
+    'Usage: registry.mjs <publish|finalize|github-release|verify-github-release> <version>',
+  );
+}
 
 async function loadArtifactManifest() {
   const manifest = JSON.parse(
@@ -224,6 +229,19 @@ async function buildStarters(root) {
 }
 
 async function createGitHubRelease() {
+  const context = githubReleaseContext();
+  await ensureAnnotatedTag(context, true);
+  await ensureGitHubRelease(context, true);
+}
+
+async function verifyGitHubRelease() {
+  const context = githubReleaseContext();
+  await ensureAnnotatedTag(context, false);
+  await ensureGitHubRelease(context, false);
+  console.log(`Annotated tag and GitHub Release for ${context.tag} are valid.`);
+}
+
+function githubReleaseContext() {
   const token = process.env.GITHUB_TOKEN;
   const repository = process.env.GITHUB_REPOSITORY;
   if (!token || !repository) throw new Error('GitHub release credentials are missing');
@@ -236,14 +254,20 @@ async function createGitHubRelease() {
     'x-github-api-version': '2022-11-28',
   };
   const api = `https://api.github.com/repos/${repository}`;
+  return { api, headers, sha, tag };
+}
+
+async function ensureAnnotatedTag(context, create) {
+  const { api, headers, sha, tag } = context;
   const existingRef = await fetch(`${api}/git/ref/tags/${tag}`, { headers });
   if (existingRef.ok) {
     const body = await existingRef.json();
     if (body.object?.type !== 'tag') throw new Error(`${tag} exists but is not annotated`);
     const tagResponse = await fetch(body.object.url, { headers });
+    if (!tagResponse.ok) throw new Error(`Could not inspect annotated tag ${tag}`);
     const tagObject = await tagResponse.json();
     if (tagObject.object?.sha !== sha) throw new Error(`${tag} does not point to ${sha}`);
-  } else if (existingRef.status === 404) {
+  } else if (existingRef.status === 404 && create) {
     const tagObject = await githubRequest(`${api}/git/tags`, headers, {
       tag,
       message: `Resvary ${version}`,
@@ -254,10 +278,14 @@ async function createGitHubRelease() {
       ref: `refs/tags/${tag}`,
       sha: tagObject.sha,
     });
+  } else if (existingRef.status === 404) {
+    throw new Error(`Annotated tag ${tag} does not exist`);
   } else {
     throw new Error(`Could not inspect ${tag}: GitHub returned ${existingRef.status}`);
   }
+}
 
+async function expectedReleaseNotes() {
   const changelog = await readFile(resolve('CHANGELOG.md'), 'utf8');
   const changelogVersion = version.split('-')[0];
   const escaped = changelogVersion.replaceAll('.', '\\.');
@@ -265,18 +293,37 @@ async function createGitHubRelease() {
     new RegExp(`## \\[${escaped}\\][^\\n]*\\n([\\s\\S]*?)(?=\\n## \\[)`),
   );
   if (!match) throw new Error(`Could not extract CHANGELOG section for ${changelogVersion}`);
+  return match[1].trim();
+}
+
+async function ensureGitHubRelease(context, create) {
+  const { api, headers, sha, tag } = context;
+  const notes = await expectedReleaseNotes();
   const releaseResponse = await fetch(`${api}/releases/tags/${tag}`, { headers });
-  if (releaseResponse.status === 404) {
+  if (releaseResponse.status === 404 && create) {
     await githubRequest(`${api}/releases`, headers, {
       tag_name: tag,
       target_commitish: sha,
       name: `Resvary ${version}`,
-      body: match[1].trim(),
+      body: notes,
       draft: false,
       prerelease: channel === 'next',
     });
+  } else if (releaseResponse.status === 404) {
+    throw new Error(`GitHub Release ${tag} does not exist`);
   } else if (!releaseResponse.ok) {
     throw new Error(`Could not inspect GitHub Release: ${releaseResponse.status}`);
+  } else {
+    const release = await releaseResponse.json();
+    if (release.tag_name !== tag || release.name !== `Resvary ${version}`) {
+      throw new Error(`GitHub Release ${tag} has unexpected identity`);
+    }
+    if (release.draft || release.prerelease !== (channel === 'next')) {
+      throw new Error(`GitHub Release ${tag} has unexpected publication state`);
+    }
+    if ((release.body ?? '').trim() !== notes) {
+      throw new Error(`GitHub Release ${tag} notes do not match CHANGELOG.md`);
+    }
   }
 }
 
