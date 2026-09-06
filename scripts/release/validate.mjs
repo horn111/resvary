@@ -9,6 +9,7 @@ import {
   repositoryRoot,
   run,
 } from './common.mjs';
+import { assertReleaseWorkflowContext } from './workflow-context.mjs';
 
 const version = process.argv[2];
 assertReleaseVersion(version);
@@ -22,9 +23,14 @@ if (checkedOutSha !== releaseSha) {
   throw new Error(`Checked out ${checkedOutSha}; expected release SHA ${releaseSha}`);
 }
 
-if (process.env.GITHUB_ACTIONS === 'true' && process.env.GITHUB_REF !== 'refs/heads/main') {
-  throw new Error('Release workflows may run only from main');
-}
+assertReleaseWorkflowContext({
+  githubActions: process.env.GITHUB_ACTIONS === 'true',
+  githubRef: process.env.GITHUB_REF,
+  mode: process.env.RELEASE_MODE,
+  releaseSha,
+  workflowSha: process.env.GITHUB_SHA,
+  consoleDigest: process.env.CONSOLE_DIGEST,
+});
 
 const manifests = [
   ['package.json', await readJson('package.json')],

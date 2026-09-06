@@ -54,9 +54,7 @@ test('advances next from an older release candidate', () => {
   const plan = createPublicationPlan({
     version: '1.0.0-rc.2',
     releaseSha,
-    packageStates: names.map((name) =>
-      state(name, { latest: '0.8.0', next: '1.0.0-rc.1' }),
-    ),
+    packageStates: names.map((name) => state(name, { latest: '0.8.0', next: '1.0.0-rc.1' })),
     publishLevels,
   });
 
@@ -90,9 +88,7 @@ test('rejects an older or equal prerelease channel', () => {
       createPublicationPlan({
         version: '1.0.0-rc.1',
         releaseSha,
-        packageStates: names.map((name) =>
-          state(name, { latest: '0.8.0', next: '1.0.0-rc.2' }),
-        ),
+        packageStates: names.map((name) => state(name, { latest: '0.8.0', next: '1.0.0-rc.2' })),
         publishLevels,
       }),
     /is not older than prerelease/,
@@ -155,22 +151,37 @@ test('rejects divergent previous latest tags', () => {
   );
 });
 
-test('release workflow uses one protected direct-publish job', async () => {
+test('release workflow separates protected publication from read-only reconciliation', async () => {
   const workflow = await readFile(
     new URL('../../.github/workflows/release.yml', import.meta.url),
     'utf8',
   );
 
-  assert.match(workflow, /options: \[dry_run, publish\]/);
+  assert.match(workflow, /options: \[dry_run, publish, reconcile\]/);
   assert.match(workflow, /environment: Production/);
-  assert.equal(workflow.match(/environment: Production/g)?.length, 1);
+  assert.equal(workflow.match(/environment: Production/g)?.length, 2);
   assert.match(workflow, /id-token: write/);
-  const publishJob = workflow.match(/\n  publish:\n([\s\S]*)/)?.[1];
+  const publishJob = workflow.match(/\r?\n  publish:\r?\n([\s\S]*?)(?=\r?\n  reconcile:)/)?.[1];
   assert.ok(publishJob);
   assert.match(publishJob, /Checkout trusted release controller/);
   assert.match(publishJob, /\.local\/release-controller\/scripts\/release\/registry\.mjs publish/);
+  const reconcileJob = workflow.match(/\r?\n  reconcile:\r?\n([\s\S]*)/)?.[1];
+  assert.ok(reconcileJob);
+  assert.match(reconcileJob, /Verify published release without mutation/);
+  assert.match(reconcileJob, /contents: read/);
+  assert.match(reconcileJob, /packages: read/);
+  assert.doesNotMatch(reconcileJob, /id-token: write|packages: write|push: true/);
+  assert.match(reconcileJob, /registry\.mjs verify-github-release/);
+  assert.match(reconcileJob, /docker buildx imagetools inspect/);
   assert.match(workflow, /1\.0\.0-rc\.1/);
   assert.doesNotMatch(workflow, /npm stage|stage-receipt|inputs\.mode == 'stage'/);
+});
+
+test('publish mode refuses to target an older workflow commit', async () => {
+  const validation = await readFile(new URL('./workflow-context.mjs', import.meta.url), 'utf8');
+
+  assert.match(validation, /mode === 'publish' && releaseSha !== workflowSha/);
+  assert.match(validation, /GitHub Actions cannot create a release tag on an older commit/);
 });
 
 test('stable releases preserve the last prerelease dist-tag under npm OIDC', async () => {
