@@ -23,7 +23,7 @@ flowchart LR
 | Gate                                                        | Status                                                                                                    |
 | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | Vercel project named `resvary-agent-demo`                   | Created                                                                                                   |
-| Production URL `https://agent.resvary.xyz`                  | Assigned to a `READY` Linux production deployment; the Vercel URL remains available as a fallback         |
+| Production URL `https://agent.resvary.xyz`                  | Canonical interactive origin assigned to a `READY` Linux production deployment                            |
 | Managed Neon PostgreSQL free database in `fra1`             | Provisioned and migrated                                                                                  |
 | Source validation                                           | 43 agent-demo tests, 17 nanopayment and credit-gate tests, and compiled Workflow browser E2E passed       |
 | Nous `qwen/qwen3.8-flash` agent profile                     | Selected                                                                                                  |
