@@ -1,0 +1,46 @@
+{
+  "name": "@resvary/agent-demo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --port 3100",
+    "build": "next build",
+    "start": "next start --port 3100",
+    "worker": "tsx src/worker.ts",
+    "migrate": "tsx scripts/migrate.ts",
+    "proof": "tsx scripts/proof.ts",
+    "preflight": "tsx scripts/preflight.ts",
+    "test": "vitest run src --maxWorkers=1",
+    "test:e2e": "playwright test",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": "24.x"
+  },
+  "dependencies": {
+    "@circle-fin/cli": "1.0.0",
+    "@openai/agents": "0.17.1",
+    "@resvary/circle": "1.0.0",
+    "@resvary/postgres": "1.0.0",
+    "@resvary/sdk": "1.0.0",
+    "next": "^16.3.3",
+    "openai": "7.10.0",
+    "pg": "^8.16.3",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "tsx": "4.23.13",
+    "workflow": "4.8.8",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "@types/node": "^22.20.1",
+    "@types/pg": "^8.15.5",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "@vercel/nft": "1.11.0",
+    "typescript": "^5.6.0",
+    "vitest": "^4.1.11"
+  }
+}

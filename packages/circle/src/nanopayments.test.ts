@@ -101,6 +101,51 @@ async function fixture() {
 }
 
 describe('GatewayNanopaymentFunding', () => {
+  it('rejects the CLI 1.0.0 timeout rewrite before calling Gateway', async () => {
+    const { funding, request, payload, facilitator } = await fixture();
+    payload.accepted.maxTimeoutSeconds = 30 * 24 * 60 * 60;
+    await expect(
+      funding.verifySettleAndCredit({
+        fundingIntentId: request.fundingIntent.id,
+        paymentPayload: payload,
+        idempotencyKey: 'cli-timeout-mismatch',
+      }),
+    ).rejects.toThrow('Gateway accepted requirements differ from the funding request');
+    expect(facilitator.verifyCalls).toBe(0);
+    expect(facilitator.settleCalls).toBe(0);
+  });
+
+  it('supports an explicitly advertised 30-day CLI authorization window without extending the intent TTL', async () => {
+    const ledger = new CreditLedger({ projectId: 'project_test', now: () => NOW });
+    const facilitator = new FakeFacilitator();
+    const funding = new GatewayNanopaymentFunding({
+      ledger,
+      sellerAddress: SELLER,
+      facilitator,
+      now: () => NOW,
+      authorizationValiditySeconds: 30 * 24 * 60 * 60,
+    });
+    const request = await funding.createFundingRequest({
+      customerId: 'cli_customer',
+      amount: '5',
+      expectedPayer: PAYER,
+      idempotencyKey: 'cli_request',
+    });
+    expect(request.paymentRequired.accepts[0].maxTimeoutSeconds).toBe(2_592_000);
+    expect(request.fundingIntent.expiresAt).toBe(
+      NOW + ARC_GATEWAY_TESTNET.authorizationValiditySeconds * 1_000,
+    );
+    const payload = payloadFor(request);
+    payload.payload.authorization!.validBefore = String(NOW / 1_000 + 2_592_000);
+    const result = await funding.verifySettleAndCredit({
+      fundingIntentId: request.fundingIntent.id,
+      paymentPayload: payload,
+      idempotencyKey: 'cli_settle',
+    });
+    expect(result.account.availableAmount).toBe('5');
+    expect(facilitator.settleCalls).toBe(1);
+  });
+
   it('verifies, settles, and grants exact credits once', async () => {
     const { facilitator, funding, request, payload } = await fixture();
     const first = await funding.verifySettleAndCredit({

@@ -90,6 +90,8 @@ export interface GatewayNanopaymentFundingConfig {
   facilitatorUrl?: string;
   resourceUrl?: string;
   intentTtlMs?: number;
+  /** EIP-3009 authorization window advertised to clients, independent of intent expiry. */
+  authorizationValiditySeconds?: number;
   now?: () => number;
 }
 
@@ -143,6 +145,7 @@ export class GatewayNanopaymentFunding {
   private readonly paymentScheme = new GatewayEvmScheme();
   private readonly resourceUrl: string;
   private readonly intentTtlMs: number;
+  private readonly authorizationValiditySeconds: number;
   private readonly now: () => number;
 
   constructor(config: GatewayNanopaymentFundingConfig) {
@@ -156,6 +159,14 @@ export class GatewayNanopaymentFunding {
     this.resourceUrl = config.resourceUrl ?? '/api/credits/gateway';
     this.intentTtlMs =
       config.intentTtlMs ?? ARC_GATEWAY_TESTNET.authorizationValiditySeconds * 1_000;
+    this.authorizationValiditySeconds =
+      config.authorizationValiditySeconds ?? ARC_GATEWAY_TESTNET.authorizationValiditySeconds;
+    if (
+      !Number.isSafeInteger(this.authorizationValiditySeconds) ||
+      this.authorizationValiditySeconds < ARC_GATEWAY_TESTNET.authorizationValiditySeconds
+    ) {
+      throw new Error('authorizationValiditySeconds must cover the Gateway minimum window');
+    }
     this.now = config.now ?? Date.now;
     if (!Number.isSafeInteger(this.intentTtlMs) || this.intentTtlMs <= 0) {
       throw new Error('intentTtlMs must be a positive integer');
@@ -315,7 +326,7 @@ export class GatewayNanopaymentFunding {
       asset: ARC_GATEWAY_TESTNET.usdcAddress,
       amount: intent.requestedUnits,
       payTo: this.sellerAddress,
-      maxTimeoutSeconds: ARC_GATEWAY_TESTNET.authorizationValiditySeconds,
+      maxTimeoutSeconds: this.authorizationValiditySeconds,
       extra: {
         name: CIRCLE_BATCHING_NAME,
         version: CIRCLE_BATCHING_VERSION,

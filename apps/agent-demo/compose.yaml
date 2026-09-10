@@ -1,0 +1,59 @@
+name: resvary-agent-demo
+x-app: &app
+  image: resvary-agent-demo:local
+  build:
+    context: ../..
+    dockerfile: apps/agent-demo/Dockerfile
+  restart: unless-stopped
+  init: true
+  read_only: true
+  tmpfs: [/tmp]
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  depends_on:
+    db:
+      condition: service_healthy
+x-env: &env
+  DATABASE_URL: postgresql://agent:${AGENT_DEMO_DB_PASSWORD:?Set database password}@db:5432/agent_demo
+  AGENT_DEMO_SECRET: ${AGENT_DEMO_SECRET:?Set session secret}
+  AGENT_DEMO_ORIGIN: ${AGENT_DEMO_ORIGIN:?Set HTTPS origin}
+  AGENT_DEMO_PAYER: ${AGENT_DEMO_PAYER:?Set Agent Wallet address}
+  AGENT_DEMO_SELLER: ${AGENT_DEMO_SELLER:?Set seller address}
+  AGENT_DEMO_ACCEPTING: ${AGENT_DEMO_ACCEPTING:-false}
+  AGENT_DEMO_TEST_MODE: 'false'
+  AGENT_DEMO_INITIAL_SPEND_UNITS: ${AGENT_DEMO_INITIAL_SPEND_UNITS:-0}
+  AGENT_DEMO_TRUSTED_IP_HEADER: x-resvary-client-ip
+services:
+  db:
+    image: postgres:17-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: agent
+      POSTGRES_PASSWORD: ${AGENT_DEMO_DB_PASSWORD:?Set database password}
+      POSTGRES_DB: agent_demo
+    volumes: [postgres-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U agent -d agent_demo']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  migrate:
+    <<: *app
+    restart: 'no'
+    environment: *env
+    command: [node, ../../node_modules/tsx/dist/cli.mjs, scripts/migrate.ts]
+    profiles: [tools]
+  web:
+    <<: *app
+    environment: *env
+    ports: ['127.0.0.1:3100:3100']
+  worker:
+    <<: *app
+    environment:
+      <<: *env
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?Set API key}
+    volumes: [circle-session:/home/node/.circle-cli]
+    command: [node, ../../node_modules/tsx/dist/cli.mjs, src/worker.ts]
+volumes:
+  postgres-data:
+  circle-session:

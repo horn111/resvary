@@ -9,5 +9,12 @@
 **/coverage
 **/*.log
 **/*.tsbuildinfo
+**/.env
+**/.env.local
+**/.env.*.local
+**/test-results
+**/playwright-report
+tmp
+output
 apps/console/fixtures/*.sqlite-wal
 apps/console/fixtures/*.sqlite-shm
