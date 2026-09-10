@@ -9,7 +9,7 @@ The Vercel deployment keeps the OpenAI Agents SDK for the agent loop. The select
 | Item                    | Current status                                                                                                                               |
 | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | Vercel project          | `resvary-agent-demo`                                                                                                                         |
-| Production URL          | <https://resvary-agent-demo.vercel.app> points to a `READY` production deployment.                                                           |
+| Production URL          | <https://agent.resvary.xyz> is the canonical interactive origin on a `READY` production deployment.                                          |
 | Web and execution stack | Next.js 16, Vercel Workflow `4.8.8`, Node.js 24                                                                                              |
 | Database                | Managed Neon PostgreSQL, free plan, `fra1`; migrations passed.                                                                               |
 | Source verification     | 43 agent-demo tests, 17 nanopayment and credit-gate tests, and the compiled Workflow browser E2E passed.                                     |

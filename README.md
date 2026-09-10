@@ -23,7 +23,7 @@ grant or top up credits
 
 Resvary keeps credit accounting separate from settlement. Arc is the reference network for external USDC funding: direct Arc transfers and Circle Gateway Nanopayments fund the same ledger. Resvary 1.0 adds an Operator Console for explaining balances and safely recovering operational failures without manual SQL.
 
-The [ETHOnline agent demo](https://resvary-agent-demo.vercel.app) shows an OpenAI Agents SDK buyer funding credits through Circle Agent Wallet and Gateway on Arc Testnet before it buys document analysis.
+The [ETHOnline agent demo](https://agent.resvary.xyz) shows an OpenAI Agents SDK buyer funding credits through Circle Agent Wallet and Gateway on Arc Testnet before it buys document analysis.
 
 ## Why Resvary
 
@@ -144,11 +144,11 @@ See the [Operator Console guide](docs/operator-console.md) and [1.0 migration gu
 
 The Continuity implementation adds an OpenAI Agents SDK buyer that purchases document analysis with Resvary credits. The agent checks the balance and quote. When the account lacks credits, server-side controls use Circle Agent Wallet and Gateway to fund the account with Testnet USDC on Arc. Resvary reserves the quoted cost, charges measured usage, releases the unused amount, and returns a receipt.
 
-- [Live agent demo](https://resvary-agent-demo.vercel.app)
+- [Live agent demo](https://agent.resvary.xyz)
 - [Agent demo source and setup](apps/agent-demo/README.md)
 - [Architecture and trust boundaries](docs/agent-demo-architecture.md)
 - [Continuity disclosure](docs/ethonline-continuity.md)
-- [Sanitized live proof](https://resvary-agent-demo.vercel.app/proofs/2026-09-10.json)
+- [Sanitized live proof](https://agent.resvary.xyz/proofs/2026-09-10.json)
 
 The demo is a working prototype with a verified Circle Testnet payment-and-analysis path. The proof states the remaining limits, including unobserved Gateway batch confirmation and production retention behavior.
 
