@@ -51,6 +51,8 @@ npm-debug.log*
 /.local/generated-collateral/
 /apps/console/test-results/
 /apps/console/playwright-report/
+/apps/agent-demo/test-results/
+/apps/agent-demo/playwright-report/
 /apps/console/fixtures/*.sqlite-wal
 /apps/console/fixtures/*.sqlite-shm
 /.impeccable/mocks/

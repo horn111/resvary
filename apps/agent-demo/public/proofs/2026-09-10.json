@@ -1,0 +1,117 @@
+{
+  "schema": "resvary-agent-live-verification-v1",
+  "recordedAt": "2026-09-09T22:39:22Z",
+  "localDate": "2026-09-10",
+  "timeZone": "Europe/Moscow",
+  "origin": "https://resvary-agent-demo.vercel.app",
+  "executionDeploymentId": "dpl_EEQU1sFtYaRTxkEtdArCTBsG5Kco",
+  "executionDeploymentUrl": "https://resvary-agent-demo-aab9jh8xp-horn111s-projects.vercel.app",
+  "network": "eip155:5042002",
+  "testFixture": false,
+  "models": {
+    "agent": {
+      "provider": "nous",
+      "model": "qwen/qwen3.8-flash",
+      "inputUsdPerMillion": 0.15,
+      "outputUsdPerMillion": 0.47
+    },
+    "analysis": {
+      "provider": "nous",
+      "model": "openai/gpt-4.1-mini",
+      "inputUsdPerMillion": 0.4,
+      "outputUsdPerMillion": 1.6
+    }
+  },
+  "creditTariff": {
+    "unitScale": 6,
+    "inputUsdPerMillion": 2,
+    "outputUsdPerMillion": 8,
+    "note": "Product credits, not the provider invoice or the fixed demo-budget hold."
+  },
+  "gateway": {
+    "transferId": "79c04414-c4ec-4ccd-95b8-24df4e8b6e3b",
+    "verificationUrl": "https://gateway-api-testnet.circle.com/v1/x402/transfers/79c04414-c4ec-4ccd-95b8-24df4e8b6e3b",
+    "httpStatus": 200,
+    "statusAtVerification": "received",
+    "token": "USDC",
+    "amountBaseUnits": "20000",
+    "sendingNetwork": "eip155:5042002",
+    "recipientNetwork": "eip155:5042002",
+    "fromAddress": "0x6fd602c654730c4b642b555a9957e9cf0ac0fc3b",
+    "toAddress": "0x4ae8b4e11b05380d0b122d99c1a29050cf8eba2d",
+    "createdAt": "2026-09-09T22:32:04.997Z",
+    "onchainTransactionHashAtVerification": null,
+    "note": "Gateway accepted the payment. Batch onchain confirmation was not observed; the ledger's settled funding status records facilitator acceptance, not batch finality."
+  },
+  "jobs": [
+    {
+      "jobId": "8729f212-e29b-4e5e-8d9c-948423e67781",
+      "createdAt": "2026-09-09T22:31:50.503Z",
+      "phase": "completed",
+      "reservationId": "rsv_ffebcfcf4e4c840f40c0fb59",
+      "receiptId": "urcpt_825946a2ea68963e28f4ec9c",
+      "reserved": "0.010276",
+      "charged": "0.001268",
+      "released": "0.009008",
+      "balanceAfterUnits": "18732",
+      "serviceUsage": { "input_tokens": "118", "output_tokens": "129" },
+      "agentUsage": { "requests": 5, "inputTokens": 3631, "outputTokens": 184 },
+      "funding": [
+        {
+          "fundingIntentId": "fund_a8eb133bfad3297c19d579ed",
+          "fundingTransactionId": "ftx_45d083e0ada44e2038726ff3",
+          "amount": "0.02",
+          "gatewayTransferId": "79c04414-c4ec-4ccd-95b8-24df4e8b6e3b",
+          "ledgerSettlementStatus": "settled"
+        }
+      ]
+    },
+    {
+      "jobId": "9c4ebb56-0d89-410b-a136-09dacad68375",
+      "createdAt": "2026-09-09T22:32:11.088Z",
+      "phase": "completed",
+      "reservationId": "rsv_3213dd1dbdf5427e1f52c24b",
+      "receiptId": "urcpt_229a2629b2e7e938e70d46d9",
+      "reserved": "0.009714",
+      "charged": "0.000988",
+      "released": "0.008726",
+      "balanceAfterUnits": "17744",
+      "serviceUsage": { "input_tokens": "66", "output_tokens": "107" },
+      "agentUsage": { "requests": 4, "inputTokens": 2883, "outputTokens": 214 },
+      "funding": []
+    }
+  ],
+  "verification": {
+    "databaseReceiptsMatchSavedJobs": true,
+    "chargedPlusReleasedEqualsReserved": true,
+    "firstJobHasExactlyOneFundingTransaction": true,
+    "sameRequestKeyReturnedSameJobResultReceiptAndEvents": true,
+    "replayPreservedBalanceAndJobCount": true,
+    "secondJobUsedRemainingCreditsWithoutPayment": true,
+    "independentSessionHasNoJobsAndZeroCredits": true,
+    "crossSessionJobReadHttpStatus": 404,
+    "anonymousStatusHttpStatus": 401,
+    "liveBrowserRun": "Payment, analysis, receipt, replay, and leftover-credit checks passed. The final isolation assertion read status before session initialization and failed. The explicit wait was fixed; the full paid run was not repeated.",
+    "separateReadOnlyIsolationRun": "Passed against production without creating a paid job; checked secure HttpOnly SameSite=Strict cookie and mobile layout.",
+    "sourceTests": {
+      "agentDemoPassed": 43,
+      "nanopaymentsAndCreditGatePassed": 17,
+      "compiledWorkflowFixtureBrowserPassed": 1
+    }
+  },
+  "budgetSnapshot": {
+    "ceilingMicroUsd": "10000000",
+    "priorProbeHoldsMicroUsd": "19390",
+    "jobHolds": 3,
+    "perJobHoldMicroUsd": "400000",
+    "remainingUpperBoundMicroUsd": "8780610",
+    "note": "Conservative reserved capacity, not actual provider spend. Includes one earlier failed job whose payment was rejected before facilitator verification. Its hold was not refunded."
+  },
+  "limitations": [
+    "Gateway batch onchain confirmation was not observed at verification time.",
+    "A real 24-hour production cleanup cycle and sustained-load behavior have not yet been observed.",
+    "External AI and payment outcomes are not claimed to be exactly-once.",
+    "These are operator-exported ledger records, not cryptographic attestations of AI inference. The Gateway transfer can be checked independently.",
+    "Submitted documents, model results, signatures, session cookies, and credentials are intentionally omitted."
+  ]
+}

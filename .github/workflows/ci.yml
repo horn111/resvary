@@ -93,6 +93,41 @@ jobs:
       - name: Run workspace tests
         run: npm test
 
+  agent-demo:
+    name: Agent demo / PostgreSQL and browser
+    runs-on: ubuntu-latest
+    needs: build
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: resvary_agent_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d resvary_agent_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/resvary_agent_test
+      AGENT_DEMO_TEST_EXECUTION_MODE: workflow
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run build:core
+      - run: npm test --workspace @resvary/agent-demo
+      - run: npm run build --workspace @resvary/agent-demo
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e --workspace @resvary/agent-demo
+      - name: Build deployment image
+        run: docker build --tag resvary-agent-demo:ci --file apps/agent-demo/Dockerfile .
+
   console-e2e:
     name: Operator Console browser tests
     runs-on: ubuntu-latest

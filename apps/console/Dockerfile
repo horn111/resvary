@@ -4,6 +4,7 @@ WORKDIR /workspace
 COPY package.json package-lock.json ./
 COPY apps/console/package.json apps/console/package.json
 COPY apps/demo/package.json apps/demo/package.json
+COPY apps/agent-demo/package.json apps/agent-demo/package.json
 COPY packages/sdk/package.json packages/sdk/package.json
 COPY packages/sqlite/package.json packages/sqlite/package.json
 COPY packages/postgres/package.json packages/postgres/package.json

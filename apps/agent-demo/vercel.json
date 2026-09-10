@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "buildCommand": "cd ../.. && npm run build:core && npm run build --workspace=@resvary/agent-demo",
+  "installCommand": "cd ../.. && npm ci",
+  "regions": ["fra1"],
+  "functions": {
+    "src/app/.well-known/workflow/v1/step/route.*": { "maxDuration": 300 },
+    "src/app/api/[...path]/route.ts": { "maxDuration": 300 }
+  }
+}
