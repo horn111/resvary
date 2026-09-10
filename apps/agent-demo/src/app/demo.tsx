@@ -165,12 +165,7 @@ export default function Demo() {
           resvary<span> / agent demo</span>
         </a>
         <nav aria-label="Demo evidence">
-          <a
-            className="proof-link"
-            href="/proofs/2026-09-10.json"
-            target="_blank"
-            rel="noreferrer"
-          >
+          <a className="proof-link" href="/proofs/2026-09-10.json" target="_blank" rel="noreferrer">
             Proof
           </a>
           <span className="tag">ARC TESTNET</span>

@@ -6,6 +6,10 @@
 
 <p align="center"><strong>Open-source prepaid credits and usage billing for AI products.</strong></p>
 
+<p align="center">
+  <a href="https://ethglobal.com/events/ethonline2026"><img src="https://img.shields.io/badge/ETHOnline%202026-Continuity%20participant-6c5ce7?style=flat-square&logo=ethereum&logoColor=white" alt="ETHOnline 2026 Continuity participant" /></a>
+</p>
+
 Resvary gives AI applications a durable balance ledger and a safe request lifecycle:
 
 ```text
@@ -18,6 +22,8 @@ grant or top up credits
 ```
 
 Resvary keeps credit accounting separate from settlement. Arc is the reference network for external USDC funding: direct Arc transfers and Circle Gateway Nanopayments fund the same ledger. Resvary 1.0 adds an Operator Console for explaining balances and safely recovering operational failures without manual SQL.
+
+The [ETHOnline agent demo](https://resvary-agent-demo.vercel.app) shows an OpenAI Agents SDK buyer funding credits through Circle Agent Wallet and Gateway on Arc Testnet before it buys document analysis.
 
 ## Why Resvary
 
@@ -128,7 +134,23 @@ docker compose -f docker-compose.console.yml up -d
 
 The console shows balances, customer timelines, usage evidence, overdue reservations, outbox failures, funding reconciliation, and the append-only operator action log. It permits only positive grants, reasoned adjustments, overdue sweeps, and dead-letter requeue. One instance serves one project.
 
+![Resvary Operator Console showing balances, ledger events, and a usage-receipt evidence chain with synthetic demo data](docs/images/operator-console-dashboard.png)
+
+_Operator Console with synthetic demo data._
+
 See the [Operator Console guide](docs/operator-console.md) and [1.0 migration guide](docs/migration-1.0.md).
+
+## ETHOnline 2026 agent demo
+
+The Continuity implementation adds an OpenAI Agents SDK buyer that purchases document analysis with Resvary credits. The agent checks the balance and quote. When the account lacks credits, server-side controls use Circle Agent Wallet and Gateway to fund the account with Testnet USDC on Arc. Resvary reserves the quoted cost, charges measured usage, releases the unused amount, and returns a receipt.
+
+- [Live agent demo](https://resvary-agent-demo.vercel.app)
+- [Agent demo source and setup](apps/agent-demo/README.md)
+- [Architecture and trust boundaries](docs/agent-demo-architecture.md)
+- [Continuity disclosure](docs/ethonline-continuity.md)
+- [Sanitized live proof](https://resvary-agent-demo.vercel.app/proofs/2026-09-10.json)
+
+The demo is a working prototype with a verified Circle Testnet payment-and-analysis path. The proof states the remaining limits, including unobserved Gateway batch confirmation and production retention behavior.
 
 ## Arc settlement for external USDC funding
 
@@ -216,6 +238,9 @@ The old payment operations APIs remain under `/api/receipts`, `/api/receipts/pro
 - [Grant policies and credit lots](docs/grant-policies.md)
 - [Operator Console](docs/operator-console.md)
 - [Operator Console production runbook](docs/operator-console-runbook.md)
+- [ETHOnline agent demo architecture](docs/agent-demo-architecture.md)
+- [ETHOnline agent demo Vercel runbook](docs/agent-demo-vercel-runbook.md)
+- [ETHOnline continuity disclosure](docs/ethonline-continuity.md)
 - [Migrate from 0.8 to 1.0](docs/migration-1.0.md)
 - [Migrate from 0.7 to 0.8](docs/migration-0.8.md)
 - [Migrate from 0.6 to 0.7](docs/migration-0.7.md)

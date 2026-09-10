@@ -5,7 +5,8 @@ import { paymentReadiness } from './lib/circle-cli';
 import type { Job } from './lib/store';
 
 const rt = createRuntime();
-if (rt.cfg.executionMode !== 'worker') throw new Error('Legacy worker is disabled in workflow mode');
+if (rt.cfg.executionMode !== 'worker')
+  throw new Error('Legacy worker is disabled in workflow mode');
 const lock = await rt.pool.connect();
 let stopping = false;
 process.on('SIGTERM', () => {
