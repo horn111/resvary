@@ -31,7 +31,7 @@ Review the complete diff for lockfile, build-context, and Vercel configuration c
 
 ## Production configuration
 
-The dedicated Vercel project is `resvary-agent-demo`, and <https://resvary-agent-demo.vercel.app> points to a `READY` Linux production deployment. The database uses managed Neon PostgreSQL on the free plan in `fra1`, and migrations passed. The deployment resolves Circle CLI from the Node runtime and uses `@vercel/nft` to trace its target-OS dependencies, including native files outside the ordinary Turbopack module bundle.
+The dedicated Vercel project is `resvary-agent-demo`, and <https://agent.resvary.xyz> points to a `READY` Linux production deployment. The Vercel URL remains available as a fallback. The database uses managed Neon PostgreSQL on the free plan in `fra1`, and migrations passed. The deployment resolves Circle CLI from the Node runtime and uses `@vercel/nft` to trace its target-OS dependencies, including native files outside the ordinary Turbopack module bundle.
 
 The selected provider configuration uses Nous for both roles:
 
@@ -70,6 +70,6 @@ An earlier live attempt stopped before Gateway verification because Circle CLI `
 
 Gateway transfer `79c04414-c4ec-4ccd-95b8-24df4e8b6e3b` independently reported the expected 20,000 USDC base units, payer, seller, and Arc Testnet network. Its status was `received` with no transaction hash. Gateway accepts nanopayments before [batch settlement onchain](https://developers.circle.com/gateway/nanopayments/concepts/batched-settlement); the successful facilitator response and Resvary credit grant do not prove final batch confirmation. Real 24-hour cleanup and sustained-load behavior also remain unverified.
 
-The proof exporter rejects fixture runs and omits user text, results, signatures, session data, and credentials. Describe <https://resvary-agent-demo.vercel.app> as a working prototype with a verified live payment-and-analysis path. Do not claim production maturity or exactly-once execution by an external provider.
+The proof exporter rejects fixture runs and omits user text, results, signatures, session data, and credentials. Describe <https://agent.resvary.xyz> as a working prototype with a verified live payment-and-analysis path. Do not claim production maturity or exactly-once execution by an external provider.
 
 Keep application-form prose, submission drafts, campaign material, and recording scripts outside the Git worktree. The user records the video and submits the final form. The September 12 target remains internal; the operator must confirm the exact ETHGlobal deadline in the official dashboard.

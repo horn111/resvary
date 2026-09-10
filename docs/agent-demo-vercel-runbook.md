@@ -23,7 +23,7 @@ flowchart LR
 | Gate                                                        | Status                                                                                                    |
 | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | Vercel project named `resvary-agent-demo`                   | Created                                                                                                   |
-| Production URL `https://resvary-agent-demo.vercel.app`      | Assigned to a `READY` Linux production deployment                                                         |
+| Production URL `https://agent.resvary.xyz`                  | Assigned to a `READY` Linux production deployment; the Vercel URL remains available as a fallback         |
 | Managed Neon PostgreSQL free database in `fra1`             | Provisioned and migrated                                                                                  |
 | Source validation                                           | 43 agent-demo tests, 17 nanopayment and credit-gate tests, and compiled Workflow browser E2E passed       |
 | Nous `qwen/qwen3.8-flash` agent profile                     | Selected                                                                                                  |
@@ -100,7 +100,7 @@ Use Vercel Sensitive variables for credentials and connection strings. Keep both
 Configure the public controls:
 
 ```text
-AGENT_DEMO_ORIGIN=https://resvary-agent-demo.vercel.app
+AGENT_DEMO_ORIGIN=https://agent.resvary.xyz
 AGENT_DEMO_EXECUTION_MODE=workflow
 AGENT_DEMO_TEST_MODE=false
 AGENT_DEMO_ACCEPTING=false
@@ -193,7 +193,7 @@ The live browser suite requires explicit opt-in because a full run creates two p
 
 ```powershell
 $env:RUN_LIVE_AGENT_DEMO='true'
-$env:LIVE_AGENT_DEMO_URL='https://resvary-agent-demo.vercel.app'
+$env:LIVE_AGENT_DEMO_URL='https://agent.resvary.xyz'
 npm run test:e2e --workspace @resvary/agent-demo -- --config playwright.production.config.ts --grep 'live funding'
 ```
 
