@@ -31,7 +31,7 @@ Review the complete diff for lockfile, build-context, and Vercel configuration c
 
 ## Production configuration
 
-The dedicated Vercel project is `resvary-agent-demo`, and <https://agent.resvary.xyz> points to a `READY` Linux production deployment. The Vercel URL remains available as a fallback. The database uses managed Neon PostgreSQL on the free plan in `fra1`, and migrations passed. The deployment resolves Circle CLI from the Node runtime and uses `@vercel/nft` to trace its target-OS dependencies, including native files outside the ordinary Turbopack module bundle.
+The dedicated Vercel project is `resvary-agent-demo`, and <https://agent.resvary.xyz> is the canonical interactive origin on a `READY` Linux production deployment. The database uses managed Neon PostgreSQL on the free plan in `fra1`, and migrations passed. The deployment resolves Circle CLI from the Node runtime and uses `@vercel/nft` to trace its target-OS dependencies, including native files outside the ordinary Turbopack module bundle.
 
 The selected provider configuration uses Nous for both roles:
 
