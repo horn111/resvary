@@ -310,7 +310,7 @@ export default function Demo() {
                   </dd>
                 </div>
                 <div>
-                  <dt>Actual charge</dt>
+                  <dt>Measured product charge</dt>
                   <dd>{money(job.receipt.amount)}</dd>
                 </div>
                 <div>

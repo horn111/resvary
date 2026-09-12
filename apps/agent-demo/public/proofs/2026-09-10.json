@@ -3,7 +3,10 @@
   "recordedAt": "2026-09-09T22:39:22Z",
   "localDate": "2026-09-10",
   "timeZone": "Europe/Moscow",
+  "scope": "Historical production verification snapshot. Amounts and identifiers belong to this run and will not match later visitor sessions.",
   "origin": "https://resvary-agent-demo.vercel.app",
+  "canonicalUrl": "https://agent.resvary.xyz",
+  "originNote": "The origin is the production alias used for this run. The canonical public URL was attached later.",
   "executionDeploymentId": "dpl_EEQU1sFtYaRTxkEtdArCTBsG5Kco",
   "executionDeploymentUrl": "https://resvary-agent-demo-aab9jh8xp-horn111s-projects.vercel.app",
   "network": "eip155:5042002",
@@ -41,7 +44,17 @@
     "toAddress": "0x4ae8b4e11b05380d0b122d99c1a29050cf8eba2d",
     "createdAt": "2026-09-09T22:32:04.997Z",
     "onchainTransactionHashAtVerification": null,
-    "note": "Gateway accepted the payment. Batch onchain confirmation was not observed; the ledger's settled funding status records facilitator acceptance, not batch finality."
+    "latestVerification": {
+      "verifiedAt": "2026-09-12T22:29:09.3868514Z",
+      "circleStatus": "completed",
+      "circleUpdatedAt": "2026-09-09T22:47:03.142Z",
+      "onchainTransactionHash": "0xa05a7f9351aa59f20e2872cb9c5535227c242cbc58a4fd4ed03b40076781c0b1",
+      "explorerUrl": "https://testnet.arcscan.app/tx/0xa05a7f9351aa59f20e2872cb9c5535227c242cbc58a4fd4ed03b40076781c0b1",
+      "arcExplorerStatus": "ok",
+      "arcExplorerResult": "success",
+      "onchainTimestamp": "2026-09-09T22:47:01Z"
+    },
+    "note": "Gateway initially accepted the payment before the batch transaction appeared. A later read-only check found Circle status completed and a successful Arc Testnet transaction. The ledger's settled funding status records facilitator acceptance and remains distinct from onchain finality."
   },
   "jobs": [
     {
@@ -91,8 +104,25 @@
     "independentSessionHasNoJobsAndZeroCredits": true,
     "crossSessionJobReadHttpStatus": 404,
     "anonymousStatusHttpStatus": 401,
-    "liveBrowserRun": "Payment, analysis, receipt, replay, and leftover-credit checks passed. The final isolation assertion read status before session initialization and failed. The explicit wait was fixed; the full paid run was not repeated.",
-    "separateReadOnlyIsolationRun": "Passed against production without creating a paid job; checked secure HttpOnly SameSite=Strict cookie and mobile layout.",
+    "browserRuns": {
+      "paidProductionRun": {
+        "result": "passed",
+        "checked": [
+          "payment",
+          "analysis",
+          "receipt conservation",
+          "saved-result replay",
+          "remaining-credit reuse"
+        ]
+      },
+      "sessionIsolation": {
+        "initialAssertion": "Read status before the new session finished initialization.",
+        "fix": "Wait for session initialization before reading status.",
+        "verification": "Passed in a separate read-only production run without creating another paid job.",
+        "paidFlowRepeatedAfterTimingFix": false,
+        "additionalChecks": ["secure HttpOnly SameSite=Strict cookie", "mobile layout"]
+      }
+    },
     "sourceTests": {
       "agentDemoPassed": 43,
       "nanopaymentsAndCreditGatePassed": 17,
@@ -105,10 +135,10 @@
     "jobHolds": 3,
     "perJobHoldMicroUsd": "400000",
     "remainingUpperBoundMicroUsd": "8780610",
-    "note": "Conservative reserved capacity, not actual provider spend. Includes one earlier failed job whose payment was rejected before facilitator verification. Its hold was not refunded."
+    "note": "Conservative admission-control capacity, not provider spend or visitor credits. One earlier payment attempt was rejected before facilitator verification; its fixed hold remains allocated and only reduces the prototype's remaining demo capacity."
   },
   "limitations": [
-    "Gateway batch onchain confirmation was not observed at verification time.",
+    "The Gateway batch transaction appeared after the recorded run; latestVerification records the later read-only confirmation.",
     "A real 24-hour production cleanup cycle and sustained-load behavior have not yet been observed.",
     "External AI and payment outcomes are not claimed to be exactly-once.",
     "These are operator-exported ledger records, not cryptographic attestations of AI inference. The Gateway transfer can be checked independently.",

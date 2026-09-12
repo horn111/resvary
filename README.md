@@ -150,7 +150,7 @@ The Continuity implementation adds an OpenAI Agents SDK buyer that purchases doc
 - [Continuity disclosure](docs/ethonline-continuity.md)
 - [Sanitized live proof](https://agent.resvary.xyz/proofs/2026-09-10.json)
 
-The demo is a working prototype with a verified Circle Testnet payment-and-analysis path. The proof states the remaining limits, including unobserved Gateway batch confirmation and production retention behavior.
+The demo is a working prototype with a verified Circle Testnet payment-and-analysis path. Circle later reported the recorded Gateway transfer as completed, and ArcScan reports its batch transaction as successful. The proof states the remaining limits, including production retention and sustained-load behavior.
 
 ## Arc settlement for external USDC funding
 
