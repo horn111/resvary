@@ -187,7 +187,7 @@ npm run proof --workspace @resvary/agent-demo -- JOB_UUID
 
 The exporter rejects fixture runs and outputs an allowlisted record without the document, result, signature, session, or credentials. Keep the first output outside the Git worktree until an operator checks the transaction and authorizes publication.
 
-The [September 10 evidence](../apps/agent-demo/public/proofs/2026-09-10.json) contains two completed jobs. The first funded 0.02 Testnet USDC and charged 0.001268 product credits; replay did not change its receipt or balance. The second charged 0.000988 from the remaining credits without another payment. The complete live browser test stopped at a session-creation timing race in its final isolation assertion. That wait was corrected, and a separate read-only production isolation test passed without another paid job.
+The [September 10 evidence](../apps/agent-demo/public/proofs/2026-09-10.json) contains two completed jobs. The first funded 0.02 Testnet USDC and charged 0.001268 product credits; replay did not change its receipt or balance. The second charged 0.000988 from the remaining credits without another payment. The paid browser flow passed. Its final isolation assertion read the new session before initialization; that wait was corrected, and a separate read-only production isolation test passed without another paid job.
 
 The live browser suite requires explicit opt-in because a full run creates two paid jobs:
 
@@ -233,7 +233,7 @@ The maintenance endpoint accepts `GET /api/internal/maintenance` with `Authoriza
 
 Circle CLI `1.0.0` rewrites `maxTimeoutSeconds` to 30 days. The demo configures `authorizationValiditySeconds` accordingly; strict requirements matching and the funding-intent expiry stay unchanged. Before this fix, one live job stopped before facilitator verification. The operator found no matching Gateway transfer and no ledger funding transaction, marked the job failed, and kept its authorization fingerprint and budget hold. Do not generalize that reconciliation to an unknown payment outcome.
 
-For an accepted payment, query `https://gateway-api-testnet.circle.com/v1/x402/transfers/TRANSFER_UUID`. Verify amount, network, payer, and seller. A successful facilitator response can precede the onchain batch, so retain both the Gateway status and transaction hash separately from Resvary's funding status. The verified transfer initially reported `received` and `txHash: null`.
+For an accepted payment, query `https://gateway-api-testnet.circle.com/v1/x402/transfers/TRANSFER_UUID`. Verify amount, network, payer, and seller. A successful facilitator response can precede the onchain batch, so retain both the Gateway status and transaction hash separately from Resvary's funding status. The verified transfer initially reported `received` and `txHash: null`. Circle later reported it as `completed`; [ArcScan reports the batch transaction as successful](https://testnet.arcscan.app/tx/0xa05a7f9351aa59f20e2872cb9c5535227c242cbc58a4fd4ed03b40076781c0b1).
 
 ## 9. Verify 24-hour cleanup
 
@@ -262,7 +262,7 @@ After rotation:
 ## Known production limitations
 
 - Two live jobs prove the payment-and-analysis path for the recorded examples, not sustained-load reliability or production maturity.
-- Gateway batch onchain confirmation and a real 24-hour cleanup cycle have not yet been observed.
+- Circle and ArcScan now expose the recorded Gateway batch transaction. A real 24-hour cleanup cycle has not yet been observed.
 - Vercel platform limits and Neon free-plan limits can interrupt or throttle execution.
 - External services cannot supply exactly-once guarantees to this application. Unknown outcomes stop for review.
 - Circle session snapshots expire and require operator rotation. Vercel cannot refresh the current snapshot.
