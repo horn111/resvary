@@ -1,0 +1,29 @@
+# Resvary
+
+> Resvary is open-source TypeScript infrastructure for prepaid credits and usage billing in AI products. It reserves a maximum cost before work starts, commits the actual charge afterward, releases the remainder, and records an auditable usage receipt.
+
+Resvary is built for technical founders, backend engineers, and platform engineers who bill variable AI usage measured in tokens, seconds, jobs, images, or tool calls. The ledger is payment-rail independent. SQLite supports local and single-node use; PostgreSQL is the multi-process deployment backend.
+
+## Product
+
+- [Homepage](https://www.resvary.xyz/): Product overview, credit lifecycle, live demo, deployment boundaries, pricing status, and FAQ.
+- [Pricing](https://www.resvary.xyz/pricing.md): Current open-source cost and managed-service availability.
+- [Source repository](https://github.com/horn111/resvary): Apache-2.0 source code, packages, tests, and release history.
+- [Getting started](https://github.com/horn111/resvary/blob/main/docs/getting-started.md): Install the SDK and run the first credit lifecycle.
+- [Architecture](https://github.com/horn111/resvary/blob/main/docs/architecture.md): Components, storage boundaries, and data flow.
+
+## Core concepts
+
+- [Prepaid credits](https://github.com/horn111/resvary/blob/main/docs/prepaid-credits.md): Posted, reserved, and available balances.
+- [Usage rating](https://github.com/horn111/resvary/blob/main/docs/usage-rating.md): Immutable price versions and final charge calculation.
+- [Usage receipts](https://github.com/horn111/resvary/blob/main/docs/receipts.md): Operational evidence for committed charges.
+- [Production persistence](https://github.com/horn111/resvary/blob/main/docs/production-persistence.md): PostgreSQL deployment and migration guidance.
+- [Security model](https://github.com/horn111/resvary/blob/main/docs/credit-security-model.md): Credit invariants, trust boundaries, and failure handling.
+- [Operator Console](https://github.com/horn111/resvary/blob/main/docs/operator-console.md): Inspect balances, trace charges, and run guarded recovery actions.
+
+## Important boundaries
+
+- Resvary is not a payment processor, bank, wallet, subscription manager, tax engine, or invoicing system.
+- Credits are closed-loop, non-transferable, and non-redeemable.
+- The current self-hosted code is free under Apache-2.0. No hosted paid plan or price exists today.
+- Arc USDC is a reference external funding path, not a requirement for using the credit ledger.
