@@ -6,6 +6,7 @@ const FOOTER_ISSUES_LINK =
   '<a href="https://github.com/horn111/resvary/issues" style="transition:color .2s">Issues</a>';
 const FOOTER_X_LINK =
   '<a href="https://x.com/resvaryAI" rel="me" style="transition:color .2s">X / Twitter</a>';
+const FOOTER_PRICING_LINK = '<a href="/pricing.md" style="transition:color .2s">Pricing data</a>';
 const PRIMARY_USE_CASES_LINK = '<a href="#use-cases" style="transition:color .2s">Use cases</a>';
 const PRIMARY_CONSOLE_LINK = '<a href="#operator-console" style="transition:color .2s">Console</a>';
 const MOBILE_USE_CASES_LINK = '<a href="#use-cases">Use cases</a>';
@@ -48,7 +49,10 @@ const SITE_HTML = CLAUDE_DESIGN_HTML.replaceAll(
   .replace(PRIMARY_USE_CASES_LINK, `${PRIMARY_CONSOLE_LINK}\n      ${PRIMARY_USE_CASES_LINK}`)
   .replace(MOBILE_USE_CASES_LINK, `${MOBILE_CONSOLE_LINK}\n        ${MOBILE_USE_CASES_LINK}`)
   .replace(PRICING_SECTION_MARKER, `${OPERATOR_CONSOLE_SECTION}\n\n  ${PRICING_SECTION_MARKER}`)
-  .replace(FOOTER_ISSUES_LINK, `${FOOTER_ISSUES_LINK}\n        ${FOOTER_X_LINK}`);
+  .replace(
+    FOOTER_ISSUES_LINK,
+    `${FOOTER_ISSUES_LINK}\n        ${FOOTER_X_LINK}\n        ${FOOTER_PRICING_LINK}`,
+  );
 
 export function ClaudeDesignPage() {
   return (
