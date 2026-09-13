@@ -75,17 +75,41 @@ export function ClaudeDesignController() {
     }
 
     const mobileMenu = root.querySelector<HTMLDetailsElement>('[data-mobile-nav]');
+    const mobileMenuSummary = mobileMenu?.querySelector<HTMLElement>('summary');
+    const mobileMenuLabel = mobileMenu?.querySelector<HTMLElement>('[data-mobile-nav-label]');
+    const mobileBreakpoint = window.matchMedia('(max-width: 63.99rem)');
+    const syncMobileMenu = () => {
+      const isOpen = mobileMenu?.open === true && mobileBreakpoint.matches;
+      document.documentElement.classList.toggle('resvary-mobile-nav-open', isOpen);
+      if (mobileMenuLabel) mobileMenuLabel.textContent = isOpen ? 'Close' : 'Menu';
+    };
     const closeMobileMenu = (event: Event) => {
-      if ((event.target as Element).closest('a')) mobileMenu?.removeAttribute('open');
+      if (event.target instanceof Element && event.target.closest('a')) {
+        mobileMenu?.removeAttribute('open');
+        syncMobileMenu();
+      }
     };
     const closeMobileMenuWithEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') mobileMenu?.removeAttribute('open');
+      if (event.key !== 'Escape' || !mobileMenu?.open) return;
+      mobileMenu.removeAttribute('open');
+      syncMobileMenu();
+      mobileMenuSummary?.focus();
+    };
+    const closeMobileMenuAtDesktop = () => {
+      if (!mobileBreakpoint.matches) mobileMenu?.removeAttribute('open');
+      syncMobileMenu();
     };
     mobileMenu?.addEventListener('click', closeMobileMenu);
-    mobileMenu?.addEventListener('keydown', closeMobileMenuWithEscape);
+    mobileMenu?.addEventListener('toggle', syncMobileMenu);
+    document.addEventListener('keydown', closeMobileMenuWithEscape);
+    mobileBreakpoint.addEventListener('change', closeMobileMenuAtDesktop);
+    syncMobileMenu();
     cleanup.push(() => {
       mobileMenu?.removeEventListener('click', closeMobileMenu);
-      mobileMenu?.removeEventListener('keydown', closeMobileMenuWithEscape);
+      mobileMenu?.removeEventListener('toggle', syncMobileMenu);
+      document.removeEventListener('keydown', closeMobileMenuWithEscape);
+      mobileBreakpoint.removeEventListener('change', closeMobileMenuAtDesktop);
+      document.documentElement.classList.remove('resvary-mobile-nav-open');
     });
 
     const paint = (now = performance.now(), force = false) => {
