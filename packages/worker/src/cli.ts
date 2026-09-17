@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { createServer, type Server } from 'node:http';
 import { checkPostgresHealth, createPostgresCreditStore } from '@resvary/postgres';
+import { CreditLedger } from '@resvary/sdk/credits';
 import { Pool } from 'pg';
 import { createHttpWebhookTransport, OutboxWorker, type OutboxWorkerLog } from './index.js';
 
@@ -34,6 +35,27 @@ async function main(): Promise<void> {
       print({ ok: true, eventId, status: 'pending' });
       return;
     }
+    if (command === 'maintenance') {
+      const projectId = requireEnv('RESVARY_PROJECT_ID');
+      const now = Date.now();
+      const limit = envPositiveInteger('RESVARY_MAINTENANCE_BATCH_SIZE', 100);
+      const ledger = new CreditLedger({ projectId, store, now: () => now });
+      const reservations = await ledger.releaseExpiredReservations({
+        now,
+        limit,
+        idempotencyKey: `maintenance:${projectId}:reservations:${now}`,
+      });
+      const lots = await ledger.sweepExpiredCreditLots({ before: now, limit });
+      print({
+        ok: true,
+        projectId,
+        cutoff: now,
+        expiredReservations: reservations.length,
+        expiredCreditLots: lots.lots.length,
+        affectedAccounts: lots.accounts.length,
+      });
+      return;
+    }
     if (command !== 'run') {
       throw new Error(usage());
     }
@@ -42,18 +64,23 @@ async function main(): Promise<void> {
     const stop = () => controller.abort();
     process.once('SIGINT', stop);
     process.once('SIGTERM', stop);
+    const leaseMs = envPositiveNumber('RESVARY_WORKER_LEASE_MS', 30_000);
+    const webhookTimeoutMs = envPositiveNumber('RESVARY_WEBHOOK_TIMEOUT_MS', 10_000);
+    if (webhookTimeoutMs >= leaseMs) {
+      throw new Error('RESVARY_WEBHOOK_TIMEOUT_MS must be less than RESVARY_WORKER_LEASE_MS');
+    }
     const worker = new OutboxWorker({
       store,
       projectId: process.env.RESVARY_PROJECT_ID,
       workerId: process.env.RESVARY_WORKER_ID,
       batchSize: envPositiveInteger('RESVARY_WORKER_BATCH_SIZE', 25),
-      leaseMs: envPositiveNumber('RESVARY_WORKER_LEASE_MS', 30_000),
+      leaseMs,
       pollIntervalMs: envPositiveNumber('RESVARY_WORKER_POLL_MS', 1_000),
       maxAttempts: envPositiveInteger('RESVARY_WORKER_MAX_ATTEMPTS', 8),
       transport: createHttpWebhookTransport({
         url: requireEnv('RESVARY_WEBHOOK_URL'),
         secret: requireEnv('RESVARY_WEBHOOK_SECRET'),
-        timeoutMs: envPositiveNumber('RESVARY_WEBHOOK_TIMEOUT_MS', 10_000),
+        timeoutMs: webhookTimeoutMs,
       }),
       logger: jsonLogger,
     });
@@ -76,7 +103,7 @@ async function main(): Promise<void> {
 }
 
 function usage(): string {
-  return 'Usage: resvary-worker [run|dead-letter list|dead-letter requeue EVENT_ID]';
+  return 'Usage: resvary-worker [run|maintenance|dead-letter list|dead-letter requeue EVENT_ID]';
 }
 
 async function startHealthServer(

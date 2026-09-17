@@ -694,6 +694,24 @@ describe('CreditLedger', () => {
     ).rejects.toBeInstanceOf(IdempotencyConflictError);
   });
 
+  it('records a replay-safe Stripe credit grant after external verification', async () => {
+    const { ledger } = await createFixture();
+    const input = {
+      customerId: 'stripe-customer',
+      amount: '25',
+      source: 'stripe' as const,
+      externalRef: 'pi_verified',
+      idempotencyKey: 'stripe-payment-intent:pi_verified',
+    };
+
+    const first = await ledger.grantCredits(input);
+    const replay = await ledger.grantCredits(input);
+
+    expect(replay).toEqual(first);
+    expect(first.grant).toMatchObject({ source: 'stripe', externalRef: 'pi_verified' });
+    expect((await ledger.getBalance('stripe-customer')).postedAmount).toBe('25');
+  });
+
   it('releases a reservation when the provider fails', async () => {
     const { ledger, price } = await createFixture();
     await ledger.grantCredits({ customerId: 'cus_1', amount: '1', idempotencyKey: 'grant-1' });
@@ -748,6 +766,84 @@ describe('CreditLedger', () => {
     expect(replay.value).toBeUndefined();
   });
 
+  it('executes one provider callback for concurrent runMetered retries', async () => {
+    const { ledger, price } = await createFixture();
+    await ledger.grantCredits({ customerId: 'cus_1', amount: '1', idempotencyKey: 'grant-1' });
+    let releaseProvider!: () => void;
+    const providerGate = new Promise<void>((resolve) => {
+      releaseProvider = resolve;
+    });
+    const callback = vi.fn(async () => {
+      await providerGate;
+      return {
+        value: 'ok',
+        usageEventId: 'usage-concurrent',
+        actualUsage: { input_tokens: '10', output_tokens: '5' },
+      };
+    });
+    const input = {
+      customerId: 'cus_1',
+      priceId: price.id,
+      estimatedUsage: { input_tokens: '100', output_tokens: '100' },
+      idempotencyKey: 'run-concurrent',
+    };
+    const first = ledger.runMetered(input, callback);
+    const second = ledger.runMetered(input, callback);
+    await vi.waitFor(() => expect(callback).toHaveBeenCalledTimes(1));
+    releaseProvider();
+
+    const [initial, replay] = await Promise.all([first, second]);
+    expect(initial.replayed).toBe(false);
+    expect(replay.replayed).toBe(true);
+    expect(callback).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not call the provider again after a failed run released its reservation', async () => {
+    const { ledger, price } = await createFixture();
+    await ledger.grantCredits({ customerId: 'cus_1', amount: '1', idempotencyKey: 'grant-1' });
+    const callback = vi.fn().mockRejectedValueOnce(new Error('provider unavailable'));
+    const input = {
+      customerId: 'cus_1',
+      priceId: price.id,
+      estimatedUsage: { input_tokens: '100', output_tokens: '100' },
+      idempotencyKey: 'run-failed',
+    };
+    await expect(ledger.runMetered(input, callback)).rejects.toThrow('provider unavailable');
+    await expect(ledger.runMetered(input, callback)).rejects.toThrow(
+      'Cannot execute provider for released reservation',
+    );
+    expect(callback).toHaveBeenCalledTimes(1);
+  });
+
+  it('persists reservation expiry when commitUsage discovers an overdue reservation', async () => {
+    const { ledger, price, setNow } = await createFixture();
+    await ledger.grantCredits({ customerId: 'cus_1', amount: '1', idempotencyKey: 'grant-1' });
+    const reservation = await ledger.reserveCredits({
+      customerId: 'cus_1',
+      priceId: price.id,
+      estimatedUsage: { input_tokens: '100' },
+      expiresAt: 1_050,
+      idempotencyKey: 'reserve-expiring',
+    });
+    setNow(1_051);
+
+    await expect(
+      ledger.commitUsage({
+        reservationId: reservation.id,
+        usageEventId: 'usage-late',
+        actualUsage: { input_tokens: '10' },
+        idempotencyKey: 'commit-late',
+      }),
+    ).rejects.toThrow(`Reservation expired: ${reservation.id}`);
+    await expect(ledger.getReservation(reservation.id)).resolves.toMatchObject({
+      status: 'expired',
+    });
+    await expect(ledger.getBalance('cus_1')).resolves.toMatchObject({
+      reservedUnits: '0',
+      availableUnits: '1000000',
+    });
+  });
+
   it('expires open reservations and rejects charges above the reserved amount', async () => {
     const { ledger, price, setNow } = await createFixture();
     await ledger.grantCredits({ customerId: 'cus_1', amount: '1', idempotencyKey: 'grant-1' });
@@ -768,6 +864,44 @@ describe('CreditLedger', () => {
     setNow(1_101);
     await ledger.releaseExpiredReservations({ idempotencyKey: 'expire-1' });
     expect((await ledger.getReservation(first.id))?.status).toBe('expired');
+    expect((await ledger.getBalance('cus_1')).reservedUnits).toBe('0');
+  });
+
+  it('bounds each expired-reservation maintenance batch', async () => {
+    const { ledger, price, setNow } = await createFixture();
+    await ledger.grantCredits({ customerId: 'cus_1', amount: '1', idempotencyKey: 'grant-1' });
+    const reservations = await Promise.all(
+      ['a', 'b'].map((suffix) =>
+        ledger.reserveCredits({
+          customerId: 'cus_1',
+          priceId: price.id,
+          estimatedUsage: { input_tokens: '10' },
+          expiresAt: 1_050,
+          idempotencyKey: `reserve-${suffix}`,
+        }),
+      ),
+    );
+    setNow(1_051);
+    await expect(
+      ledger.releaseExpiredReservations({ idempotencyKey: 'invalid-limit', limit: 0 }),
+    ).rejects.toThrow('positive safe integer');
+
+    const firstBatch = await ledger.releaseExpiredReservations({
+      idempotencyKey: 'expire-batch-1',
+      limit: 1,
+    });
+    expect(firstBatch).toHaveLength(1);
+    expect(
+      (await Promise.all(reservations.map((item) => ledger.getReservation(item.id)))).filter(
+        (item) => item?.status === 'open',
+      ),
+    ).toHaveLength(1);
+
+    const secondBatch = await ledger.releaseExpiredReservations({
+      idempotencyKey: 'expire-batch-2',
+      limit: 1,
+    });
+    expect(secondBatch).toHaveLength(1);
     expect((await ledger.getBalance('cus_1')).reservedUnits).toBe('0');
   });
 

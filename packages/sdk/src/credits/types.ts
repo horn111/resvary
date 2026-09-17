@@ -4,6 +4,7 @@ export type CreditGrantSource =
   | 'migration'
   | 'arc'
   | 'circle_gateway_nanopayment'
+  | 'stripe'
   | 'allowance'
   | 'promotion';
 export type CreditGrantPolicyType = 'allowance' | 'promotion';
@@ -417,6 +418,7 @@ export interface OutboxEventFilter {
 }
 
 export interface CreditLotFilter extends CreditBalanceFilter {
+  accountId?: string;
   policyId?: string;
   kind?: CreditLotKind;
   expiresBefore?: number;

@@ -33,6 +33,8 @@ export interface Job {
   receipt: UsageReceipt | null;
   failure: string | null;
   model_cost: number;
+  budget_settled: boolean;
+  budget_charge_units: number | null;
   agent_usage: { inputTokens: number; outputTokens: number; requests: number } | null;
   ai_config: { agent: AiConfig; analysis: AiConfig } | null;
   workflow_run_id: string | null;
@@ -60,10 +62,14 @@ CREATE TABLE IF NOT EXISTS agent_demo.jobs (
  document text, phase text NOT NULL, estimated jsonb NOT NULL, reservation_id text,
  challenge jsonb, result text, usage jsonb, receipt jsonb, failure text,
  model_cost integer NOT NULL DEFAULT 0,
+ budget_settled boolean NOT NULL DEFAULT false,
+ budget_charge_units integer,
  created_at timestamptz NOT NULL DEFAULT now(), expires_at timestamptz NOT NULL DEFAULT now()+interval '24 hours',
  UNIQUE(customer, request_key));
 CREATE INDEX IF NOT EXISTS agent_jobs_queue ON agent_demo.jobs(created_at) WHERE phase='queued';
 ALTER TABLE agent_demo.jobs ADD COLUMN IF NOT EXISTS agent_usage jsonb;
+ALTER TABLE agent_demo.jobs ADD COLUMN IF NOT EXISTS budget_settled boolean NOT NULL DEFAULT false;
+ALTER TABLE agent_demo.jobs ADD COLUMN IF NOT EXISTS budget_charge_units integer;
 ALTER TABLE agent_demo.jobs ADD COLUMN IF NOT EXISTS ai_config jsonb;
 ALTER TABLE agent_demo.jobs ADD COLUMN IF NOT EXISTS workflow_run_id text;
 ALTER TABLE agent_demo.jobs ADD COLUMN IF NOT EXISTS dispatch_token uuid;
@@ -234,6 +240,40 @@ export class JobStore {
       kind,
       JSON.stringify(detail),
     ]);
+  }
+  async settleBudget(id: string, actualUnits: number) {
+    if (!Number.isSafeInteger(actualUnits) || actualUnits < 0 || actualUnits > RUN_BUDGET_UNITS) {
+      throw new Error('Actual AI spend must fit inside the held run budget');
+    }
+    return this.transaction(async (client) => {
+      const job = (
+        await client.query<Pick<Job, 'phase' | 'budget_settled'>>(
+          'SELECT phase,budget_settled FROM agent_demo.jobs WHERE id=$1 FOR UPDATE',
+          [id],
+        )
+      ).rows[0];
+      if (!job) throw new Error('Job not found');
+      if (job.budget_settled) return false;
+      if (job.phase !== 'completed')
+        throw new Error('Only a completed job can settle its AI budget');
+      const budget = (
+        await client.query<{ allocated: string }>(
+          'SELECT allocated::text FROM agent_demo.budget WHERE id=1 FOR UPDATE',
+        )
+      ).rows[0];
+      if (!budget || Number(budget.allocated) < RUN_BUDGET_UNITS) {
+        throw new Error('Held AI budget invariant failed');
+      }
+      await client.query('UPDATE agent_demo.budget SET allocated=allocated-$1+$2 WHERE id=1', [
+        RUN_BUDGET_UNITS,
+        actualUnits,
+      ]);
+      await client.query(
+        'UPDATE agent_demo.jobs SET budget_settled=true,budget_charge_units=$2 WHERE id=$1',
+        [id, actualUnits],
+      );
+      return true;
+    });
   }
   async transition(id: string, from: Phase[], to: Phase) {
     return (

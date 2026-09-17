@@ -16,4 +16,4 @@ service account and restrict the database directory with NTFS ACLs.
 
 The existing `createSqliteReceiptStore` remains available for payment invoices, receipts, webhook deliveries, and Arc watcher cursors. Both stores can use the same file.
 
-Requires Node.js 24+ and local filesystem access. The credit store uses WAL, `BEGIN IMMEDIATE`, rollback-safe writes, and versioned schema metadata. Opening schema v4 applies schema v5 automatically and backfills balances and open reservations into verified legacy lots. Resvary 0.8 keeps schema v5 and stores advanced prices and receipt breakdowns in the existing payload columns.
+Requires Node.js 24+ and local filesystem access. The credit store uses WAL, `BEGIN IMMEDIATE`, rollback-safe writes, and versioned schema metadata. Opening an older database applies migrations automatically. Schema v5 adds credit policies and verified legacy-lot backfill; schema v6 adds normalized admin query columns, timeline indexes, and the operator action journal.

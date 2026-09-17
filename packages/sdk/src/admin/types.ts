@@ -118,6 +118,8 @@ export interface OperatorAction {
   targetType: 'customer' | 'project' | 'outbox_event';
   targetId: string;
   reason: string;
+  command?: Record<string, unknown>;
+  commandHash?: string;
   status: OperatorActionStatus;
   createdAt: number;
   completedAt?: number;

@@ -65,7 +65,7 @@ The console exposes four narrow commands:
 - an expiry sweep limited to reservations that are already overdue;
 - requeue of an event whose current status is `dead_letter`.
 
-Every command receives a UUID that is also the idempotency identity. The console writes an append-only `OperatorAction` before execution and appends the outcome afterward. If the process stops between those records, retrying the same command recovers through the underlying idempotency record.
+Every command receives a UUID that is also the idempotency identity. The console records the normalized command parameters, including amount or expiry cutoff, in an append-only `OperatorAction` before execution and appends the outcome afterward. Reusing a UUID with changed parameters returns a conflict. If the process stops between journal records, retry the same command unchanged; the underlying idempotency record prevents a second mutation.
 
 The console does not expose arbitrary reservation release, usage commit, funding confirmation, pricing/policy CRUD, refund, or history deletion.
 

@@ -11,7 +11,7 @@ Circle-native Testnet funding adapters for the Resvary prepaid credit ledger.
 npm install @resvary/sdk @resvary/circle
 ```
 
-Credits are granted only after a direct Arc RPC proof or successful Gateway facilitator settlement. Funding creates non-expiring general credit lots. Resvary 0.8 funding integrations remain Testnet-only. See `docs/circle-gateway-funding.md` and `docs/funding-recovery.md`.
+Credits are granted only after a direct Arc RPC proof or successful Gateway facilitator settlement. Funding creates non-expiring general credit lots. Resvary 1.0 funding integrations remain Testnet-only. See `docs/circle-gateway-funding.md` and `docs/funding-recovery.md`.
 
 ## Credit gate (workspace source)
 

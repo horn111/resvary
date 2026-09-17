@@ -1,6 +1,6 @@
 # Production Persistence
 
-Resvary 0.8 is a stable self-hosted SDK. PostgreSQL 16–18 supports multiple application and worker processes. SQLite remains for local and single-node deployments. This release does not include a hosted control plane, SLA, RBAC, compliance certification, or managed operations. Direct Arc and Circle Gateway funding remain Testnet-only.
+Resvary 1.0 is a stable self-hosted SDK. PostgreSQL 16–18 supports multiple application and worker processes. SQLite remains for local and single-node deployments. This release does not include a hosted control plane, SLA, RBAC, compliance certification, or managed operations. Direct Arc and Circle Gateway funding remain Testnet-only.
 
 ## Provisioning
 
@@ -33,13 +33,13 @@ RESVARY_WORKER_ID=resvary-worker-1
 RESVARY_HEALTH_PORT=8081
 ```
 
-`/live` reports whether the worker is stopping. `/ready` checks database connectivity, schema version, and current pending/dead-letter counts. Delivery is at least once; consumers must deduplicate by `x-resvary-event-id`.
+`/live` reports whether the worker is stopping. `/ready` checks database connectivity and schema version. Its response also reports pending and dead-letter counts, the age of the oldest pending event, overdue reservations, and funding records that require reconciliation. Delivery is at least once; consumers must deduplicate by `x-resvary-event-id`.
 
 ## Monitoring
 
 Alert on readiness failures, increasing dead-letter count, sustained pending event growth, transaction retry exhaustion, connection pool saturation, and the age of the oldest pending event. JSON worker logs include event ID, type, attempt, latency, and sanitized error, never secret or payload.
 
-Schedule `sweepExpiredCreditLots` in application-owned maintenance infrastructure for inactive accounts. Normal balance operations already exclude expired promotion units transactionally. The outbox worker does not run credit expiry sweeps.
+Schedule `resvary-worker maintenance` with `RESVARY_PROJECT_ID` for inactive accounts. One invocation processes bounded reservation and credit-lot batches; `RESVARY_MAINTENANCE_BATCH_SIZE` defaults to 100. Repeat the command until both expired counts reach zero when draining a backlog. Normal balance operations exclude expired promotion units transactionally. The long-running outbox command does not run credit expiry sweeps.
 
 Inspect and recover dead letters explicitly:
 

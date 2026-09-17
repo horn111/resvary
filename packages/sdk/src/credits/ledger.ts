@@ -5,6 +5,7 @@ import {
   IdempotencyConflictError,
   InsufficientCreditsError,
   InvalidCreditStateError,
+  MeteredExecutionAlreadyClaimedError,
   UnsupportedCreditStoreCapabilityError,
 } from './errors.js';
 import {
@@ -230,6 +231,7 @@ export class CreditLedger {
   readonly store: CreditStore;
   private readonly reservationTtlMs: number;
   private readonly now: () => number;
+  private readonly activeMeteredExecutions = new Map<string, Promise<void>>();
 
   constructor(config: CreditLedgerConfig) {
     this.projectId = requireText(config.projectId, 'projectId');
@@ -325,6 +327,7 @@ export class CreditLedger {
         const lots = await tx.listCreditLots({
           projectId: this.projectId,
           customerId: current.customerId,
+          accountId: current.id,
           policyId: policy.id,
           kind: 'allowance',
         });
@@ -926,7 +929,7 @@ export class CreditLedger {
   async commitUsage(
     input: CommitUsageInput,
   ): Promise<{ receipt: UsageReceipt; reservation: CreditReservation; balance: CreditAccount }> {
-    return this.withStoreTransaction((tx) =>
+    const outcome = await this.withStoreTransaction((tx) =>
       this.idempotent(tx, 'commit_usage', input.idempotencyKey, input, async () => {
         const now = this.now();
         const reservation = await this.requireReservation(tx, input.reservationId);
@@ -942,7 +945,7 @@ export class CreditLedger {
         }
         if (reservation.expiresAt <= now) {
           await this.expireReservation(tx, reservation, now);
-          throw new InvalidCreditStateError(`Reservation expired: ${reservation.id}`);
+          return { expiredReservationId: reservation.id };
         }
 
         const existingUsage = await tx.getUsageEvent(input.usageEventId);
@@ -1082,6 +1085,10 @@ export class CreditLedger {
         return { receipt, reservation: committedReservation, balance: account };
       }),
     );
+    if ('expiredReservationId' in outcome) {
+      throw new InvalidCreditStateError(`Reservation expired: ${outcome.expiredReservationId}`);
+    }
+    return outcome;
   }
 
   async releaseReservation(
@@ -1106,10 +1113,18 @@ export class CreditLedger {
   async releaseExpiredReservations(input: {
     idempotencyKey: string;
     now?: number;
+    limit?: number;
   }): Promise<CreditReservation[]> {
+    if (input.limit !== undefined && (!Number.isSafeInteger(input.limit) || input.limit <= 0)) {
+      throw new Error('Expired reservation limit must be a positive safe integer');
+    }
+    const before = input.now ?? this.now();
+    if (!Number.isSafeInteger(before)) {
+      throw new Error('Expired reservation cutoff must be a safe integer');
+    }
     return this.withStoreTransaction((tx) =>
       this.idempotent(tx, 'release_expired', input.idempotencyKey, input, async () =>
-        this.expireOpenReservations(tx, input.now ?? this.now()),
+        this.expireOpenReservations(tx, before, undefined, input.limit),
       ),
     );
   }
@@ -1119,15 +1134,50 @@ export class CreditLedger {
     callback: () => Promise<RunMeteredCallbackResult<T>>,
   ): Promise<RunMeteredResult<T>> {
     const reserved = await this.reserveCredits(input);
-    const reservation = (await this.store.getReservation(reserved.id)) ?? reserved;
+    const executionKey = `${this.projectId}:${input.idempotencyKey}`;
+    const activeExecution = this.activeMeteredExecutions.get(executionKey);
+    if (activeExecution) {
+      await activeExecution;
+      return this.replayMeteredResult<T>(reserved.id);
+    }
+
+    let signalCompletion!: () => void;
+    const completion = new Promise<void>((resolve) => {
+      signalCompletion = resolve;
+    });
+    this.activeMeteredExecutions.set(executionKey, completion);
+    try {
+      return await this.executeMetered(input, reserved.id, callback);
+    } finally {
+      signalCompletion();
+      if (this.activeMeteredExecutions.get(executionKey) === completion) {
+        this.activeMeteredExecutions.delete(executionKey);
+      }
+    }
+  }
+
+  private async executeMetered<T>(
+    input: RunMeteredInput,
+    reservationId: string,
+    callback: () => Promise<RunMeteredCallbackResult<T>>,
+  ): Promise<RunMeteredResult<T>> {
+    const reservation = await this.requireReservationFromStore(reservationId);
     if (reservation.status === 'committed' && reservation.usageReceiptId) {
-      const receipt = await this.requireUsageReceipt(reservation.usageReceiptId);
-      return {
-        replayed: true,
-        reservation,
-        receipt,
-        balance: await this.getBalance(reservation.customerId),
-      };
+      return this.replayMeteredResult<T>(reservation.id);
+    }
+    if (reservation.status !== 'open') {
+      throw new InvalidCreditStateError(
+        `Cannot execute provider for ${reservation.status} reservation: ${reservation.id}`,
+      );
+    }
+
+    const claimed = await this.claimMeteredExecution(input, reservation.id);
+    if (!claimed) {
+      const current = await this.requireReservationFromStore(reservation.id);
+      if (current.status === 'committed' && current.usageReceiptId) {
+        return this.replayMeteredResult<T>(current.id);
+      }
+      throw new MeteredExecutionAlreadyClaimedError(reservation.id);
     }
 
     let result: RunMeteredCallbackResult<T>;
@@ -1151,6 +1201,56 @@ export class CreditLedger {
       idempotencyKey: `${input.idempotencyKey}:commit`,
     });
     return { value: result.value, replayed: false, ...committed };
+  }
+
+  private async replayMeteredResult<T>(reservationId: string): Promise<RunMeteredResult<T>> {
+    const reservation = await this.requireReservationFromStore(reservationId);
+    if (reservation.status !== 'committed' || !reservation.usageReceiptId) {
+      if (reservation.status !== 'open') {
+        throw new InvalidCreditStateError(
+          `Cannot execute provider for ${reservation.status} reservation: ${reservation.id}`,
+        );
+      }
+      throw new MeteredExecutionAlreadyClaimedError(reservation.id);
+    }
+    const receipt = await this.requireUsageReceipt(reservation.usageReceiptId);
+    return {
+      replayed: true,
+      reservation,
+      receipt,
+      balance: await this.getBalance(reservation.customerId),
+    };
+  }
+
+  private claimMeteredExecution(input: RunMeteredInput, reservationId: string): Promise<boolean> {
+    return this.store.transaction(async (tx) => {
+      const key = requireText(input.idempotencyKey, 'idempotencyKey');
+      const scope = `${this.projectId}:run_metered_execution`;
+      const requestHash = hashRequest(input);
+      const existing = await tx.getIdempotencyRecord(scope, key);
+      if (existing) {
+        if (existing.requestHash !== requestHash) throw new IdempotencyConflictError(key);
+        return false;
+      }
+      const claim = {
+        scope,
+        key,
+        requestHash,
+        result: { reservationId },
+        createdAt: this.now(),
+      };
+      if (tx.claimIdempotencyRecord) return tx.claimIdempotencyRecord(claim);
+      await tx.saveIdempotencyRecord(claim);
+      return true;
+    });
+  }
+
+  private async requireReservationFromStore(id: string): Promise<CreditReservation> {
+    const reservation = await this.store.getReservation(id);
+    if (!reservation || reservation.projectId !== this.projectId) {
+      throw new CreditNotFoundError('Credit reservation', id);
+    }
+    return reservation;
   }
 
   async getBalance(customerId: string): Promise<CreditAccount> {
@@ -1448,6 +1548,7 @@ export class CreditLedger {
       await tx.listCreditLots({
         projectId: this.projectId,
         customerId: account.customerId,
+        accountId: account.id,
       })
     )
       .filter(
@@ -1619,6 +1720,7 @@ export class CreditLedger {
       await tx.listCreditLots({
         projectId: this.projectId,
         customerId: account.customerId,
+        accountId: account.id,
       })
     )
       .filter((lot) => lot.accountId === account.id && parseCreditUnits(lot.availableUnits) > 0n)
@@ -1683,14 +1785,17 @@ export class CreditLedger {
     tx: CreditStoreTransaction,
     now: number,
     customerId?: string,
+    limit?: number,
   ): Promise<CreditReservation[]> {
     const open = await tx.listReservations({
       projectId: this.projectId,
       customerId,
       status: 'open',
+      expiresBefore: now,
+      limit,
     });
     const expired: CreditReservation[] = [];
-    for (const reservation of open.filter((item) => item.expiresAt <= now)) {
+    for (const reservation of open) {
       const result = await this.expireReservation(tx, reservation, now);
       expired.push(result.reservation);
     }

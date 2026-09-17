@@ -1391,6 +1391,16 @@ class SqliteCreditTransaction implements CreditPolicyStoreTransaction {
       ['scope', 'key'],
     );
   }
+  async claimIdempotencyRecord(value: IdempotencyRecord) {
+    return insert(
+      this.db,
+      'resvary_idempotency_keys',
+      ['scope', 'key', 'created_at'],
+      [value.scope, value.key, value.createdAt],
+      value,
+      ['scope', 'key'],
+    );
+  }
   async saveFundingIntent(value: FundingIntent) {
     upsert(
       this.db,
@@ -1579,13 +1589,23 @@ function reader(db: DatabaseSyncType): CreditStoreReader & CreditPolicyStoreRead
       );
     },
     async listReservations(filter = {}) {
+      if (
+        filter.limit !== undefined &&
+        (!Number.isSafeInteger(filter.limit) || filter.limit <= 0)
+      ) {
+        throw new Error('Query limit must be a positive safe integer');
+      }
       return all<CreditReservation>(
         db,
         'SELECT payload FROM resvary_credit_reservations ORDER BY created_at ASC',
-      ).filter(
-        (item) =>
-          matchesBalanceFilter(item, filter) && (!filter.status || item.status === filter.status),
-      );
+      )
+        .filter(
+          (item) =>
+            matchesBalanceFilter(item, filter) &&
+            (!filter.status || item.status === filter.status) &&
+            (filter.expiresBefore === undefined || item.expiresAt <= filter.expiresBefore),
+        )
+        .slice(0, filter.limit ?? Number.MAX_SAFE_INTEGER);
     },
     async getUsageEvent(id) {
       return one<UsageEvent>(db, 'SELECT payload FROM resvary_usage_events WHERE id = ?', [id]);
@@ -1718,6 +1738,7 @@ function reader(db: DatabaseSyncType): CreditStoreReader & CreditPolicyStoreRead
       ).filter(
         (item) =>
           matchesBalanceFilter(item, filter) &&
+          (!filter.accountId || item.accountId === filter.accountId) &&
           (!filter.policyId || item.policyId === filter.policyId) &&
           (!filter.kind || item.kind === filter.kind) &&
           (filter.expiresBefore === undefined ||
@@ -1773,13 +1794,16 @@ function insert(
   values: unknown[],
   payload: unknown,
   conflictColumns: string[] = ['id'],
-): void {
+): boolean {
   const allColumns = [...columns, 'payload'];
   const placeholders = allColumns.map(() => '?').join(', ');
   const conflict = conflictColumns.join(', ');
-  db.prepare(
-    `INSERT INTO ${table} (${allColumns.join(', ')}) VALUES (${placeholders}) ON CONFLICT(${conflict}) DO NOTHING`,
-  ).run(...values, serializeReceiptStoreValue(payload));
+  const result = db
+    .prepare(
+      `INSERT INTO ${table} (${allColumns.join(', ')}) VALUES (${placeholders}) ON CONFLICT(${conflict}) DO NOTHING`,
+    )
+    .run(...values, serializeReceiptStoreValue(payload)) as { changes: number };
+  return result.changes === 1;
 }
 
 function upsert(

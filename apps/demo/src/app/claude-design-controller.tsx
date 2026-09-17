@@ -77,11 +77,19 @@ export function ClaudeDesignController() {
     const mobileMenu = root.querySelector<HTMLDetailsElement>('[data-mobile-nav]');
     const mobileMenuSummary = mobileMenu?.querySelector<HTMLElement>('summary');
     const mobileMenuLabel = mobileMenu?.querySelector<HTMLElement>('[data-mobile-nav-label]');
+    const backgroundContent = [...root.querySelectorAll<HTMLElement>('main, footer')];
     const mobileBreakpoint = window.matchMedia('(max-width: 63.99rem)');
     const syncMobileMenu = () => {
       const isOpen = mobileMenu?.open === true && mobileBreakpoint.matches;
       document.documentElement.classList.toggle('resvary-mobile-nav-open', isOpen);
       if (mobileMenuLabel) mobileMenuLabel.textContent = isOpen ? 'Close' : 'Menu';
+      mobileMenuSummary?.setAttribute('aria-expanded', String(isOpen));
+      for (const element of backgroundContent) element.inert = isOpen;
+      if (isOpen && document.activeElement === mobileMenuSummary) {
+        window.requestAnimationFrame(() =>
+          mobileMenu?.querySelector<HTMLElement>('nav a')?.focus(),
+        );
+      }
     };
     const closeMobileMenu = (event: Event) => {
       if (event.target instanceof Element && event.target.closest('a')) {
@@ -89,11 +97,29 @@ export function ClaudeDesignController() {
         syncMobileMenu();
       }
     };
-    const closeMobileMenuWithEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || !mobileMenu?.open) return;
-      mobileMenu.removeAttribute('open');
-      syncMobileMenu();
-      mobileMenuSummary?.focus();
+    const handleMobileMenuKeydown = (event: KeyboardEvent) => {
+      if (!mobileMenu?.open || !mobileBreakpoint.matches) return;
+      if (event.key === 'Escape') {
+        mobileMenu.removeAttribute('open');
+        syncMobileMenu();
+        mobileMenuSummary?.focus();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const focusable = [
+        mobileMenuSummary,
+        ...mobileMenu.querySelectorAll<HTMLElement>('nav a[href]'),
+      ].filter((element): element is HTMLElement => element !== null);
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (!first || !last) return;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
     const closeMobileMenuAtDesktop = () => {
       if (!mobileBreakpoint.matches) mobileMenu?.removeAttribute('open');
@@ -101,15 +127,16 @@ export function ClaudeDesignController() {
     };
     mobileMenu?.addEventListener('click', closeMobileMenu);
     mobileMenu?.addEventListener('toggle', syncMobileMenu);
-    document.addEventListener('keydown', closeMobileMenuWithEscape);
+    document.addEventListener('keydown', handleMobileMenuKeydown);
     mobileBreakpoint.addEventListener('change', closeMobileMenuAtDesktop);
     syncMobileMenu();
     cleanup.push(() => {
       mobileMenu?.removeEventListener('click', closeMobileMenu);
       mobileMenu?.removeEventListener('toggle', syncMobileMenu);
-      document.removeEventListener('keydown', closeMobileMenuWithEscape);
+      document.removeEventListener('keydown', handleMobileMenuKeydown);
       mobileBreakpoint.removeEventListener('change', closeMobileMenuAtDesktop);
       document.documentElement.classList.remove('resvary-mobile-nav-open');
+      for (const element of backgroundContent) element.inert = false;
     });
 
     const paint = (now = performance.now(), force = false) => {

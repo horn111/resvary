@@ -23,6 +23,8 @@ import type {
 
 export interface CreditReservationFilter extends CreditBalanceFilter {
   status?: CreditReservation['status'];
+  expiresBefore?: number;
+  limit?: number;
 }
 
 export interface CreditStoreReader {
@@ -70,6 +72,7 @@ export interface CreditStoreTransaction extends CreditStoreReader {
   saveLedgerEntry(entry: LedgerEntry): Promise<void>;
   saveOutboxEvent(event: CreditOutboxEvent): Promise<void>;
   saveIdempotencyRecord(record: IdempotencyRecord): Promise<void>;
+  claimIdempotencyRecord?(record: IdempotencyRecord): Promise<boolean>;
   saveFundingIntent(intent: FundingIntent): Promise<void>;
   saveFundingTransaction(transaction: FundingTransaction): Promise<void>;
 }
@@ -548,6 +551,12 @@ class MemoryCreditTransaction implements CreditPolicyStoreTransaction {
       structuredClone(value),
     );
   }
+  async claimIdempotencyRecord(value: IdempotencyRecord) {
+    const id = idempotencyId(value.scope, value.key);
+    if (this.state.idempotencyRecords.has(id)) return false;
+    this.state.idempotencyRecords.set(id, structuredClone(value));
+    return true;
+  }
   async saveFundingIntent(value: FundingIntent) {
     this.state.fundingIntents.set(value.id, structuredClone(value));
   }
@@ -613,11 +622,21 @@ function reader(state: MemoryState): CreditStoreReader & CreditPolicyStoreReader
       return clone(state.reservations.get(id));
     },
     async listReservations(filter = {}) {
+      if (
+        filter.limit !== undefined &&
+        (!Number.isSafeInteger(filter.limit) || filter.limit <= 0)
+      ) {
+        throw new Error('Query limit must be a positive safe integer');
+      }
       return clones(
-        [...state.reservations.values()].filter(
-          (item) =>
-            matchesBalanceFilter(item, filter) && (!filter.status || item.status === filter.status),
-        ),
+        [...state.reservations.values()]
+          .filter(
+            (item) =>
+              matchesBalanceFilter(item, filter) &&
+              (!filter.status || item.status === filter.status) &&
+              (filter.expiresBefore === undefined || item.expiresAt <= filter.expiresBefore),
+          )
+          .slice(0, filter.limit ?? Number.MAX_SAFE_INTEGER),
       );
     },
     async getUsageEvent(id) {
@@ -715,6 +734,7 @@ function reader(state: MemoryState): CreditStoreReader & CreditPolicyStoreReader
           .filter(
             (item) =>
               matchesBalanceFilter(item, filter) &&
+              (!filter.accountId || item.accountId === filter.accountId) &&
               (!filter.policyId || item.policyId === filter.policyId) &&
               (!filter.kind || item.kind === filter.kind) &&
               (filter.expiresBefore === undefined ||

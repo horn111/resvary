@@ -192,6 +192,15 @@ describe('SqliteAdminStore', () => {
     });
     expect(repeated.action).toEqual(first.action);
     expect((await admin.listOperatorActions('project_ops')).items).toHaveLength(1);
+    await expect(
+      operator.grantCredits({
+        actionId,
+        customerId: 'customer_ops',
+        amount: '4',
+        reason: 'Restore credits after verified support incident',
+      }),
+    ).rejects.toThrow('was already used for another command');
+    expect((await ledger.getBalance('customer_ops')).postedUnits).toBe('13000000');
 
     const recoveryActionId = 'eaa4bb85-8898-494f-a174-33691b036b67';
     let rejectSuccessJournalOnce = true;

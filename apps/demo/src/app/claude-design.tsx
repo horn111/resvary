@@ -21,7 +21,7 @@ const OPERATOR_CONSOLE_SECTION = `<section id="operator-console" data-operator-c
       <div style="display:grid;grid-template-columns:minmax(0,0.72fr) minmax(0,1.28fr);gap:min(8vw,110px);align-items:start">
         <div>
           <div style="font-family:var(--font-mono),'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--color-ink-muted);margin-bottom:26px">10 / Operator Console</div>
-          <h2 style="margin:0;font-size:clamp(30px,3.6vw,54px);line-height:1.02;letter-spacing:-0.032em;font-weight:500;max-width:17ch;text-wrap:balance">Explain every balance. Recover every incident safely.</h2>
+          <h2 style="margin:0;font-size:clamp(30px,3.6vw,54px);line-height:1.02;letter-spacing:-0.032em;font-weight:500;max-width:17ch;text-wrap:balance">Explain every balance. Recover known ledger incidents safely.</h2>
           <p style="margin:26px 0 0;max-width:48ch;font-size:16.5px;line-height:1.6;color:var(--color-ink-body)">A self-hosted command ledger for one Resvary project. Search customers, trace a charge through its receipt and price version, and run only the recovery actions the ledger can prove are safe.</p>
           <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:30px">
             <a href="https://github.com/horn111/resvary/blob/main/docs/operator-console.md" style="display:inline-flex;align-items:center;padding:14px 22px;background:var(--color-ink);color:var(--color-canvas);font-family:var(--font-mono),'JetBrains Mono',monospace;font-size:12px;letter-spacing:0.12em;text-transform:uppercase">Open setup guide</a>
@@ -94,6 +94,10 @@ let SITE_HTML = CLAUDE_DESIGN_HTML.replaceAll(
     'The deterministic ledger demo needs no AI key. The buyer-agent prototype shows the full Testnet path with OpenAI Agents SDK, Circle Agent Wallet, Gateway, and Arc.',
   )
   .replace(
+    '<code style="font-family:var(--font-mono),\'JetBrains Mono\',monospace;font-size:13.5px;color:var(--color-ink)">runMetered</code> releases the full reservation when the provider callback throws. The account keeps its posted credits.',
+    '<code style="font-family:var(--font-mono),\'JetBrains Mono\',monospace;font-size:13.5px;color:var(--color-ink)">runMetered</code> releases the reservation and keeps the execution claim when the callback throws. Start a new operation only after confirming the provider did not complete the first one.',
+  )
+  .replace(
     'Run the interactive demo <span style="opacity:0.5">→</span></a>',
     'Run the ledger demo <span style="opacity:0.5">→</span></a>\n        <a href="https://agent.resvary.xyz" style="align-self:flex-start;display:inline-flex;align-items:center;gap:10px;padding:14px 22px;border:1px solid var(--color-line-strong);font-family:var(--font-mono),\'JetBrains Mono\',monospace;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-ink-strong)">Open the agent demo <span style="opacity:0.5">→</span></a>',
   )
@@ -116,6 +120,33 @@ SITE_HTML = replaceSectionByLabel(SITE_HTML, '13 / Access', ACCESS_SECTION)
   .replaceAll('10 / Credit model', '09 / Credit model')
   .replaceAll('14 / FAQ', '12 / FAQ')
   .replace(PRICING_SECTION_MARKER, `${OPERATOR_CONSOLE_SECTION}\n\n  ${PRICING_SECTION_MARKER}`);
+
+assertSiteHtml(SITE_HTML);
+
+function assertSiteHtml(html: string) {
+  const required = [
+    '1.0 stable',
+    'data-operator-console-section="true"',
+    'Install version 1.0. Run it in your stack.',
+    'https://agent.resvary.xyz',
+    'keeps the execution claim when the callback throws',
+  ];
+  const forbidden = [
+    '0.5 stable',
+    '04 / Included in 0.5',
+    'Hosted Postgres service',
+    'until public package releases are available',
+  ];
+  for (const value of required) {
+    if (!html.includes(value))
+      throw new Error(`Landing page is missing required content: ${value}`);
+  }
+  for (const value of forbidden) {
+    if (html.includes(value)) throw new Error(`Landing page contains stale content: ${value}`);
+  }
+}
+
+export { SITE_HTML };
 
 export function ClaudeDesignPage() {
   return (

@@ -7,7 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.0.0] - Unreleased
+### Fixed
+
+- Added a durable execution claim to `runMetered`, blocked provider callbacks for closed reservations, and serialized matching calls within one process.
+- Persisted reservation expiry when `commitUsage` discovers an overdue reservation.
+- Bound Operator Console idempotency to normalized command parameters, including amounts and expiry cutoffs.
+
+### Changed
+
+- Moved PostgreSQL project, customer, status, policy, and expiry filtering into SQL and released transaction connections before retry backoff.
+- Added bounded reservation maintenance and operational backlog fields to PostgreSQL health responses.
+- Agent Demo now replaces a completed run's fixed budget hold with measured provider spend while retaining the hold for unknown outcomes.
+- Added Agent Demo image vulnerability reporting and weekly dependency update checks.
+- Documented replay-safe Stripe webhook funding and added `stripe` as a credit grant source.
+
+## [1.0.0] - 2026-09-06
 
 ### Added
 
@@ -269,7 +283,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI/CD pipeline with GitHub Actions
 - Security policy and contribution guidelines
 
-[unreleased]: https://github.com/horn111/resvary/compare/v0.8.0...HEAD
+[unreleased]: https://github.com/horn111/resvary/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/horn111/resvary/compare/v0.8.0...v1.0.0
 [0.8.0]: https://github.com/horn111/resvary/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/horn111/resvary/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/horn111/resvary/compare/v0.6.0...v0.6.1
