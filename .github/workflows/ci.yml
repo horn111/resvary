@@ -127,6 +127,14 @@ jobs:
       - run: npm run test:e2e --workspace @resvary/agent-demo
       - name: Build deployment image
         run: docker build --tag resvary-agent-demo:ci --file apps/agent-demo/Dockerfile .
+      - name: Report Agent Demo image vulnerabilities
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: resvary-agent-demo:ci
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '0'
 
   console-e2e:
     name: Operator Console browser tests

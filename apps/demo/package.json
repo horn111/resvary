@@ -8,7 +8,7 @@
     "prebuild": "node ../../scripts/check-claude-design.mjs && npm run build --workspace=@resvary/sdk && npm run build --workspace=@resvary/sqlite && npm run build --workspace=@resvary/circle",
     "build": "next build",
     "start": "next start",
-    "test": "vitest run src/app/api/demo-security.test.ts"
+    "test": "vitest run src/app/api/demo-security.test.ts src/app/claude-design.test.ts"
   },
   "engines": {
     "node": ">=24.0.0"

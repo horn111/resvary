@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { CreditLedger } from '../credits/ledger.js';
 import type { CreditStore, OutboxDeliveryStore } from '../credits/store.js';
 import { toCreditUnits } from '../credits/amount.js';
@@ -51,28 +52,40 @@ export class OperatorService {
   }
 
   grantCredits(input: OperatorGrantInput) {
-    if (toCreditUnits(input.amount) <= 0n)
-      throw new Error('Operator grant amount must be positive');
-    return this.execute(input, 'credit.grant', 'customer', input.customerId, () =>
-      this.config.ledger.grantCredits({
-        customerId: input.customerId,
-        amount: input.amount,
-        source: 'manual',
-        idempotencyKey: this.idempotencyKey(input.actionId),
-        metadata: this.metadata(input),
-      }),
+    const amountUnits = toCreditUnits(input.amount);
+    if (amountUnits <= 0n) throw new Error('Operator grant amount must be positive');
+    return this.execute(
+      input,
+      'credit.grant',
+      'customer',
+      input.customerId,
+      { amountUnits: amountUnits.toString() },
+      () =>
+        this.config.ledger.grantCredits({
+          customerId: input.customerId,
+          amount: input.amount,
+          source: 'manual',
+          idempotencyKey: this.idempotencyKey(input.actionId),
+          metadata: this.metadata(input),
+        }),
     );
   }
 
   adjustCredits(input: OperatorAdjustInput) {
-    return this.execute(input, 'credit.adjust', 'customer', input.customerId, () =>
-      this.config.ledger.adjustCredits({
-        customerId: input.customerId,
-        amount: input.amount,
-        reason: input.reason,
-        idempotencyKey: this.idempotencyKey(input.actionId),
-        metadata: this.metadata(input),
-      }),
+    return this.execute(
+      input,
+      'credit.adjust',
+      'customer',
+      input.customerId,
+      { amountUnits: signedUnits(input.amount).toString() },
+      () =>
+        this.config.ledger.adjustCredits({
+          customerId: input.customerId,
+          amount: input.amount,
+          reason: input.reason,
+          idempotencyKey: this.idempotencyKey(input.actionId),
+          metadata: this.metadata(input),
+        }),
     );
   }
 
@@ -81,11 +94,22 @@ export class OperatorService {
     const before = input.before ?? currentTime;
     if (!Number.isSafeInteger(before)) throw new Error('Operator expiry time must be an integer');
     if (before > currentTime) throw new Error('Operator expiry time cannot be in the future');
-    return this.execute(input, 'reservation.expire_overdue', 'project', this.config.projectId, () =>
-      this.config.ledger.releaseExpiredReservations({
-        now: before,
-        idempotencyKey: this.idempotencyKey(input.actionId),
-      }),
+    return this.execute(
+      input,
+      'reservation.expire_overdue',
+      'project',
+      this.config.projectId,
+      { before: input.before ?? null },
+      (_pendingRecovery, existing) =>
+        this.config.ledger.releaseExpiredReservations({
+          now:
+            input.before ??
+            (typeof existing?.command?.effectiveBefore === 'number'
+              ? existing.command.effectiveBefore
+              : before),
+          idempotencyKey: this.idempotencyKey(input.actionId),
+        }),
+      { effectiveBefore: before },
     );
   }
 
@@ -95,6 +119,7 @@ export class OperatorService {
       'outbox.requeue',
       'outbox_event',
       input.eventId,
+      {},
       async (pendingRecovery) => {
         const event = await this.config.deliveryStore.getOutboxEvent(input.eventId);
         if (!event || event.projectId !== this.config.projectId) {
@@ -115,7 +140,9 @@ export class OperatorService {
     type: OperatorActionType,
     targetType: OperatorAction['targetType'],
     targetId: string,
-    operation: (pendingRecovery: boolean) => Promise<T>,
+    command: Record<string, unknown>,
+    operation: (pendingRecovery: boolean, existing?: OperatorAction) => Promise<T>,
+    generatedCommand: Record<string, unknown> = {},
   ): Promise<{ action: OperatorAction; result: T }> {
     const actionId = requireUuid(input.actionId);
     const reason = requireText(input.reason, 'reason');
@@ -124,7 +151,7 @@ export class OperatorService {
       actionId,
     );
     if (existing) {
-      this.assertSameCommand(existing, type, targetType, targetId, reason);
+      this.assertSameCommand(existing, type, targetType, targetId, reason, command);
       if (existing.status === 'succeeded') {
         return { action: existing, result: existing.result as T };
       }
@@ -138,6 +165,8 @@ export class OperatorService {
         targetType,
         targetId,
         reason,
+        command: { ...command, ...generatedCommand },
+        commandHash: hashCommand(command),
         status: 'pending',
         createdAt: this.now(),
       });
@@ -145,7 +174,7 @@ export class OperatorService {
 
     let result: T;
     try {
-      result = await operation(existing?.status === 'pending');
+      result = await operation(existing?.status === 'pending', existing);
     } catch (error) {
       await this.appendOutcome(
         actionId,
@@ -153,6 +182,8 @@ export class OperatorService {
         targetType,
         targetId,
         reason,
+        existing?.command ?? { ...command, ...generatedCommand },
+        existing?.commandHash ?? hashCommand(command),
         'failed',
         undefined,
         error instanceof Error ? error.message : String(error),
@@ -166,6 +197,8 @@ export class OperatorService {
       targetType,
       targetId,
       reason,
+      existing?.command ?? { ...command, ...generatedCommand },
+      existing?.commandHash ?? hashCommand(command),
       'succeeded',
       result,
     );
@@ -178,6 +211,8 @@ export class OperatorService {
     targetType: OperatorAction['targetType'],
     targetId: string,
     reason: string,
+    command: Record<string, unknown>,
+    commandHash: string,
     status: Exclude<OperatorActionStatus, 'pending'>,
     result?: unknown,
     error?: string,
@@ -192,6 +227,8 @@ export class OperatorService {
       targetType,
       targetId,
       reason,
+      command,
+      commandHash,
       status,
       createdAt: pending?.createdAt ?? this.now(),
       completedAt: this.now(),
@@ -208,12 +245,14 @@ export class OperatorService {
     targetType: OperatorAction['targetType'],
     targetId: string,
     reason: string,
+    command: Record<string, unknown>,
   ) {
     if (
       action.type !== type ||
       action.targetType !== targetType ||
       action.targetId !== targetId ||
-      action.reason !== reason
+      action.reason !== reason ||
+      (action.commandHash !== undefined && action.commandHash !== hashCommand(command))
     ) {
       throw new Error(`Operator action id ${action.id} was already used for another command`);
     }
@@ -230,6 +269,28 @@ export class OperatorService {
       reason: input.reason,
     };
   }
+}
+
+function signedUnits(amount: string): bigint {
+  const normalized = amount.trim();
+  return normalized.startsWith('-')
+    ? -toCreditUnits(normalized.slice(1))
+    : toCreditUnits(normalized);
+}
+
+function hashCommand(value: unknown): string {
+  return createHash('sha256').update(stableStringify(value)).digest('hex');
+}
+
+function stableStringify(value: unknown): string {
+  if (value === undefined) return 'null';
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+  return `{${Object.entries(value as Record<string, unknown>)
+    .filter(([, item]) => item !== undefined)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, item]) => `${JSON.stringify(key)}:${stableStringify(item)}`)
+    .join(',')}}`;
 }
 
 function requireText(value: string, field: string): string {

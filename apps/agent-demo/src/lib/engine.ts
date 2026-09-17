@@ -129,9 +129,13 @@ export class JobEngine {
   }
   async execute(id: string) {
     let job = await this.rt.jobs.get(id);
-    if (job.phase === 'completed') return { status: 'completed', replayed: true };
+    if (job.phase === 'completed') {
+      await this.settleCompletedBudget(job);
+      return { status: 'completed', replayed: true };
+    }
     if (job.phase === 'result_saved') {
       await this.commit(job);
+      await this.settleCompletedBudget(await this.rt.jobs.get(id));
       return { status: 'completed' };
     }
     if (['provider_pending', 'review_required', 'failed'].includes(job.phase))
@@ -177,6 +181,7 @@ export class JobEngine {
         : {}),
     });
     await this.commit(await this.rt.jobs.get(id));
+    await this.settleCompletedBudget(await this.rt.jobs.get(id));
     return { status: 'completed' };
   }
   async commit(job: Job) {
@@ -217,14 +222,14 @@ export class JobEngine {
     this.agentFailed = false;
     try {
       const existing = await this.rt.jobs.get(id);
-      if (
-        existing.phase === 'completed' ||
-        existing.phase === 'failed' ||
-        existing.phase === 'review_required'
-      )
+      if (existing.phase === 'completed') {
+        await this.settleCompletedBudget(existing);
         return;
+      }
+      if (existing.phase === 'failed' || existing.phase === 'review_required') return;
       if (existing.phase === 'result_saved') {
         await this.commit(existing);
+        await this.settleCompletedBudget(await this.rt.jobs.get(id));
         return;
       }
       if (this.rt.cfg.testMode) {
@@ -327,6 +332,7 @@ export class JobEngine {
       }
       const final = await this.rt.jobs.get(id);
       if (final.phase !== 'completed') throw new Error('Agent stopped before completing the job');
+      await this.settleCompletedBudget(final);
     } catch {
       const job = await this.rt.jobs.get(id);
       if (!['completed', 'failed', 'result_saved'].includes(job.phase)) {
@@ -338,5 +344,15 @@ export class JobEngine {
       }
       // result_saved is recoverable without another paid model call.
     }
+  }
+
+  private async settleCompletedBudget(job: Job) {
+    if (job.budget_settled || job.phase !== 'completed') return;
+    if (job.ai_config && !job.agent_usage) return;
+    const agentCost =
+      job.ai_config && job.agent_usage
+        ? costUnits(job.ai_config.agent, job.agent_usage.inputTokens, job.agent_usage.outputTokens)
+        : 0;
+    await this.rt.jobs.settleBudget(job.id, job.model_cost + agentCost);
   }
 }

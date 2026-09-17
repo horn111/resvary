@@ -60,6 +60,9 @@ describe.skipIf(!database)('durable document jobs on PostgreSQL', () => {
     await engine.run(first.id);
     const done = await rt.jobs.get(first.id);
     expect(done.phase).toBe('completed');
+    expect(done.budget_settled).toBe(true);
+    expect(done.budget_charge_units).toBe(0);
+    expect((await rt.jobs.status()).remainingUnits).toBe(10_000_000);
     expect(Number(done.receipt?.releasedAmount)).toBeGreaterThan(0);
     expect(await rt.ledger.listFundingTransactions(done.challenge!.fundingIntent.id)).toHaveLength(
       1,
@@ -130,7 +133,10 @@ describe.skipIf(!database)('durable document jobs on PostgreSQL', () => {
     const engine = new JobEngine(rt, analyze);
     await engine.run(job.id);
     await engine.run(job.id);
-    expect((await rt.jobs.get(job.id)).phase).toBe('review_required');
+    const paused = await rt.jobs.get(job.id);
+    expect(paused.phase).toBe('review_required');
+    expect(paused.budget_settled).toBe(false);
+    expect((await rt.jobs.status()).remainingUnits).toBe(10_000_000 - RUN_BUDGET_UNITS);
     expect(analyze).toHaveBeenCalledTimes(1);
   });
   it('commits a saved result after failure without invoking the provider again', async () => {
@@ -360,6 +366,7 @@ describe.skipIf(!database)('durable document jobs on PostgreSQL', () => {
     await executeWorkflowJob(rt, job.id, engine);
     expect((await rt.jobs.get(job.id)).phase).toBe('result_saved');
     expect(await recoverWorkflowJob(rt, job.id, engine)).toBe('completed');
+    expect((await rt.jobs.get(job.id)).budget_settled).toBe(true);
     expect(analyze).toHaveBeenCalledTimes(1);
   });
   it('keeps a failed dispatch recoverable after the enqueue acknowledgment is lost', async () => {

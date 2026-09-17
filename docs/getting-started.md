@@ -15,7 +15,7 @@ Follow the quickstart in the root README to create a ledger, meter, and immutabl
 ## Scaffold an application
 
 ```bash
-npx create-resvary@0.8.0 my-ai-product
+npx create-resvary@1.0.0 my-ai-product
 ```
 
 Choose `AI prepaid credits` and either Next.js or Express. The legacy x402 paid API starter remains an explicit alternate template.
@@ -27,6 +27,6 @@ npm install
 npm run dev
 ```
 
-Set `RESVARY_DEMO_ADMIN_TOKEN` and a separate `RESVARY_WEBHOOK_SECRET`, open [http://localhost:3000](http://localhost:3000), enter the admin token, grant `$5`, and run the simulated AI operation. Repeat the same request to inspect idempotency, or trigger provider failure to verify full release.
+Set `RESVARY_DEMO_ADMIN_TOKEN` and a separate `RESVARY_WEBHOOK_SECRET`, open [http://localhost:3000](http://localhost:3000), enter the admin token, grant `$5`, and run the simulated AI operation. Repeat the same request to inspect idempotency, or trigger provider failure to verify release and the retained execution claim.
 
 Read [prepaid-credits.md](prepaid-credits.md), [usage-rating.md](usage-rating.md), and [credit-security-model.md](credit-security-model.md) before integrating production data.

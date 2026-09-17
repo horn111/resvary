@@ -20,7 +20,7 @@ export async function recoverWorkflowJob(rt: Runtime, id: string, engine = new J
   if (!state || state.expires_at.getTime() <= Date.now()) return 'expired';
   if (state.phase === 'result_saved') {
     // Only the persisted provider output is used. commitUsage has a stable key.
-    await engine.commit(await rt.jobs.get(id));
+    await engine.execute(id);
     return (await rt.jobs.executionStatus(id))?.phase ?? 'expired';
   }
   return state.phase;

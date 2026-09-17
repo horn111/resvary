@@ -12,6 +12,7 @@ export {
   IdempotencyConflictError,
   InsufficientCreditsError,
   InvalidCreditStateError,
+  MeteredExecutionAlreadyClaimedError,
   UnsupportedCreditStoreCapabilityError,
 } from './errors.js';
 export {

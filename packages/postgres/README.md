@@ -17,10 +17,7 @@ await store.close();
 
 Pass either `connectionString` or an existing `pg.Pool`. A store created from a connection string owns and closes its pool. A store given a pool never closes it.
 
-Credit transactions and bundled receipt ledger operations run at `SERIALIZABLE` isolation with bounded retry. Schema v3 adds grant policies, credit lots, reservation allocations, and guarded legacy backfill. Apply migrations before starting application or worker processes.
-
-Resvary 0.8 keeps schema v3. Graduated/package price definitions and their receipt line items use
-the existing JSONB payloads, so upgrading from 0.7 requires no database migration.
+Credit transactions and bundled receipt ledger operations run at `SERIALIZABLE` isolation with bounded retry. Schema v4 adds normalized admin query columns, timeline indexes, and the append-only operator action journal. Apply migrations before starting application, worker, or console processes.
 
 CLI commands:
 
@@ -32,4 +29,4 @@ resvary-postgres import-sqlite --sqlite .resvary/resvary.sqlite
 resvary-postgres verify-import --sqlite .resvary/resvary.sqlite
 ```
 
-SQLite import requires Node.js 24 and SQLite schema v5. Stop every writer before importing. Verification compares entity payloads, balances, ledger totals, lots, allocations, and open reservations.
+SQLite import requires Node.js 24 and an offline Resvary 0.8 SQLite schema v5 database. Stop every writer before importing. Verification compares entity payloads, balances, ledger totals, lots, allocations, and open reservations.

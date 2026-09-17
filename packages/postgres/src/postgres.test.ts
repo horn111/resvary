@@ -17,6 +17,7 @@ import {
 } from '@resvary/sdk/receipts';
 import { createPostgresCreditStore } from './credit.js';
 import { createPostgresAdminStore } from './admin.js';
+import { checkPostgresHealth } from './health.js';
 import { applyV1, applyV2, applyV3, migratePostgres } from './migrations.js';
 import { createPostgresReceiptStore } from './receipt.js';
 import { importSqliteDatabase, verifySqliteImport } from './import-sqlite.js';
@@ -171,6 +172,15 @@ suite('Postgres stores', () => {
       reservation: { id: reservation.id },
       price: { id: price.id },
     });
+    const health = await checkPostgresHealth({ pool: pool!, schema });
+    expect(health).toMatchObject({
+      ok: true,
+      schemaVersion: 4,
+      reconciliationRequiredFunding: 0,
+    });
+    expect(health.deadLetterEvents).toBeGreaterThanOrEqual(1);
+    expect(health.overdueReservations).toBeGreaterThanOrEqual(1);
+    expect(health.oldestPendingOutboxAgeMs).toBeGreaterThanOrEqual(0);
 
     const operator = new OperatorService({
       projectId,
@@ -445,6 +455,52 @@ suite('Postgres stores', () => {
     expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
     expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
     expect((await first.getBalance('customer')).availableAmount).toBe('0.25');
+  });
+
+  it('claims one runMetered callback across independent store instances', async () => {
+    const suffix = randomUUID();
+    const projectId = `project_run_metered_${suffix}`;
+    const customerId = `customer_run_metered_${suffix}`;
+    const first = new CreditLedger({
+      projectId,
+      store: createPostgresCreditStore({ pool: pool!, schema }),
+    });
+    const second = new CreditLedger({
+      projectId,
+      store: createPostgresCreditStore({ pool: pool!, schema }),
+    });
+    await first.grantCredits({ customerId, amount: '2', idempotencyKey: 'grant' });
+    const meter = await first.registerMeter({
+      key: `jobs_${suffix}`,
+      dimensions: ['jobs'],
+      idempotencyKey: 'meter',
+    });
+    const price = await first.createPriceVersion({
+      meterKey: meter.key,
+      rates: [{ dimension: 'jobs', unitSize: '1', amount: '1' }],
+      idempotencyKey: 'price',
+    });
+    let callbackCalls = 0;
+    const callback = async () => {
+      callbackCalls += 1;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      return { value: 'done', usageEventId: `usage_${suffix}`, actualUsage: { jobs: '1' } };
+    };
+    const input = {
+      customerId,
+      priceId: price.id,
+      estimatedUsage: { jobs: '1' },
+      idempotencyKey: 'run',
+    };
+
+    const outcomes = await Promise.allSettled([
+      first.runMetered(input, callback),
+      second.runMetered(input, callback),
+    ]);
+
+    expect(callbackCalls).toBe(1);
+    expect(outcomes.some((outcome) => outcome.status === 'fulfilled')).toBe(true);
+    expect((await first.getBalance(customerId)).availableAmount).toBe('1');
   });
 
   it('round-trips advanced prices and receipt breakdowns on schema v3', async () => {

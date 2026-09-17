@@ -41,6 +41,15 @@ export class InvalidCreditStateError extends CreditError {
   }
 }
 
+export class MeteredExecutionAlreadyClaimedError extends CreditError {
+  constructor(readonly reservationId: string) {
+    super(
+      `Metered execution was already claimed for reservation ${reservationId}; do not call the provider again. Reconcile the provider result and retry commitUsage directly.`,
+      'metered_execution_already_claimed',
+    );
+  }
+}
+
 export class UnsupportedCreditStoreCapabilityError extends CreditError {
   constructor(capability = 'credit policies') {
     super(`Credit store does not support ${capability}`, 'unsupported_store_capability');

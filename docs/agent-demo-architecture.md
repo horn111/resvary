@@ -148,7 +148,7 @@ A Hyperbolic key probe returned HTTP 401. That response proves rejection, not co
 
 PostgreSQL stores the demo budget in micro-USD. The ceiling equals `10,000,000` units (`$10.00`). Provider probes created `19,390` units (`$0.019390`) of conservative pre-call holds, while the provider reported `$0.00083109` in total probe spend. A fresh production database must seed the holds through `AGENT_DEMO_INITIAL_SPEND_UNITS` before the budget row exists.
 
-Each accepted request increments allocated budget by `400,000` units (`$0.40`). The code never decrements that amount, even when the provider charges less or the job fails. After the known probe holds, the database can accept 24 job holds. The 25th would exceed the ceiling.
+Each accepted request holds `400,000` units (`$0.40`) before an external call. A completed job replaces that hold with the measured analysis and agent-model cost. Budget settlement is idempotent. Jobs with an unknown provider outcome or missing agent usage retain the full hold for operator review.
 
 The visitor-facing Resvary ledger uses a separate product tariff of `$2` per million input tokens and `$8` per million output tokens. It reserves the maximum quote, charges measured service usage, and releases unused product credits. The receipt represents this product tariff. It does not represent the Nous invoice or the fixed demo-budget allocation.
 

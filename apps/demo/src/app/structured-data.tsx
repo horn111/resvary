@@ -19,7 +19,7 @@ const FAQ_ITEMS = [
   {
     question: 'What happens when the provider fails?',
     answer:
-      'runMetered releases the full reservation when the provider callback throws. The account keeps its posted credits.',
+      'runMetered releases the reservation and keeps the execution claim when the callback throws. Start a new operation only after confirming the provider did not complete the first one.',
   },
   {
     question: 'What happens if commit fails after the AI request succeeds?',

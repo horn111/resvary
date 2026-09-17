@@ -17,6 +17,9 @@ Optional health endpoints are enabled with `RESVARY_HEALTH_PORT`. Use `/live` fo
 ```text
 resvary-worker dead-letter list
 resvary-worker dead-letter requeue EVENT_ID
+resvary-worker maintenance
 ```
+
+Run `maintenance` from a scheduler with `RESVARY_PROJECT_ID` set. Each invocation expires at most 100 overdue reservations and 100 due credit lots by default. Change the bound with `RESVARY_MAINTENANCE_BATCH_SIZE`; repeat the command until both counts reach zero during a backlog drain.
 
 Run each replica with a unique `RESVARY_WORKER_ID`, or omit it to generate a process-unique ID. JSON logs contain event identifiers and sanitized errors, never webhook secrets or event payloads.

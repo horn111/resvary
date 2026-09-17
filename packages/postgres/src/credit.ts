@@ -72,6 +72,7 @@ export class PostgresCreditStore implements CreditPolicyStore, OutboxDeliverySto
   ): Promise<T> {
     for (let attempt = 0; ; attempt += 1) {
       const client = await this.handle.pool.connect();
+      let retry = false;
       try {
         await client.query('BEGIN ISOLATION LEVEL SERIALIZABLE');
         const result = await handler(new PostgresCreditTransaction(client, this.handle));
@@ -82,9 +83,14 @@ export class PostgresCreditStore implements CreditPolicyStore, OutboxDeliverySto
         if (!isRetryableTransactionError(error) || attempt >= this.handle.maxTransactionRetries) {
           throw error;
         }
-        await new Promise((resolve) => setTimeout(resolve, Math.min(10 * 2 ** attempt, 250)));
+        retry = true;
       } finally {
         client.release();
+      }
+      if (retry) {
+        const maximumDelayMs = Math.min(10 * 2 ** attempt, 250);
+        const delayMs = Math.round(maximumDelayMs * (0.5 + Math.random() * 0.5));
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
       }
     }
   }
@@ -601,6 +607,17 @@ class PostgresCreditTransaction implements CreditPolicyStoreTransaction {
       ['scope', 'key'],
     );
   }
+  claimIdempotencyRecord(value: IdempotencyRecord) {
+    return insertOnce(
+      this.client,
+      this.handle,
+      'resvary_idempotency_keys',
+      ['scope', 'key', 'created_at'],
+      [value.scope, value.key, value.createdAt],
+      value,
+      ['scope', 'key'],
+    );
+  }
   saveFundingIntent(value: FundingIntent) {
     return upsert(
       this.client,
@@ -780,13 +797,17 @@ function reader(
         `SELECT payload::text AS payload FROM ${t('resvary_credit_accounts')} WHERE project_id = $1 AND customer_id = $2`,
         [projectId, customerId],
       ),
-    listAccounts: (filter = {}) =>
-      filteredAll(
+    listAccounts: (filter = {}) => {
+      const query = sqlFilter([
+        ['project_id', filter.projectId],
+        ['customer_id', filter.customerId],
+      ]);
+      return all(
         db,
-        `SELECT payload::text AS payload FROM ${t('resvary_credit_accounts')} ORDER BY updated_at ASC`,
-        [],
-        (value: CreditAccount) => matchesBalanceFilter(value, filter),
-      ),
+        `SELECT payload::text AS payload FROM ${t('resvary_credit_accounts')} ${query.where} ORDER BY updated_at ASC`,
+        query.values,
+      );
+    },
     getGrant: (id) =>
       one(db, `SELECT payload::text AS payload FROM ${t('resvary_credit_grants')} WHERE id = $1`, [
         id,
@@ -821,14 +842,20 @@ function reader(
         `SELECT payload::text AS payload FROM ${t('resvary_credit_reservations')} WHERE id = $1`,
         [id],
       ),
-    listReservations: (filter = {}) =>
-      filteredAll(
+    listReservations: (filter = {}) => {
+      const query = sqlFilter([
+        ['project_id', filter.projectId],
+        ['customer_id', filter.customerId],
+        ['status', filter.status],
+        ['expires_at', filter.expiresBefore, '<='],
+      ]);
+      const limit = sqlLimit(filter.limit, query.values);
+      return all(
         db,
-        `SELECT payload::text AS payload FROM ${t('resvary_credit_reservations')} ORDER BY created_at ASC`,
-        [],
-        (value: CreditReservation) =>
-          matchesBalanceFilter(value, filter) && (!filter.status || value.status === filter.status),
-      ),
+        `SELECT payload::text AS payload FROM ${t('resvary_credit_reservations')} ${query.where} ORDER BY created_at ASC ${limit.sql}`,
+        limit.values,
+      );
+    },
     getUsageEvent: (id) =>
       one(db, `SELECT payload::text AS payload FROM ${t('resvary_usage_events')} WHERE id = $1`, [
         id,
@@ -857,17 +884,16 @@ function reader(
       return result.rows[0] ? parseOutboxRow(result.rows[0]) : undefined;
     },
     listOutboxEvents: async (filter = {}) => {
+      const query = sqlFilter([
+        ['project_id', filter.projectId],
+        ['status', filter.status],
+        ['type', filter.type],
+      ]);
       const result = await db.query<OutboxRow>(
-        outboxSelect(t('resvary_outbox_events'), 'ORDER BY created_at ASC, id ASC'),
+        outboxSelect(t('resvary_outbox_events'), `${query.where} ORDER BY created_at ASC, id ASC`),
+        query.values,
       );
-      return result.rows
-        .map(parseOutboxRow)
-        .filter(
-          (item) =>
-            (!filter.projectId || item.projectId === filter.projectId) &&
-            (!filter.status || item.status === filter.status) &&
-            (!filter.type || item.type === filter.type),
-        );
+      return result.rows.map(parseOutboxRow);
     },
     getIdempotencyRecord: (scope, key) =>
       one(
@@ -926,18 +952,21 @@ function reader(
       one(db, `SELECT payload::text AS payload FROM ${t('resvary_credit_lots')} WHERE id = $1`, [
         id,
       ]),
-    listCreditLots: (filter = {}) =>
-      filteredAll(
+    listCreditLots: (filter = {}) => {
+      const query = sqlFilter([
+        ['project_id', filter.projectId],
+        ['customer_id', filter.customerId],
+        ['account_id', filter.accountId],
+        ['policy_id', filter.policyId],
+        ['kind', filter.kind],
+        ['expires_at', filter.expiresBefore, '<='],
+      ]);
+      return all(
         db,
-        `SELECT payload::text AS payload FROM ${t('resvary_credit_lots')} ORDER BY created_at, id`,
-        [],
-        (value: CreditLot) =>
-          matchesBalanceFilter(value, filter) &&
-          (!filter.policyId || value.policyId === filter.policyId) &&
-          (!filter.kind || value.kind === filter.kind) &&
-          (filter.expiresBefore === undefined ||
-            (value.expiresAt !== undefined && value.expiresAt <= filter.expiresBefore)),
-      ),
+        `SELECT payload::text AS payload FROM ${t('resvary_credit_lots')} ${query.where} ORDER BY created_at, id`,
+        query.values,
+      );
+    },
     listCreditLotAllocations: (reservationId) =>
       all(
         db,
@@ -958,19 +987,48 @@ function reader(
          WHERE policy_id = $1 AND account_id = $2 AND period_key = $3`,
         [policyId, accountId, periodKey],
       ),
-    listGrantPolicyApplications: (filter = {}) =>
-      filteredAll(
+    listGrantPolicyApplications: (filter = {}) => {
+      const query = sqlFilter([
+        ['project_id', filter.projectId],
+        ['customer_id', filter.customerId],
+        ['policy_id', filter.policyId],
+        ['policy_type', filter.policyType],
+        ['period_key', filter.periodKey],
+      ]);
+      return all(
         db,
-        `SELECT payload::text AS payload FROM ${t('resvary_grant_policy_applications')}
-         ORDER BY created_at, id`,
-        [],
-        (value: GrantPolicyApplication) =>
-          matchesBalanceFilter(value, filter) &&
-          (!filter.policyId || value.policyId === filter.policyId) &&
-          (!filter.policyType || value.policyType === filter.policyType) &&
-          (!filter.periodKey || value.periodKey === filter.periodKey),
-      ),
+        `SELECT payload::text AS payload FROM ${t('resvary_grant_policy_applications')} ${query.where} ORDER BY created_at, id`,
+        query.values,
+      );
+    },
   };
+}
+
+type SqlFilter = [column: string, value: unknown, operator?: '='] | [string, unknown, '<='];
+
+function sqlFilter(filters: SqlFilter[]): { where: string; values: unknown[] } {
+  const values: unknown[] = [];
+  const predicates: string[] = [];
+  for (const [column, value, operator = '='] of filters) {
+    if (value === undefined) continue;
+    values.push(value);
+    predicates.push(`${column} ${operator} $${values.length}`);
+  }
+  return {
+    where: predicates.length ? `WHERE ${predicates.join(' AND ')}` : '',
+    values,
+  };
+}
+
+function sqlLimit(
+  limit: number | undefined,
+  values: unknown[],
+): { sql: string; values: unknown[] } {
+  if (limit === undefined) return { sql: '', values };
+  if (!Number.isSafeInteger(limit) || limit <= 0) {
+    throw new Error('Query limit must be a positive safe integer');
+  }
+  return { sql: `LIMIT $${values.length + 1}`, values: [...values, limit] };
 }
 
 function outboxSelect(tableName: string, suffix: string): string {
@@ -1004,15 +1062,6 @@ async function all<T>(db: Queryable, sql: string, values: unknown[] = []): Promi
   return result.rows.map((row) => parseReceiptStoreValue<T>(row.payload));
 }
 
-async function filteredAll<T>(
-  db: Queryable,
-  sql: string,
-  values: unknown[],
-  filter: (value: T) => boolean,
-): Promise<T[]> {
-  return (await all<T>(db, sql, values)).filter(filter);
-}
-
 async function insert(
   db: Queryable,
   handle: PostgresHandle,
@@ -1022,9 +1071,34 @@ async function insert(
   payload: unknown,
   conflictColumns: string[] = ['id'],
 ): Promise<void> {
+  await insertResult(db, handle, name, columns, values, payload, conflictColumns);
+}
+
+async function insertOnce(
+  db: Queryable,
+  handle: PostgresHandle,
+  name: string,
+  columns: string[],
+  values: unknown[],
+  payload: unknown,
+  conflictColumns: string[] = ['id'],
+): Promise<boolean> {
+  const result = await insertResult(db, handle, name, columns, values, payload, conflictColumns);
+  return result.rowCount === 1;
+}
+
+function insertResult(
+  db: Queryable,
+  handle: PostgresHandle,
+  name: string,
+  columns: string[],
+  values: unknown[],
+  payload: unknown,
+  conflictColumns: string[],
+) {
   const allColumns = [...columns, 'payload'];
   const params = allColumns.map((_, index) => `$${index + 1}`).join(', ');
-  await db.query(
+  return db.query(
     `INSERT INTO ${table(handle, name)} (${allColumns.join(', ')}) VALUES (${params})
      ON CONFLICT (${conflictColumns.join(', ')}) DO NOTHING`,
     [...values, serializeReceiptStoreValue(payload)],
@@ -1049,16 +1123,6 @@ async function upsert(
     `INSERT INTO ${table(handle, name)} (${allColumns.join(', ')}) VALUES (${params})
      ON CONFLICT (id) DO UPDATE SET ${updates}`,
     [...values, serializeReceiptStoreValue(payload)],
-  );
-}
-
-function matchesBalanceFilter(
-  value: { projectId: string; customerId: string },
-  filter: CreditBalanceFilter,
-): boolean {
-  return (
-    (!filter.projectId || value.projectId === filter.projectId) &&
-    (!filter.customerId || value.customerId === filter.customerId)
   );
 }
 

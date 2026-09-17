@@ -110,7 +110,9 @@ console.log(result.receipt.releasedAmount);
 console.log(result.balance.availableAmount);
 ```
 
-If the provider throws, `runMetered` releases the full reservation. If provider execution succeeds but commit fails, the reservation stays open so the same operation can be retried safely.
+`runMetered` stores an execution claim before it calls the provider. Concurrent matching calls on one `CreditLedger` instance wait for the first execution; calls through another instance receive `MeteredExecutionAlreadyClaimedError` instead of calling the provider again. Pass the same key to the provider when it supports idempotent requests.
+
+If the callback throws, `runMetered` releases the reservation and keeps the claim. Start a new operation only after confirming the provider did not complete the first one, or when a duplicate result is acceptable. If the provider returns a result but the credit commit fails, save that result and call `commitUsage` with the same usage event and commit key. Do not retry the whole `runMetered` callback.
 
 For a multi-process deployment, install Postgres persistence and apply migrations before the application starts:
 
@@ -247,6 +249,7 @@ The old payment operations APIs remain under `/api/receipts`, `/api/receipts/pro
 - [Migrate from 0.4 to 0.5](docs/migration-0.5.md)
 - [Direct Arc credit funding](docs/arc-credit-funding.md)
 - [Circle Gateway funding](docs/circle-gateway-funding.md)
+- [Stripe funding webhook](docs/stripe-funding.md)
 - [Funding recovery](docs/funding-recovery.md)
 - [Migrate from 0.3 to 0.4](docs/migration-0.4.md)
 - [Release evidence checklist](docs/evidence/circle-funding-proof.md)

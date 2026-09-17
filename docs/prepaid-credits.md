@@ -25,7 +25,9 @@ const result = await credits.commitUsage({
 });
 ```
 
-Use `runMetered` when provider execution and billing happen in the same process. Use the individual commands when a queue or worker separates reservation from execution.
+Use `runMetered` when provider execution and billing happen in the same process. The method stores an execution claim before the callback, so the same operation key cannot start another provider call through the bundled stores. A matching call on the active `CreditLedger` instance waits for the first call. Another instance receives `MeteredExecutionAlreadyClaimedError` and must reconcile the first execution.
+
+Use the individual commands when a queue or worker separates reservation from execution. Persist the provider result before `commitUsage`. After a commit error, retry `commitUsage` with the saved usage event; do not call the provider again. Pass the operation key to providers that support idempotent requests because the SDK cannot make an external API call and a database transaction atomic.
 
 ## Pricing
 
@@ -45,7 +47,7 @@ Good keys already exist in most applications: request IDs, job IDs, provider res
 - Actual charges cannot exceed a reservation.
 - Create another reservation before continuing a job that needs a higher limit.
 - Open reservations expire after 15 minutes by default.
-- Expiry is processed lazily during reservations or explicitly with `releaseExpiredReservations`.
+- Expiry is processed during reservations or with `releaseExpiredReservations`. Set `limit` for bounded maintenance batches.
 - Manual, funding, allowance, and migrated legacy credits do not expire. Promotion policies require a positive expiry.
 
 ## Allowances and promotions

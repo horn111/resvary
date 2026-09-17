@@ -74,7 +74,9 @@ quantity ranges, and package components charge every started block. All quantiti
 integer strings and `BigInt`; unknown dimensions fail closed. SQLite and PostgreSQL persist the
 complete price and receipt breakdown in their existing payload columns.
 
-`runMetered` is a convenience orchestrator. Provider exceptions release the reservation. Commit failures do not: the caller can retry the same commit without giving away completed usage.
+`runMetered` is a convenience orchestrator for one-process provider execution. It stores a durable execution claim before the callback. The claim blocks another ledger instance from calling the provider with the same operation key, while a retry on the active instance waits for the first call. A thrown callback releases the reservation and retains the claim.
+
+An external call and a database transaction cannot form one atomic operation. Use the operation key as the provider idempotency key when the provider supports it. Save a successful provider result before calling `commitUsage`. If the commit fails, retry `commitUsage` with the same usage event and idempotency key; do not retry the provider callback.
 
 ## Payment compatibility
 
