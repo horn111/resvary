@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-FROM node:24-bookworm-slim AS dependencies
+FROM node:26-bookworm-slim AS dependencies
 WORKDIR /workspace
 COPY package.json package-lock.json ./
 COPY apps/console/package.json apps/console/package.json
@@ -13,14 +13,14 @@ COPY packages/worker/package.json packages/worker/package.json
 COPY packages/create-resvary/package.json packages/create-resvary/package.json
 RUN npm ci --ignore-scripts
 
-FROM node:24-bookworm-slim AS builder
+FROM node:26-bookworm-slim AS builder
 WORKDIR /workspace
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=dependencies /workspace/node_modules ./node_modules
 COPY . .
 RUN npm run build --workspace=@resvary/console
 
-FROM node:24-bookworm-slim AS runner
+FROM node:26-bookworm-slim AS runner
 WORKDIR /app/apps/console
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
