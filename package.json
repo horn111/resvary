@@ -33,9 +33,9 @@
     "proof:gateway": "npm run proof:build && node examples/gateway-nanopayment-proof.mjs"
   },
   "devDependencies": {
-    "@types/node": "^22.20.1",
-    "prettier": "^3.3.0",
-    "typescript": "^5.6.0"
+    "@types/node": "^26.5.1",
+    "prettier": "^3.9.6",
+    "typescript": "^7.0.2"
   },
   "engines": {
     "node": ">=20.0.0"
