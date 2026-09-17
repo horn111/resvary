@@ -3,8 +3,8 @@ updates:
   - package-ecosystem: npm
     directory: /
     schedule:
-      interval: weekly
-    open-pull-requests-limit: 5
+      interval: monthly
+    open-pull-requests-limit: 2
     groups:
       production-dependencies:
         patterns:
@@ -18,17 +18,29 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
-    open-pull-requests-limit: 3
+      interval: monthly
+    open-pull-requests-limit: 1
+    groups:
+      github-actions:
+        patterns:
+          - '*'
 
   - package-ecosystem: docker
     directory: /apps/agent-demo
     schedule:
-      interval: weekly
-    open-pull-requests-limit: 2
+      interval: monthly
+    open-pull-requests-limit: 1
+    ignore:
+      - dependency-name: node
+        update-types:
+          - version-update:semver-major
 
   - package-ecosystem: docker
     directory: /apps/console
     schedule:
-      interval: weekly
-    open-pull-requests-limit: 2
+      interval: monthly
+    open-pull-requests-limit: 1
+    ignore:
+      - dependency-name: node
+        update-types:
+          - version-update:semver-major
