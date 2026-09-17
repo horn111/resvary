@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-FROM node:24-bookworm-slim AS build
+FROM node:26-bookworm-slim AS build
 WORKDIR /workspace
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY package.json package-lock.json ./
@@ -16,7 +16,7 @@ RUN npm ci --ignore-scripts
 COPY . .
 RUN npm run build:core && npm run build --workspace @resvary/agent-demo
 
-FROM node:24-bookworm-slim AS runtime
+FROM node:26-bookworm-slim AS runtime
 WORKDIR /workspace
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 HOME=/home/node
 COPY --from=build --chown=node:node /workspace/node_modules ./node_modules
