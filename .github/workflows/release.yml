@@ -47,7 +47,7 @@ jobs:
         run: test "$RELEASE_REF" = refs/heads/main
 
       - name: Checkout release commit
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ inputs.release_sha }}
           fetch-depth: 0
@@ -150,7 +150,7 @@ jobs:
 
       - name: Upload checked release archives
         if: ${{ inputs.mode != 'reconcile' }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: release-${{ inputs.version }}-${{ inputs.release_sha }}
           path: ${{ runner.temp }}/release-artifacts
@@ -174,14 +174,14 @@ jobs:
 
     steps:
       - name: Checkout release commit
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ inputs.release_sha }}
           fetch-depth: 0
           persist-credentials: false
 
       - name: Checkout trusted release controller
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ github.sha }}
           path: .local/release-controller
@@ -226,7 +226,7 @@ jobs:
 
       - name: Derive Operator Console image tags
         id: console-meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ghcr.io/${{ github.repository_owner }}/resvary-console
           tags: |
@@ -259,7 +259,7 @@ jobs:
 
       - name: Upload Operator Console scan report
         if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-console.sarif
 
@@ -287,14 +287,14 @@ jobs:
 
     steps:
       - name: Checkout release commit
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ inputs.release_sha }}
           fetch-depth: 0
           persist-credentials: false
 
       - name: Checkout trusted release controller
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ github.sha }}
           path: .local/release-controller
