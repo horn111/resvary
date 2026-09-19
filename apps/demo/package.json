@@ -5,16 +5,17 @@
   "description": "Resvary prepaid AI credits and usage billing demo",
   "scripts": {
     "dev": "next dev",
-    "prebuild": "node ../../scripts/check-claude-design.mjs && npm run build --workspace=@resvary/sdk && npm run build --workspace=@resvary/sqlite && npm run build --workspace=@resvary/circle",
+    "prebuild": "node ../../scripts/check-claude-design.mjs && npm run build --workspace=@resvary/sdk && npm run build --workspace=@resvary/sqlite && npm run build --workspace=@resvary/circle && npm run build --workspace=@resvary/postgres",
     "build": "next build",
     "start": "next start",
-    "test": "vitest run src/app/api/demo-security.test.ts src/app/claude-design.test.ts"
+    "test": "vitest run src/app/api/demo-security.test.ts src/app/api/credits/store.test.ts src/app/claude-design.test.ts"
   },
   "engines": {
     "node": ">=24.0.0"
   },
   "dependencies": {
     "@resvary/circle": "1.0.0",
+    "@resvary/postgres": "1.0.0",
     "@resvary/sdk": "1.0.0",
     "@resvary/sqlite": "1.0.0",
     "@vercel/analytics": "^2.0.1",

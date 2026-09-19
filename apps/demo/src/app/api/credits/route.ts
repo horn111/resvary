@@ -22,9 +22,10 @@ import {
 } from '@resvary/sdk/receipts';
 import { createHash } from 'node:crypto';
 import { requireDemoMutationAuthorization } from '../demo-auth';
-import { getDemoCredits } from './store';
+import { getDemoCredits, getDemoPersistenceLabel } from './store';
 
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 const customerId = 'customer_demo';
 const simulatedFundingRecipient = '0x1111111111111111111111111111111111111111' as const;
@@ -239,7 +240,7 @@ async function getState() {
       latestEvent && process.env.RESVARY_WEBHOOK_SECRET?.trim()
         ? signCreditOutboxEvent(latestEvent, process.env.RESVARY_WEBHOOK_SECRET.trim()).header
         : null,
-    persistence: process.env.RESVARY_CREDITS_DB_PATH ?? '.resvary/demo.sqlite',
+    persistence: getDemoPersistenceLabel(),
     fundingIntents,
     fundingTransactions,
     arcLiveFundingTransaction:
