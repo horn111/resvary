@@ -31,6 +31,7 @@ type Status = {
   accepting: boolean;
   balance: string;
   testMode: boolean;
+  arcEnvironment: 'mainnet' | 'testnet';
   message: string;
   jobs: { id: string; phase: string }[];
 };
@@ -168,7 +169,9 @@ export default function Demo() {
           <a className="proof-link" href="/proofs/2026-09-10.json" target="_blank" rel="noreferrer">
             Proof
           </a>
-          <span className="tag">ARC TESTNET</span>
+          <span className="tag">
+            ARC {status?.arcEnvironment === 'testnet' ? 'TESTNET' : 'MAINNET'}
+          </span>
         </nav>
       </header>
       <section className="intro">
@@ -185,7 +188,9 @@ export default function Demo() {
       <div className="notice">
         {status?.testMode
           ? 'LOCAL TEST MODE · Deterministic analysis and simulated settlement. No real AI or USDC payment.'
-          : 'Testnet USDC is supplied by the project. Document analysis uses a paid AI provider.'}
+          : status?.arcEnvironment === 'mainnet'
+            ? 'MAINNET · The agent spends real USDC within a server-enforced per-run limit.'
+            : 'Testnet USDC is supplied by the project. Document analysis uses a paid AI provider.'}
       </div>
       <div className="workspace">
         <section className="document panel">

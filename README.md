@@ -23,7 +23,7 @@ grant or top up credits
 
 Resvary keeps credit accounting separate from settlement. Arc is the reference network for external USDC funding: direct Arc transfers and Circle Gateway Nanopayments fund the same ledger. Resvary 1.0 adds an Operator Console for explaining balances and safely recovering operational failures without manual SQL.
 
-The [ETHOnline agent demo](https://agent.resvary.xyz) shows an OpenAI Agents SDK buyer funding credits through Circle Agent Wallet and Gateway on Arc Testnet before it buys document analysis.
+The [agent demo](https://agent.resvary.xyz) shows an OpenAI Agents SDK buyer funding credits through Circle Agent Wallet and Gateway on Arc before it buys document analysis. Its archived public proof was recorded on Testnet; the current source supports an explicit Mainnet configuration.
 
 ## Why Resvary
 
@@ -43,7 +43,7 @@ Resvary provides:
 - in-memory, SQLite, and Postgres stores;
 - a lease-based outbox worker with retry and dead-letter recovery;
 - a self-hosted, single-project Operator Console with an audit explorer and guarded recovery actions;
-- direct Arc Testnet USDC top-ups with durable watcher recovery;
+- direct Arc Mainnet and Testnet USDC top-ups with durable watcher recovery;
 - Circle Gateway Nanopayment top-ups through the official batching facilitator;
 - an interactive Next.js demo and Express/Next.js starter generator.
 
@@ -144,7 +144,7 @@ See the [Operator Console guide](docs/operator-console.md) and [1.0 migration gu
 
 ## ETHOnline 2026 agent demo
 
-The Continuity implementation adds an OpenAI Agents SDK buyer that purchases document analysis with Resvary credits. The agent checks the balance and quote. When the account lacks credits, server-side controls use Circle Agent Wallet and Gateway to fund the account with Testnet USDC on Arc. Resvary reserves the quoted cost, charges measured usage, releases the unused amount, and returns a receipt.
+The Continuity implementation adds an OpenAI Agents SDK buyer that purchases document analysis with Resvary credits. The agent checks the balance and quote. When the account lacks credits, server-side controls use Circle Agent Wallet and Gateway to fund the account on the configured Arc network. Resvary reserves the quoted cost, charges measured usage, releases the unused amount, and returns a receipt.
 
 - [Live agent demo](https://agent.resvary.xyz)
 - [Agent demo source and setup](apps/agent-demo/README.md)
@@ -152,22 +152,23 @@ The Continuity implementation adds an OpenAI Agents SDK buyer that purchases doc
 - [Continuity disclosure](docs/ethonline-continuity.md)
 - [Sanitized live proof](https://agent.resvary.xyz/proofs/2026-09-10.json)
 
-The demo is a working prototype with a verified Circle Testnet payment-and-analysis path. Circle later reported the recorded Gateway transfer as completed, and ArcScan reports its batch transaction as successful. The proof states the remaining limits, including production retention and sustained-load behavior.
+The archived proof verifies the former Circle Testnet payment-and-analysis path. Circle later reported the recorded Gateway transfer as completed, and the Testnet explorer reports its batch transaction as successful. It does not prove the new Mainnet path; Mainnet activation requires a separate wallet session, funded Gateway balance, deployment check, and low-value live verification.
 
 ## Arc settlement for external USDC funding
 
-Arc provides Resvary's reference settlement path for external USDC funding. Install the Circle integration package to accept direct Arc Testnet transfers and Circle Gateway Nanopayments on Arc:
+Arc provides Resvary's reference settlement path for external USDC funding. Install the Circle integration package to accept direct Arc Mainnet or Testnet transfers and Circle Gateway Nanopayments:
 
 ```bash
 npm install @resvary/circle
 ```
 
 ```typescript
-import { GatewayNanopaymentFunding } from '@resvary/circle';
+import { ARC_GATEWAY_MAINNET, GatewayNanopaymentFunding } from '@resvary/circle';
 
 const funding = new GatewayNanopaymentFunding({
   ledger: credits,
   sellerAddress: '0x1111111111111111111111111111111111111111',
+  network: ARC_GATEWAY_MAINNET,
 });
 
 const request = await funding.createFundingRequest({
@@ -227,7 +228,7 @@ The old payment operations APIs remain under `/api/receipts`, `/api/receipts/pro
 - Outbox delivery is at least once. Webhook consumers must deduplicate by `x-resvary-event-id`.
 - Postgres migrations are explicit deployment steps and never run when a store is constructed.
 - Expired promotional credits are excluded transactionally. Reserved promotional units may still commit after expiry; released expired units burn instead of returning to available.
-- Direct Arc and Gateway funding are Testnet-only and are not production money-flow claims.
+- Direct Arc and Gateway adapters support Mainnet and Testnet. Mainnet use moves real USDC and requires application-level limits, authentication, monitoring, and legal/compliance review.
 - Resvary stores authorization hashes and normalized evidence, never buyer private keys or full Gateway signatures.
 
 ## Documentation

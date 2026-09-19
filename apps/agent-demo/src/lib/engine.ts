@@ -109,7 +109,9 @@ export class JobEngine {
       throw new Error('Payment outcome is unknown; automatic repayment is disabled');
     if (!(await this.rt.jobs.transition(id, ['queued', 'running'], 'payment_pending')))
       throw new Error('Payment was already claimed or requires review');
-    await this.rt.jobs.event(id, 'payment_started', { network: 'Arc Testnet' });
+    await this.rt.jobs.event(id, 'payment_started', {
+      network: this.rt.cfg.arcEnvironment === 'mainnet' ? 'Arc Mainnet' : 'Arc Testnet',
+    });
     await pay(this.rt, job);
     const paid = await this.rt.ledger.listFundingTransactions(job.challenge.fundingIntent.id);
     if (
@@ -279,8 +281,7 @@ export class JobEngine {
           }),
           tool({
             name: 'top_up',
-            description:
-              'Buy missing product credits via Circle Agent Wallet on Arc Testnet. Server enforces amount, recipient and one funding intent per job.',
+            description: `Buy missing product credits via Circle Agent Wallet on Arc ${this.rt.cfg.arcEnvironment === 'mainnet' ? 'Mainnet' : 'Testnet'}. Server enforces amount, recipient and one funding intent per job.`,
             parameters: z.object({}),
             execute: guarded(() => this.topup(id), 100_000),
           }),

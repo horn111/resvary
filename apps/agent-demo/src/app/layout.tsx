@@ -17,7 +17,7 @@ const jetBrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL('https://agent.resvary.xyz'),
   title: 'Resvary / Agent document demo',
-  description: 'An agent buys document analysis with credits funded on Arc Testnet.',
+  description: 'An agent buys document analysis with credits funded through Circle Gateway on Arc.',
 };
 
 export const viewport: Viewport = {

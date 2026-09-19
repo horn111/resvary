@@ -9,6 +9,7 @@ try {
     JSON.stringify(
       {
         testMode: rt.cfg.testMode,
+        arcEnvironment: rt.cfg.arcEnvironment,
         database: 'reachable',
         wallet,
         budgetRemainingUpperBoundUsd: state.remainingUnits / 1e6,

@@ -104,7 +104,7 @@ app.get(
   // This legacy middleware fails closed until a trusted verifyPayment callback is configured.
   expressPaywall({
     price: '${price}',
-    network: 'arc-testnet',
+    network: 'arc',
     description: 'Premium Data API (${config.pricing} pricing)',
   }),
   (_req, res) => {

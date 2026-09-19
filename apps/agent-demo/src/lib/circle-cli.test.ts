@@ -11,13 +11,15 @@ import { paymentReadiness } from './circle-cli';
 
 const wallet = `0x${'a1'.repeat(20)}`;
 const payer = `0x${'b2'.repeat(20)}`;
-const rt = { cfg: { testMode: false, wallet, payer } } as unknown as Runtime;
+const rt = {
+  cfg: { testMode: false, arcEnvironment: 'mainnet', wallet, payer },
+} as unknown as Runtime;
 
 function responses(backingEOA = payer, listedWallet = wallet) {
   exec.mockImplementation((_executable, args, _options, callback) => {
     const data =
       args[2] === 'status'
-        ? { testnet: { tokenStatus: 'VALID' } }
+        ? { mainnet: { tokenStatus: 'VALID' } }
         : args[2] === 'list'
           ? { wallets: [{ address: listedWallet }] }
           : { total: '1', backingEOA };
@@ -34,6 +36,7 @@ describe('Circle Agent Wallet identity', () => {
     expect(await paymentReadiness(rt)).toMatchObject({ ready: true });
     const balanceArgs = exec.mock.calls.find((call) => call[1][1] === 'gateway')?.[1] as string[];
     expect(balanceArgs[balanceArgs.indexOf('--address') + 1]).toBe(wallet);
+    expect(balanceArgs[balanceArgs.indexOf('--chain') + 1]).toBe('ARC');
   });
 
   it('rejects a backing EOA that differs from the funding intent payer', async () => {
@@ -44,7 +47,7 @@ describe('Circle Agent Wallet identity', () => {
     });
   });
 
-  it('rejects an Agent Wallet absent from the authenticated Testnet account', async () => {
+  it('rejects an Agent Wallet absent from the authenticated Mainnet account', async () => {
     responses(payer, `0x${'d4'.repeat(20)}`);
     expect(await paymentReadiness(rt)).toMatchObject({ ready: false });
     expect(exec).toHaveBeenCalledTimes(2);

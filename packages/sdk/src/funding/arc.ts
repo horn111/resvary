@@ -17,11 +17,20 @@ import {
   type ProofClient,
   type ReceiptStore,
 } from '../receipts/index.js';
+import {
+  ARC_MAINNET,
+  ARC_TESTNET,
+  ARC_TESTNET_CONTRACTS,
+  assertArcNetworkConfig,
+} from '../constants.js';
+import type { NetworkConfig } from '../types.js';
 
 export interface ArcCreditFundingConfig {
   ledger: CreditLedger;
   payTo: `0x${string}`;
   network?: string;
+  /** Full Arc network configuration. Defaults to Testnet for backward compatibility. */
+  networkConfig?: NetworkConfig;
   receiptStore?: ReceiptStore;
   rpcUrl?: string;
   publicClient?: ProofClient;
@@ -37,6 +46,7 @@ export class ArcCreditFunding {
   private readonly ledger: CreditLedger;
   private readonly payTo: `0x${string}`;
   private readonly network: string;
+  private readonly networkConfig: NetworkConfig;
   private readonly receiptStore?: ReceiptStore;
   private readonly rpcUrl?: string;
   private readonly publicClient?: ProofClient;
@@ -44,12 +54,17 @@ export class ArcCreditFunding {
   constructor(config: ArcCreditFundingConfig) {
     this.ledger = config.ledger;
     this.payTo = config.payTo;
-    this.network = config.network ?? 'arc-testnet';
+    this.networkConfig =
+      config.networkConfig ?? (config.network === 'arc' ? ARC_MAINNET : ARC_TESTNET);
+    assertArcNetworkConfig(this.networkConfig);
+    this.network = config.network ?? this.networkConfig.id ?? 'arc-testnet';
     this.receiptStore = config.receiptStore;
     this.rpcUrl = config.rpcUrl;
     this.publicClient = config.publicClient;
-    if (this.network !== 'arc-testnet') {
-      throw new Error('ArcCreditFunding currently supports Arc Testnet only');
+    if (this.network !== this.networkConfig.id) {
+      throw new Error(
+        `Arc funding network ${this.network} does not match ${this.networkConfig.name}`,
+      );
     }
   }
 
@@ -85,7 +100,14 @@ export class ArcCreditFunding {
     });
 
     await this.receiptStore?.saveInvoice(invoice);
-    return { fundingIntent, invoice, paymentRequest: createMemoPaymentRequest(invoice) };
+    return {
+      fundingIntent,
+      invoice,
+      paymentRequest: createMemoPaymentRequest(invoice, {
+        usdcAddress: this.networkConfig.usdcAddress,
+        memoContract: ARC_TESTNET_CONTRACTS.memo,
+      }),
+    };
   }
 
   async confirmPayment(input: {
@@ -119,6 +141,7 @@ export class ArcCreditFunding {
       paymentRequest,
       rpcUrl: this.rpcUrl,
       publicClient: this.publicClient,
+      network: this.networkConfig,
     });
     if (proof.network !== intent.network) {
       throw new Error('Verified payment proof network does not match the funding intent');

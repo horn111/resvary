@@ -10,7 +10,9 @@ export type PaymentScheme = 'exact' | 'upto';
 
 /** Network configuration for Arc or other EVM chains */
 export interface NetworkConfig {
-  /** Chain ID (e.g., 5042002 for Arc Testnet) */
+  /** Stable network identifier used in receipts and funding records. */
+  readonly id?: string;
+  /** Chain ID (5042 for Arc Mainnet, 5042002 for Arc Testnet) */
   readonly chainId: number;
   /** RPC endpoint URL */
   readonly rpcUrl: string;
@@ -96,7 +98,7 @@ export interface PaymentResult {
 export interface EndpointConfig {
   /** Price in USDC per unit (depends on pricing model) */
   price: string;
-  /** Network identifier (default: 'arc-testnet') */
+  /** Network identifier (default remains 'arc-testnet' for backward compatibility) */
   network?: string;
   /** Human-readable endpoint description */
   description?: string;

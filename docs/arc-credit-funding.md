@@ -1,15 +1,18 @@
 # Direct Arc Credit Funding
 
-Direct Arc Testnet USDC is one of Resvary's two Circle-native funding rails. It is first-class alongside Circle Gateway Nanopayments. Both fund the same payment-rail-agnostic prepaid credit ledger.
+Direct Arc USDC is one of Resvary's two Circle-native funding rails. It supports Arc Mainnet and Testnet and is first-class alongside Circle Gateway Nanopayments. Both fund the same payment-rail-agnostic prepaid credit ledger.
 
 ```typescript
 import { CreditLedger } from '@resvary/sdk/credits';
 import { ArcCreditFunding } from '@resvary/sdk/funding/arc';
+import { ARC_MAINNET } from '@resvary/sdk';
 
 const ledger = new CreditLedger({ projectId: 'my_ai_product' });
 const funding = new ArcCreditFunding({
   ledger,
   payTo: '0x1111111111111111111111111111111111111111',
+  network: 'arc',
+  networkConfig: ARC_MAINNET,
   receiptStore,
 });
 
@@ -40,12 +43,15 @@ Confirmation fetches the transaction from Arc RPC before granting credits. It re
 ## Durable worker
 
 ```typescript
+import { ARC_MAINNET } from '@resvary/sdk';
 import { ArcFundingWorker } from '@resvary/sdk/funding';
 
 const worker = new ArcFundingWorker({
   ledger,
   receiptStore,
   payTo,
+  network: 'arc',
+  networkConfig: ARC_MAINNET,
   confirmations: 2,
   maxBlockRange: 2_000,
   maxBlocksPerPoll: 10_000,
@@ -57,7 +63,7 @@ worker.start();
 
 The worker restores pending invoices after restart, persists cursors, bounds RPC ranges, retries transient failures, rescans a small overlap, and reconciles a receipt saved before a crash with a missing credit grant. Recovery re-fetches and verifies the transaction; a stored receipt is never sufficient authority by itself.
 
-This is Arc Testnet functionality. Resvary does not export a mainnet placeholder or claim production settlement, custody, or redemption.
+For Testnet, pass `network: 'arc-testnet'` with `ARC_TESTNET`. Mainnet verification checks chain ID `5042` and links evidence to `https://explorer.arc.io`; Testnet checks chain ID `5042002`. Both use the official USDC and Memo predeploy addresses. An injected Mainnet proof client must expose `getChainId()` so verification can fail closed when the observed network is missing or wrong. Mainnet transfers move real USDC, so keep funding limits and operator reconciliation in place. Resvary does not provide custody or redemption.
 
 ## Release proof runner
 

@@ -16,7 +16,7 @@ const terms = {
 function session() {
   return {
     email: 'fixture@example.invalid',
-    testnet: {
+    mainnet: {
       userToken: 'fixture-user-token',
       encryptionKey: 'fixture-encryption-key',
       encryptedUserSecret: 'fixture-encrypted-user-secret',
@@ -25,21 +25,22 @@ function session() {
       expiresAt: Date.now() + 3_600_000,
       refreshToken: 'must-not-export-refresh-token',
     },
-    mainnet: { userToken: 'must-not-export-mainnet-token' },
+    testnet: { userToken: 'must-not-export-testnet-token' },
   };
 }
 function configuredEnv() {
   return {
     ...process.env,
     VERCEL: '1',
-    CIRCLE_AGENT_SESSION_BUNDLE: exportCircleSession(session(), terms, encryptionKey).encrypted,
+    CIRCLE_AGENT_SESSION_BUNDLE: exportCircleSession(session(), terms, encryptionKey, 'mainnet')
+      .encrypted,
     CIRCLE_SESSION_ENCRYPTION_KEY: encryptionKey,
   };
 }
 afterEach(() => vi.restoreAllMocks());
 
-describe('portable Circle Testnet session', () => {
-  it('hydrates only Testnet secrets, keeps homes isolated under concurrency, and cleans them', async () => {
+describe('portable Circle network session', () => {
+  it('hydrates only Mainnet secrets, keeps homes isolated under concurrency, and cleans them', async () => {
     const environments = configuredEnv();
     const homes: string[] = [];
     let bothEntered!: () => void;
@@ -55,7 +56,8 @@ describe('portable Circle Testnet session', () => {
           await entered;
           const raw = await readFile(join(directory, 'profiles', 'agent', 'session.json'), 'utf8');
           expect(raw).toContain('fixture-user-token');
-          expect(raw).not.toContain('mainnet');
+          expect(raw).toContain('mainnet');
+          expect(raw).not.toContain('testnet');
           expect(raw).not.toContain('refreshToken');
           expect(JSON.parse(await readFile(join(directory, 'terms.json'), 'utf8'))).toEqual(terms);
           if (process.platform !== 'win32') {
@@ -114,15 +116,16 @@ describe('portable Circle Testnet session', () => {
 
   it('requires prior Terms acceptance and a full session rather than keychain metadata', () => {
     expect(() =>
-      exportCircleSession(session(), { ...terms, accepted: false }, encryptionKey),
+      exportCircleSession(session(), { ...terms, accepted: false }, encryptionKey, 'mainnet'),
     ).toThrow('Invalid Circle');
     expect(() =>
       exportCircleSession(
-        { email: 'fixture@example.invalid', testnet: { expiresAt: Date.now() + 3_600_000 } },
+        { email: 'fixture@example.invalid', mainnet: { expiresAt: Date.now() + 3_600_000 } },
         terms,
         encryptionKey,
+        'mainnet',
       ),
-    ).toThrow('No portable Testnet session');
+    ).toThrow('No portable Circle mainnet session');
   });
 
   it('does not inherit provider keys, Node injections, or Circle endpoint overrides', () => {
@@ -152,8 +155,8 @@ describe('portable Circle Testnet session', () => {
         },
       );
       const response = JSON.parse(stdout);
-      expect(response.data.testnet.tokenStatus).toBe('VALID');
-      expect(response.data.mainnet.tokenStatus).toBe('NOT_LOGGED_IN');
+      expect(response.data.mainnet.tokenStatus).toBe('VALID');
+      expect(response.data.testnet.tokenStatus).toBe('NOT_LOGGED_IN');
     }, configuredEnv());
   }, 25_000);
 });

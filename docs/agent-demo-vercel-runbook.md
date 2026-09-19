@@ -1,6 +1,6 @@
 # Resvary agent demo Vercel runbook
 
-This runbook covers the dedicated `resvary-agent-demo` Vercel project, its managed Neon PostgreSQL database, Vercel Workflow `4.8.8`, and the Circle Testnet Agent Wallet session. It does not authorize production deployment or paid calls.
+This runbook covers the dedicated `resvary-agent-demo` Vercel project, its managed Neon PostgreSQL database, Vercel Workflow `4.8.8`, and the Circle Mainnet Agent Wallet session. Mainnet verification moves real USDC; keep admission closed except during an explicitly authorized, low-value verification window.
 
 ## Production topology
 
@@ -13,29 +13,29 @@ flowchart LR
     Workflow --> Agent[OpenAI Agents SDK\nNous Qwen agent]
     Agent --> Service[Nous GPT-4.1-mini\npaid analysis]
     Agent -->|fixed CLI command| Circle[Circle Agent Wallet SCA]
-    Circle -->|authorization from backing EOA| Gateway[Circle Gateway\nArc Testnet]
+    Circle -->|authorization from backing EOA| Gateway[Circle Gateway\nArc Mainnet]
     Gateway --> Ledger[Resvary credits\nreserve and commit]
     Ledger --> Neon
 ```
 
 ## Current release gates
 
-| Gate                                                        | Status                                                                                                    |
-| ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| Vercel project named `resvary-agent-demo`                   | Created                                                                                                   |
-| Production URL `https://agent.resvary.xyz`                  | Canonical interactive origin assigned to a `READY` Linux production deployment                            |
-| Managed Neon PostgreSQL free database in `fra1`             | Provisioned and migrated                                                                                  |
-| Source validation                                           | 43 agent-demo tests, 17 nanopayment and credit-gate tests, and compiled Workflow browser E2E passed       |
-| Nous `qwen/qwen3.8-flash` agent profile                     | Selected                                                                                                  |
-| Nous `openai/gpt-4.1-mini` analysis profile                 | Selected                                                                                                  |
-| Hyperbolic compatibility                                    | Failed credential probe with HTTP 401; unverified                                                         |
-| Circle SCA, backing EOA, session, and Gateway balance check | Operator and deployed-cloud readiness passed                                                              |
-| Circle CLI packaging fix                                    | Warning-free local and Linux Vercel builds passed                                                         |
-| Paid analysis and replay                                    | Two live analyses completed, one real 0.02 Testnet USDC top-up; replay and leftover-credit reuse verified |
-| Session isolation                                           | Separate read-only production browser test passed                                                         |
-| Gateway batch finality and real 24-hour cleanup             | Not yet observed                                                                                          |
+| Gate                                                        | Status                                                                                     |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Vercel project named `resvary-agent-demo`                   | Created                                                                                    |
+| Production URL `https://agent.resvary.xyz`                  | Canonical interactive origin assigned to a `READY` Linux production deployment             |
+| Managed Neon PostgreSQL free database in `fra1`             | Provisioned and migrated                                                                   |
+| Source validation                                           | 43 agent-demo tests, 21 Circle integration tests, and compiled Workflow browser E2E passed |
+| Nous `qwen/qwen3.8-flash` agent profile                     | Selected                                                                                   |
+| Nous `openai/gpt-4.1-mini` analysis profile                 | Selected                                                                                   |
+| Hyperbolic compatibility                                    | Failed credential probe with HTTP 401; unverified                                          |
+| Circle SCA, backing EOA, session, and Gateway balance check | Archived Testnet check passed; Mainnet check is required before admission                  |
+| Circle CLI packaging fix                                    | Warning-free local and Linux Vercel builds passed                                          |
+| Paid analysis and replay                                    | Archived Testnet proof passed; no Mainnet paid proof is claimed yet                        |
+| Session isolation                                           | Separate read-only production browser test passed                                          |
+| Gateway batch finality and real 24-hour cleanup             | Not yet observed                                                                           |
 
-The current deployment accepts new jobs within the persistent budget. For a fresh deployment, keep `AGENT_DEMO_ACCEPTING=false` until readiness passes, then enable one controlled paid verification run. See the [evidence and test qualifications](ethonline-continuity.md#evidence-status).
+Keep `AGENT_DEMO_ACCEPTING=false` throughout the Mainnet migration. Enable it only after Mainnet session, wallet identity, Gateway balance, deployment, and readiness checks pass. See the [historical Testnet evidence and qualifications](ethonline-continuity.md#evidence-status).
 
 An earlier Vercel build reached `@circle-fin/cli`, then `@open-wallet-standard/core`, and failed on a native/non-ECMAScript asset. The implemented boundary resolves the CLI from the Node runtime and uses `@vercel/nft` to trace its dependency files for the target operating system. Local and Linux Vercel builds pass. This build result proves packaging, not the paid path.
 
@@ -66,7 +66,7 @@ Confirm these pinned runtime dependencies in `apps/agent-demo/package.json`:
 - `workflow` `4.8.8`
 - `@openai/agents` `0.17.1`
 - `openai` `7.10.0`
-- `@circle-fin/cli` `1.0.0`
+- `@circle-fin/cli` `1.1.3`
 
 ## 2. Check the Vercel and Neon boundary
 
@@ -103,6 +103,7 @@ Configure the public controls:
 AGENT_DEMO_ORIGIN=https://agent.resvary.xyz
 AGENT_DEMO_EXECUTION_MODE=workflow
 AGENT_DEMO_TEST_MODE=false
+AGENT_DEMO_ARC_NETWORK=mainnet
 AGENT_DEMO_ACCEPTING=false
 AGENT_DEMO_INITIAL_SPEND_UNITS=19390
 AGENT_DEMO_AGENT_PROVIDER=nous
@@ -127,25 +128,25 @@ Set the three public wallet addresses from operator-verified records:
 ```text
 AGENT_DEMO_WALLET=<Circle Agent Wallet SCA>
 AGENT_DEMO_PAYER=<Gateway backing EOA>
-AGENT_DEMO_SELLER=<distinct Arc Testnet seller>
+AGENT_DEMO_SELLER=<distinct Arc Mainnet seller>
 ```
 
 The SCA and backing EOA serve different protocol roles. Do not copy one address into both fields. The configuration rejects an identical payer and seller.
 
 `scripts/sync-vercel-env.mjs` accepts the installed Vercel CLI entry file, checks the linked project name, reads the two ignored local files, and streams each value through stdin. Review the linked `.vercel/project.json` before using it. The script refuses production test mode and non-Workflow execution mode.
 
-## 4. Export and rotate the Circle Testnet session
+## 4. Export and rotate the Circle Mainnet session
 
-Use Circle CLI `1.0.0` on the operator machine:
+Use Circle CLI `1.1.3` on the operator machine:
 
-1. Complete `wallet login` with `--testnet --type agent` and accept terms in the CLI.
+1. Complete `circle wallet login EMAIL --type agent` without `--testnet`, and accept terms in the CLI.
 2. Confirm that the chosen wallet address is the Agent Wallet SCA.
-3. From the repository root, run `node node_modules/tsx/dist/cli.mjs apps/agent-demo/scripts/export-circle-session.ts` in a shell that can read the operator's Circle CLI home.
+3. Set `AGENT_DEMO_ARC_NETWORK=mainnet`, then run `node node_modules/tsx/dist/cli.mjs apps/agent-demo/scripts/export-circle-session.ts` from a shell that can read the operator's Circle CLI home.
 4. Confirm that Git ignores `.env.circle-session.local`.
 5. Upload the encrypted bundle and its separate key as Sensitive server variables.
 6. Move the old ignored export to secure operator storage before creating a replacement. The exporter refuses to overwrite it.
 
-The current snapshot expires on October 7, 2026. Read the exact timestamp from the private export on the operator machine without copying it into logs. Rotate before that time, deploy the new Sensitive values, then run readiness again. The date belongs to this snapshot; Circle does not promise a seven-day duration.
+Read the exact expiry from the new private export on the operator machine without copying credentials into logs. Rotate before expiry, deploy the new Sensitive values, then run readiness again. The archived Testnet snapshot cannot authenticate Mainnet.
 
 Each Vercel payment invocation decrypts the snapshot into a unique directory under the platform temporary directory. The code applies private permissions, gives Circle CLI a reduced environment, and deletes the directory after the child process exits. Never expose either bundle variable through a `NEXT_PUBLIC_` name.
 
@@ -156,10 +157,10 @@ Keep admission off and check:
 - the production page loads over HTTPS;
 - `POST /api/session` sets the secure, `HttpOnly`, `SameSite=Strict` cookie;
 - `/api/status` reports the database budget and `workerReady=true` for that session;
-- readiness reports the configured Agent Wallet SCA, backing EOA relationship, valid Testnet session, and at least `0.05` Gateway USDC;
+- readiness reports the configured Agent Wallet SCA, backing EOA relationship, valid Mainnet session, and at least `0.05` Gateway USDC;
 - Neon contains the migrated budget row with `allocated=19390` before the first accepted job.
 
-Both operator and deployed-cloud readiness passed. At 22:39 UTC on September 9, the remaining budget upper bound was `$8.780610`, after `19,390` micro-USD of probe holds and three `400,000`-unit job holds. That figure is available conservative capacity, not remaining provider account credit or an invoice. Repeat readiness after any build, environment, session, or database change.
+The archived Testnet operator and deployed-cloud readiness checks passed. Mainnet readiness must be re-run after the new session and addresses are installed. At 22:39 UTC on September 9, the remaining provider budget upper bound was `$8.780610`; that figure is not a Gateway balance or invoice.
 
 Readiness caches payment status for up to 60 seconds. Wait for that window or use an operator-side preflight process after a session rotation.
 
@@ -174,7 +175,7 @@ One job must produce all of these records:
 1. A PostgreSQL budget increment of `400000` micro-USD.
 2. A single execution owner and one agent run.
 3. A funding intent and exactly one settled funding transaction when the account starts below the quote.
-4. A Circle authorization from the configured backing EOA to the configured seller on Arc Testnet.
+4. A Circle authorization from the configured backing EOA to the configured seller on Arc Mainnet.
 5. A credit reservation followed by one saved service result and measured usage.
 6. A committed usage receipt whose charged plus released units equal the reservation.
 7. A second read of the same job that returns the saved result and receipt without another provider or payment call.
@@ -187,7 +188,7 @@ npm run proof --workspace @resvary/agent-demo -- JOB_UUID
 
 The exporter rejects fixture runs and outputs an allowlisted record without the document, result, signature, session, or credentials. Keep the first output outside the Git worktree until an operator checks the transaction and authorizes publication.
 
-The [September 10 evidence](../apps/agent-demo/public/proofs/2026-09-10.json) contains two completed jobs. The first funded 0.02 Testnet USDC and charged 0.001268 product credits; replay did not change its receipt or balance. The second charged 0.000988 from the remaining credits without another payment. The paid browser flow passed. Its final isolation assertion read the new session before initialization; that wait was corrected, and a separate read-only production isolation test passed without another paid job.
+The [September 10 evidence](../apps/agent-demo/public/proofs/2026-09-10.json) is historical Testnet evidence. It must not be presented as Mainnet verification. Publish a separate sanitized Mainnet proof only after checking the transfer, network, amount, payer, seller, replay behavior, and final job receipt.
 
 The live browser suite requires explicit opt-in because a full run creates two paid jobs:
 
@@ -231,9 +232,9 @@ Do not clear an execution token, authorization fingerprint, reservation ID, or f
 
 The maintenance endpoint accepts `GET /api/internal/maintenance` with `Authorization: Bearer <CRON_SECRET>`. It performs database-only cleanup, stale-claim reconciliation, saved-result commits, and dispatch draining. Never call it without an approved operator context because it mutates production state.
 
-Circle CLI `1.0.0` rewrites `maxTimeoutSeconds` to 30 days. The demo configures `authorizationValiditySeconds` accordingly; strict requirements matching and the funding-intent expiry stay unchanged. Before this fix, one live job stopped before facilitator verification. The operator found no matching Gateway transfer and no ledger funding transaction, marked the job failed, and kept its authorization fingerprint and budget hold. Do not generalize that reconciliation to an unknown payment outcome.
+Circle CLI `1.1.3` rewrites `maxTimeoutSeconds` to 30 days. The demo configures `authorizationValiditySeconds` accordingly; strict requirements matching and the funding-intent expiry stay unchanged. Never generalize a known pre-verification Testnet failure to an unknown Mainnet payment outcome.
 
-For an accepted payment, query `https://gateway-api-testnet.circle.com/v1/x402/transfers/TRANSFER_UUID`. Verify amount, network, payer, and seller. A successful facilitator response can precede the onchain batch, so retain both the Gateway status and transaction hash separately from Resvary's funding status. The verified transfer initially reported `received` and `txHash: null`. Circle later reported it as `completed`; [ArcScan reports the batch transaction as successful](https://testnet.arcscan.app/tx/0xa05a7f9351aa59f20e2872cb9c5535227c242cbc58a4fd4ed03b40076781c0b1).
+For a Mainnet payment, query `https://gateway-api.circle.com/v1/x402/transfers/TRANSFER_UUID`. Verify `eip155:5042`, amount, payer, and seller. A successful facilitator response can precede the onchain batch, so retain both the Gateway status and transaction hash separately from Resvary's funding status. The archived Testnet transfer remains available through the Testnet Gateway API and explorer.
 
 ## 9. Verify 24-hour cleanup
 
@@ -261,10 +262,10 @@ After rotation:
 
 ## Known production limitations
 
-- Two live jobs prove the payment-and-analysis path for the recorded examples, not sustained-load reliability or production maturity.
-- Circle and ArcScan now expose the recorded Gateway batch transaction. A real 24-hour cleanup cycle has not yet been observed.
+- Two archived Testnet jobs prove the recorded flow, not Mainnet correctness, sustained-load reliability, or production maturity.
+- No Mainnet paid proof has been recorded. A real 24-hour cleanup cycle has not yet been observed.
 - Vercel platform limits and Neon free-plan limits can interrupt or throttle execution.
 - External services cannot supply exactly-once guarantees to this application. Unknown outcomes stop for review.
 - Circle session snapshots expire and require operator rotation. Vercel cannot refresh the current snapshot.
 - The fixed `$0.40` demo-budget allocation does not return unused capacity. Probe calls already hold `$0.019390` of the ceiling, while the provider reported `$0.00083109` in billed probe cost.
-- Circle CLI `1.0.0` contains unresolved transitive audit advisories. Keep its commands fixed and its session private while tracking upstream releases.
+- Keep Circle CLI commands fixed, the session private, and dependency audits in the release gate.

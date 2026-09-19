@@ -51,4 +51,4 @@ The intended credits are:
 - not represented as stored money or an investment;
 - subject to the merchant's own terms, refund policy, privacy notice, and tax treatment.
 
-A `UsageReceipt` is an operational billing record, not a tax invoice. Arc Testnet activity is development data. Before offering mainnet funding, transferable value, multi-merchant balances, or redemption, obtain jurisdiction-specific legal advice.
+A `UsageReceipt` is an operational billing record, not a tax invoice. Arc Testnet activity is development data; Arc Mainnet activity moves real USDC. Enabling the Mainnet adapter does not determine the merchant's licensing, consumer-protection, sanctions, tax, privacy, or money-transmission obligations. Obtain jurisdiction-specific legal advice before accepting Mainnet funding, and before adding transferable value, multi-merchant balances, custody, cash-out, or redemption.

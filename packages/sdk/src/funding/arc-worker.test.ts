@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ARC_MAINNET } from '../constants.js';
 import { CreditLedger } from '../credits/index.js';
 import { InMemoryReceiptStore, createReceipt } from '../receipts/index.js';
 import { ArcCreditFunding } from './arc.js';
@@ -9,6 +10,40 @@ const buyer = '0x2222222222222222222222222222222222222222';
 const txHash = `0x${'ab'.repeat(32)}` as `0x${string}`;
 
 describe('ArcFundingWorker', () => {
+  it('restores Arc Mainnet invoices with one shared network profile', async () => {
+    const ledger = new CreditLedger({ projectId: 'project_arc_mainnet_worker' });
+    const receiptStore = new InMemoryReceiptStore();
+    const funding = new ArcCreditFunding({
+      ledger,
+      receiptStore,
+      payTo: seller,
+      network: 'arc',
+      networkConfig: ARC_MAINNET,
+    });
+    await funding.createFundingRequest({
+      customerId: 'customer_mainnet',
+      amount: '2',
+      idempotencyKey: 'create_arc_mainnet',
+    });
+    const worker = new ArcFundingWorker({
+      ledger,
+      receiptStore,
+      payTo: seller,
+      network: 'arc',
+      networkConfig: ARC_MAINNET,
+      publicClient: {
+        getBlockNumber: async () => 0n,
+        getLogs: async () => [],
+        getTransactionReceipt: async () => {
+          throw new Error('not needed');
+        },
+        getChainId: async () => 5_042,
+      } as any,
+    });
+
+    await expect(worker.resumePendingIntents()).resolves.toHaveLength(1);
+  });
+
   it('refuses to reconcile a saved receipt without fresh RPC verification', async () => {
     const ledger = new CreditLedger({ projectId: 'project_arc_worker' });
     const receiptStore = new InMemoryReceiptStore();

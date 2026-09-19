@@ -12,7 +12,8 @@ import {
   type Log,
   type PublicClient,
 } from 'viem';
-import { ARC_TESTNET, USDC_DECIMALS } from '../constants.js';
+import { ARC_TESTNET, USDC_DECIMALS, assertArcNetworkConfig } from '../constants.js';
+import type { NetworkConfig } from '../types.js';
 import { createMemoPaymentRequest, ERC20_TRANSFER_ABI } from './memo-payment.js';
 import { createMemoPaymentProofFromReceipt } from './proof.js';
 import { createWatcherCursorKey, type ReceiptStore } from './store.js';
@@ -87,6 +88,8 @@ export interface ReceiptWatcherConfig {
   confirmations?: number;
   pollIntervalMs?: number;
   expectedChainId?: number;
+  /** Arc network to watch. Defaults to Testnet for backward compatibility. */
+  network?: NetworkConfig;
   maxBlockRange?: number;
   /** Maximum inclusive block count processed for one invoice during a single poll. */
   maxBlocksPerPoll?: number;
@@ -105,6 +108,7 @@ export class ReceiptWatcher {
   private readonly confirmations: bigint;
   private readonly pollIntervalMs: number;
   private readonly expectedChainId: number;
+  private readonly network: NetworkConfig;
   private readonly maxBlockRange: bigint;
   private readonly maxBlocksPerPoll: bigint;
   private readonly cursorOverlap: bigint;
@@ -121,14 +125,19 @@ export class ReceiptWatcher {
   constructor(config: ReceiptWatcherConfig) {
     this.ledger = config.ledger;
     this.cursorStore = config.cursorStore;
+    this.network = config.network ?? ARC_TESTNET;
+    assertArcNetworkConfig(this.network);
     this.client =
       config.publicClient ??
       createPublicClient({
-        transport: http(config.rpcUrl ?? ARC_TESTNET.rpcUrl),
+        transport: http(config.rpcUrl ?? this.network.rpcUrl),
       });
     this.confirmations = BigInt(config.confirmations ?? 1);
     this.pollIntervalMs = config.pollIntervalMs ?? 5_000;
-    this.expectedChainId = config.expectedChainId ?? ARC_TESTNET.chainId;
+    this.expectedChainId = config.expectedChainId ?? this.network.chainId;
+    if (this.expectedChainId !== this.network.chainId) {
+      throw new Error('Receipt watcher expectedChainId must match its Arc network');
+    }
     this.maxBlockRange = BigInt(config.maxBlockRange ?? 2_000);
     this.maxBlocksPerPoll = BigInt(config.maxBlocksPerPoll ?? 10_000);
     this.cursorOverlap = BigInt(config.cursorOverlap ?? 0);
@@ -150,6 +159,9 @@ export class ReceiptWatcher {
   }
 
   watchInvoice(invoice: PaymentInvoice, options: { fromBlock?: bigint } = {}): void {
+    if (invoice.network !== this.network.id) {
+      throw new Error(`Receipt watcher cannot watch an invoice for ${invoice.network}`);
+    }
     this.invoices.set(invoice.id, invoice);
     if (options.fromBlock !== undefined) {
       this.cursors.set(invoice.id, options.fromBlock);
@@ -166,6 +178,9 @@ export class ReceiptWatcher {
       return [];
     }
 
+    if (!this.client.getChainId && this.network.chainId === 5_042) {
+      throw new Error('Arc Mainnet receipt watcher clients must expose getChainId()');
+    }
     if (this.client.getChainId) {
       const chainId = await this.withRetry(() => this.client.getChainId!());
       if (chainId !== this.expectedChainId) {
@@ -289,6 +304,7 @@ export class ReceiptWatcher {
       txHash: match.txHash,
       paymentRequest: request,
       txReceipt,
+      network: this.network,
     });
 
     const observed: ObservedPayment = {
@@ -305,7 +321,7 @@ export class ReceiptWatcher {
       onchainProof,
       observedAt: Date.now(),
       metadata: {
-        source: 'arc-testnet-watcher',
+        source: `${this.network.id ?? `eip155:${this.network.chainId}`}-watcher`,
         memoIndex: match.args.memoIndex?.toString(),
         explorerUrl: onchainProof.explorerUrl,
       },

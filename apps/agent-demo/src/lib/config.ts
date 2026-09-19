@@ -18,6 +18,11 @@ export function config() {
   if (secret.length < 32) throw new Error('AGENT_DEMO_SECRET must have at least 32 characters');
   const origin = new URL(required('AGENT_DEMO_ORIGIN')).origin;
   const testMode = process.env.AGENT_DEMO_TEST_MODE === 'true';
+  const configuredArcEnvironment = process.env.AGENT_DEMO_ARC_NETWORK ?? 'testnet';
+  if (configuredArcEnvironment !== 'mainnet' && configuredArcEnvironment !== 'testnet') {
+    throw new Error('AGENT_DEMO_ARC_NETWORK must be mainnet or testnet');
+  }
+  const arcEnvironment: 'mainnet' | 'testnet' = configuredArcEnvironment;
   if (testMode && !['localhost', '127.0.0.1'].includes(new URL(origin).hostname)) {
     throw new Error('Test mode is limited to loopback origins');
   }
@@ -46,6 +51,7 @@ export function config() {
     secret,
     origin,
     testMode,
+    arcEnvironment,
     initial,
     databaseUrl: required('DATABASE_URL'),
     seller,

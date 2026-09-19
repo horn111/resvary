@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { encodeAbiParameters, encodeEventTopics, parseAbiItem } from 'viem';
-import { ARC_TESTNET_CONTRACTS } from '../constants.js';
+import { ARC_MAINNET, ARC_TESTNET_CONTRACTS } from '../constants.js';
 import { ReceiptLedger } from './ledger.js';
 import { ARC_MEMO_ABI, createMemoPaymentRequest } from './memo-payment.js';
 import { InMemoryReceiptStore, createWatcherCursorKey } from './store.js';
@@ -16,6 +16,48 @@ const transferEvent = parseAbiItem(
 const memoEvent = ARC_MEMO_ABI.find((item) => item.type === 'event' && item.name === 'Memo');
 
 describe('ReceiptWatcher', () => {
+  it('rejects a chain id that disagrees with the selected Arc network', () => {
+    const ledger = new ReceiptLedger();
+    const publicClient = createMockClient({ memoLogs: [], receiptLogs: [] });
+    expect(
+      () =>
+        new ReceiptWatcher({
+          ledger,
+          publicClient,
+          network: ARC_MAINNET,
+          expectedChainId: 5_042_002,
+        }),
+    ).toThrow('expectedChainId must match');
+  });
+
+  it('rejects invoices from another Arc network', () => {
+    const ledger = new ReceiptLedger();
+    const invoice = ledger.createInvoice({ id: 'inv_wrong_network', amount: '1', payTo: seller });
+    const watcher = new ReceiptWatcher({
+      ledger,
+      network: ARC_MAINNET,
+      publicClient: { ...createMockClient({ memoLogs: [], receiptLogs: [] }), getChainId: vi.fn() },
+    });
+    expect(() => watcher.watchInvoice(invoice)).toThrow('cannot watch an invoice');
+  });
+
+  it('requires injected Arc Mainnet clients to report their chain id', async () => {
+    const ledger = new ReceiptLedger();
+    const invoice = ledger.createInvoice({
+      id: 'inv_mainnet_client',
+      amount: '1',
+      payTo: seller,
+      network: 'arc',
+    });
+    const watcher = new ReceiptWatcher({
+      ledger,
+      network: ARC_MAINNET,
+      publicClient: createMockClient({ memoLogs: [], receiptLogs: [] }),
+    });
+    watcher.watchInvoice(invoice);
+    await expect(watcher.pollOnce()).rejects.toThrow('must expose getChainId');
+  });
+
   it('rejects cursor overlap that cannot make forward progress', () => {
     const ledger = new ReceiptLedger();
     const publicClient = createMockClient({ memoLogs: [], receiptLogs: [] });

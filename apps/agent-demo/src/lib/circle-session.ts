@@ -4,22 +4,26 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { z } from 'zod';
 
-const VERSION = 'resvary-circle-testnet-v1';
+const VERSION = 'resvary-circle-session-v2';
 const AAD = Buffer.from(VERSION, 'utf8');
 const secretField = z.string().min(1).max(16_384);
+const environmentSchema = z.enum(['mainnet', 'testnet']);
+type CircleEnvironment = z.infer<typeof environmentSchema>;
+const environmentSessionSchema = z
+  .object({
+    userToken: secretField,
+    encryptionKey: secretField,
+    encryptedUserSecret: secretField,
+    storageKey: secretField,
+    deviceId: z.string().min(1).max(256),
+    expiresAt: z.number().int().positive(),
+  })
+  .strict();
 const sessionSchema = z
   .object({
     email: z.string().min(1).max(320),
-    testnet: z
-      .object({
-        userToken: secretField,
-        encryptionKey: secretField,
-        encryptedUserSecret: secretField,
-        storageKey: secretField,
-        deviceId: z.string().min(1).max(256),
-        expiresAt: z.number().int().positive(),
-      })
-      .strict(),
+    mainnet: environmentSessionSchema.optional(),
+    testnet: environmentSessionSchema.optional(),
   })
   .strict();
 const termsSchema = z
@@ -33,7 +37,8 @@ const termsSchema = z
 const bundleSchema = z
   .object({
     version: z.literal(VERSION),
-    cliVersion: z.literal('1.0.0'),
+    cliVersion: z.literal('1.1.3'),
+    environment: environmentSchema,
     session: sessionSchema,
     terms: termsSchema,
   })
@@ -48,36 +53,48 @@ function keyBytes(key: string) {
 
 function validateBundle(value: unknown): Bundle {
   const parsed = bundleSchema.safeParse(value);
-  if (!parsed.success) throw new Error('Invalid Circle Testnet session bundle');
-  if (parsed.data.session.testnet.expiresAt <= Date.now() + 120_000)
-    throw new Error(
-      'Circle Testnet session expires soon or has expired; log in and export it again',
-    );
+  if (!parsed.success) throw new Error('Invalid Circle session bundle');
+  const slot = parsed.data.session[parsed.data.environment];
+  const otherEnvironment = parsed.data.environment === 'mainnet' ? 'testnet' : 'mainnet';
+  if (!slot || parsed.data.session[otherEnvironment]) {
+    throw new Error('Circle session bundle must contain exactly one network slot');
+  }
+  if (slot.expiresAt <= Date.now() + 120_000)
+    throw new Error(`Circle ${parsed.data.environment} session expires soon or has expired`);
   return parsed.data;
 }
 
-/** Select only the Testnet Agent Wallet slot. Never copy mainnet, local keys, or RPC overrides. */
-export function exportCircleSession(session: unknown, terms: unknown, encryptionKey: string) {
-  const source = session as { email?: unknown; testnet?: Record<string, unknown> } | null;
-  const slot = source?.testnet;
+/** Select one Agent Wallet slot. Never copy the other network, local keys, or RPC overrides. */
+export function exportCircleSession(
+  session: unknown,
+  terms: unknown,
+  encryptionKey: string,
+  environment: CircleEnvironment = 'testnet',
+) {
+  const source = session as {
+    email?: unknown;
+    mainnet?: Record<string, unknown>;
+    testnet?: Record<string, unknown>;
+  } | null;
+  const slot = source?.[environment];
   if (!slot || !slot.userToken)
-    throw new Error(
-      'No portable Testnet session found; log in with the pinned CLI on this machine first',
-    );
+    throw new Error(`No portable Circle ${environment} session found; log in first`);
+  const selectedSession = {
+    email: source?.email,
+    [environment]: {
+      userToken: slot.userToken,
+      encryptionKey: slot.encryptionKey,
+      encryptedUserSecret: slot.encryptedUserSecret,
+      storageKey: slot.storageKey,
+      deviceId: slot.deviceId,
+      expiresAt: slot.expiresAt,
+    },
+  };
   const bundle = validateBundle({
     version: VERSION,
-    cliVersion: '1.0.0',
-    session: {
-      email: source.email,
-      testnet: {
-        userToken: slot.userToken,
-        encryptionKey: slot.encryptionKey,
-        encryptedUserSecret: slot.encryptedUserSecret,
-        storageKey: slot.storageKey,
-        deviceId: slot.deviceId,
-        expiresAt: slot.expiresAt,
-      },
-    },
+    cliVersion: '1.1.3',
+    environment,
+    session: selectedSession,
     terms,
   });
   const plaintext = Buffer.from(JSON.stringify(bundle), 'utf8');
@@ -95,7 +112,8 @@ export function exportCircleSession(session: unknown, terms: unknown, encryption
         ciphertext.toString('base64url'),
         cipher.getAuthTag().toString('base64url'),
       ].join('.'),
-      expiresAt: bundle.session.testnet.expiresAt,
+      expiresAt: bundle.session[bundle.environment]!.expiresAt,
+      environment: bundle.environment,
     };
   } finally {
     key.fill(0);
@@ -165,8 +183,7 @@ export async function withCircleSession<T>(
   const encryptionKey = source.CIRCLE_SESSION_ENCRYPTION_KEY;
   const env = circleChildEnv(source);
   if (!encrypted && !encryptionKey) {
-    if (source.VERCEL)
-      throw new Error('Circle Testnet session bundle is not configured for Vercel');
+    if (source.VERCEL) throw new Error('Circle session bundle is not configured for Vercel');
     if (source.CIRCLE_CLI_HOME) env.CIRCLE_CLI_HOME = source.CIRCLE_CLI_HOME;
     return operation(env);
   }
@@ -192,7 +209,7 @@ export async function withCircleSession<T>(
       JSON.stringify({ telemetry: { enabled: false } }),
       { mode: 0o600, flag: 'wx' },
     );
-    // Pinned CLI 1.0.0 reads this session during payment. It never refreshes or
+    // Pinned CLI 1.1.3 reads this session during payment. It never refreshes or
     // rewrites it; a new operator login/export is needed when its token expires.
     return await operation({ ...env, CIRCLE_CLI_HOME: directory });
   } finally {

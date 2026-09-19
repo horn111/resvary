@@ -6,12 +6,17 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { exportCircleSession } from '../src/lib/circle-session';
 
-// Run after an operator completes `circle wallet login EMAIL --testnet`.
+// Run after an operator completes `circle wallet login EMAIL` for Mainnet or
+// `circle wallet login EMAIL --testnet` for Testnet.
 // Credentials stay in a Git-ignored env file. Do not print or pipe its contents.
 async function main() {
   const repository = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
   const destination = join(repository, '.env.circle-session.local');
   const cliHome = process.env.CIRCLE_CLI_HOME ?? join(homedir(), '.circle-cli');
+  const environment = process.env.AGENT_DEMO_ARC_NETWORK ?? 'testnet';
+  if (environment !== 'mainnet' && environment !== 'testnet') {
+    throw new Error('AGENT_DEMO_ARC_NETWORK must be mainnet or testnet');
+  }
   try {
     execFileSync('git', ['check-ignore', '--quiet', '--', destination], {
       cwd: repository,
@@ -29,18 +34,18 @@ async function main() {
     terms = JSON.parse(await readFile(join(cliHome, 'terms.json'), 'utf8'));
   } catch {
     throw new Error(
-      'Cannot read a completed CLI login and Terms acceptance; log in on Testnet first',
+      `Cannot read a completed CLI login and Terms acceptance; log in on ${environment} first`,
     );
   }
   const encryptionKey = randomBytes(32).toString('hex');
-  const bundle = exportCircleSession(session, terms, encryptionKey);
+  const bundle = exportCircleSession(session, terms, encryptionKey, environment);
   try {
     await writeFile(
       destination,
       [
         '# PRIVATE: upload these two values only as server-side Sensitive environment variables.',
         '# Never use NEXT_PUBLIC_ prefixes or publish this file.',
-        `# Testnet session expires at ${new Date(bundle.expiresAt).toISOString()}.`,
+        `# Circle ${bundle.environment} session expires at ${new Date(bundle.expiresAt).toISOString()}.`,
         `CIRCLE_AGENT_SESSION_BUNDLE=${bundle.encrypted}`,
         `CIRCLE_SESSION_ENCRYPTION_KEY=${encryptionKey}`,
         '',
@@ -54,7 +59,7 @@ async function main() {
       );
     throw new Error('Cannot write the private Circle session export');
   }
-  console.log(`Circle Testnet export saved to ${destination}`);
+  console.log(`Circle ${bundle.environment} export saved to ${destination}`);
   console.log(
     `Expires at ${new Date(bundle.expiresAt).toISOString()}. No credential values were printed.`,
   );

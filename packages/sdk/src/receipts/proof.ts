@@ -4,6 +4,7 @@
 
 import { createPublicClient, getAddress, http, parseAbiItem, parseEventLogs, type Log } from 'viem';
 import { ARC_TESTNET } from '../constants.js';
+import type { NetworkConfig } from '../types.js';
 import { ARC_MEMO_ABI, ERC20_TRANSFER_ABI } from './memo-payment.js';
 import type { ReceiptOnchainProof, MemoPaymentRequest } from './types.js';
 
@@ -71,6 +72,8 @@ export interface VerifyMemoPaymentProofInput {
   paymentRequest: MemoPaymentRequest;
   rpcUrl?: string;
   publicClient?: ProofClient;
+  /** Arc network to verify against. Defaults to Testnet for backward compatibility. */
+  network?: NetworkConfig;
   verifiedAt?: number;
 }
 
@@ -82,6 +85,8 @@ export interface FindMemoPaymentProofInput {
   paymentRequest: MemoPaymentRequest;
   rpcUrl?: string;
   publicClient?: ProofPollingClient;
+  /** Arc network to scan. Defaults to Testnet for backward compatibility. */
+  network?: NetworkConfig;
   fromBlock?: bigint;
   toBlock?: bigint;
   confirmations?: number;
@@ -128,18 +133,25 @@ type MemoProofCandidateResult =
 export async function verifyMemoPaymentProof(
   input: VerifyMemoPaymentProofInput,
 ): Promise<ReceiptOnchainProof> {
+  const network = input.network ?? ARC_TESTNET;
   const client =
     input.publicClient ??
     createPublicClient({
-      transport: http(input.rpcUrl ?? ARC_TESTNET.rpcUrl),
+      transport: http(input.rpcUrl ?? network.rpcUrl),
     });
 
+  if (!client.getChainId && network.chainId === 5_042) {
+    throw new MemoPaymentProofError(
+      'chain_mismatch',
+      'Arc Mainnet proof clients must expose getChainId()',
+    );
+  }
   if (client.getChainId) {
     const chainId = await client.getChainId();
-    if (chainId !== ARC_TESTNET.chainId) {
+    if (chainId !== network.chainId) {
       throw new MemoPaymentProofError(
         'chain_mismatch',
-        `RPC chain ${chainId} does not match Arc Testnet ${ARC_TESTNET.chainId}`,
+        `RPC chain ${chainId} does not match ${network.name} ${network.chainId}`,
       );
     }
   }
@@ -150,14 +162,14 @@ export async function verifyMemoPaymentProof(
   } catch {
     throw new MemoPaymentProofError(
       'tx_not_found',
-      `Transaction ${input.txHash} was not found on Arc Testnet`,
+      `Transaction ${input.txHash} was not found on ${network.name}`,
     );
   }
 
   if (!txReceipt) {
     throw new MemoPaymentProofError(
       'tx_not_found',
-      `Transaction ${input.txHash} was not found on Arc Testnet`,
+      `Transaction ${input.txHash} was not found on ${network.name}`,
     );
   }
 
@@ -165,6 +177,7 @@ export async function verifyMemoPaymentProof(
     txHash: input.txHash,
     paymentRequest: input.paymentRequest,
     txReceipt,
+    network,
     verifiedAt: input.verifiedAt,
   });
 }
@@ -172,9 +185,10 @@ export async function verifyMemoPaymentProof(
 export async function findMemoPaymentProof(
   input: FindMemoPaymentProofInput,
 ): Promise<FindMemoPaymentProofResult> {
+  const network = input.network ?? ARC_TESTNET;
   const client = (input.publicClient ??
     createPublicClient({
-      transport: http(input.rpcUrl ?? ARC_TESTNET.rpcUrl),
+      transport: http(input.rpcUrl ?? network.rpcUrl),
     })) as ProofPollingClient;
   const { fromBlock, toBlock } = await resolveProofSearchRange(input, client);
 
@@ -297,6 +311,7 @@ async function verifyMemoProofCandidate(
       txHash,
       paymentRequest: input.paymentRequest,
       publicClient: client,
+      network: input.network,
       verifiedAt: input.verifiedAt,
     });
 
@@ -314,9 +329,12 @@ export function createMemoPaymentProofFromReceipt(params: {
   txHash: `0x${string}`;
   paymentRequest: MemoPaymentRequest;
   txReceipt: ProofTransactionReceipt;
+  /** Arc network represented by the receipt. Defaults to Testnet. */
+  network?: NetworkConfig;
   verifiedAt?: number;
 }): ReceiptOnchainProof {
   const { paymentRequest, txHash, txReceipt } = params;
+  const network = params.network ?? ARC_TESTNET;
 
   if (txReceipt.status !== 'success') {
     throw new MemoPaymentProofError('tx_reverted', `Transaction ${txHash} did not succeed`);
@@ -450,8 +468,8 @@ export function createMemoPaymentProofFromReceipt(params: {
   const paidAmountUnits = (amountTransfer.args as { value: bigint }).value;
 
   return {
-    chainId: ARC_TESTNET.chainId,
-    network: 'arc-testnet',
+    chainId: network.chainId,
+    network: network.id ?? `eip155:${network.chainId}`,
     txHash,
     blockNumber: txReceipt.blockNumber,
     transactionIndex: txReceipt.transactionIndex ?? numberOrUndefined(memoById.transactionIndex),
@@ -464,7 +482,7 @@ export function createMemoPaymentProofFromReceipt(params: {
     payTo: getAddress(paymentRequest.payTo) as `0x${string}`,
     target: getAddress(paymentRequest.target) as `0x${string}`,
     amountUnits: paidAmountUnits.toString(),
-    explorerUrl: `${ARC_TESTNET.explorerUrl}/tx/${txHash}`,
+    explorerUrl: `${network.explorerUrl}/tx/${txHash}`,
     verifiedAt: params.verifiedAt ?? Date.now(),
   };
 }

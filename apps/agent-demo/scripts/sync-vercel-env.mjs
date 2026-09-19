@@ -23,6 +23,7 @@ if ((source.AGENT_DEMO_SECRET?.length ?? 0) < 32 || (source.CRON_SECRET?.length 
   throw new Error('Application and maintenance secrets must contain at least 32 characters');
 const publicNames = [
   'AGENT_DEMO_ORIGIN',
+  'AGENT_DEMO_ARC_NETWORK',
   'AGENT_DEMO_PAYER',
   'AGENT_DEMO_SELLER',
   'AGENT_DEMO_WALLET',
@@ -47,8 +48,12 @@ for (const provider of providers) {
     throw new Error('Select supported providers first');
   secretNames.push(`${provider.toUpperCase()}_API_KEY`);
 }
-if (source.AGENT_DEMO_TEST_MODE !== 'false' || source.AGENT_DEMO_EXECUTION_MODE !== 'workflow')
-  throw new Error('Vercel requires live dependencies and workflow mode');
+if (
+  source.AGENT_DEMO_TEST_MODE !== 'false' ||
+  source.AGENT_DEMO_EXECUTION_MODE !== 'workflow' ||
+  source.AGENT_DEMO_ARC_NETWORK !== 'mainnet'
+)
+  throw new Error('Vercel production requires Mainnet, live dependencies, and workflow mode');
 for (const name of [...publicNames, ...secretNames]) {
   if (!source[name]?.trim()) throw new Error(`Missing ${name}`);
 }
