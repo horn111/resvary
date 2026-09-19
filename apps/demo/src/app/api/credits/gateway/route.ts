@@ -1,6 +1,6 @@
 import { GatewayNanopaymentFunding, createNextGatewayTopUpHandler } from '@resvary/circle';
 import { requireDemoMutationAuthorization } from '../../demo-auth';
-import { getDemoCredits } from '../store';
+import { getDemoCredits, getDemoPersistenceLabel } from '../store';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -19,7 +19,7 @@ export async function GET() {
       expectedPayer: config.expectedPayer,
       amount: config.amount,
       customerId: config.customerId,
-      persistence: process.env.RESVARY_CREDITS_DB_PATH ?? '.resvary/demo.sqlite',
+      persistence: getDemoPersistenceLabel(),
       testnetOnly: true,
     },
     { headers: { 'cache-control': 'private, no-store' } },
@@ -93,7 +93,7 @@ function readLiveGatewayConfig(): LiveGatewayConfig {
     !expectedPayer
   )
     disabledReason = 'The configured Gateway payer is not a valid EVM address';
-  else if (runningOnVercel && !allowEphemeralVercel)
+  else if (runningOnVercel && !process.env.DATABASE_URL?.trim() && !allowEphemeralVercel)
     disabledReason =
       'The SQLite proof route is disabled on ephemeral Vercel storage; run it locally or explicitly acknowledge the limitation';
 
