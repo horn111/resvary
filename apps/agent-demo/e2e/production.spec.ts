@@ -28,6 +28,7 @@ type Status = {
   accepting: boolean;
   balance: string;
   testMode: boolean;
+  arcEnvironment: 'mainnet' | 'testnet';
   message: string;
   jobs: { id: string; phase: string }[];
 };
@@ -130,13 +131,19 @@ test('live funding, paid analysis, idempotent replay, remaining credits, and ses
     page.getByRole('heading', { name: 'An agent pays for document analysis.' }),
   ).toBeVisible();
   await expect(
-    page.getByText('Testnet USDC is supplied by the project.', { exact: false }),
+    page.getByText('MAINNET · The agent spends real USDC', { exact: false }),
   ).toBeVisible();
   await expect(page.getByText('LOCAL TEST MODE', { exact: false })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Run paid analysis' })).toBeEnabled();
 
   const initialStatus = await getJson<Status>(page.request, '/api/status');
-  expect(initialStatus).toMatchObject({ accepting: true, balance: '0', testMode: false, jobs: [] });
+  expect(initialStatus).toMatchObject({
+    accepting: true,
+    balance: '0',
+    testMode: false,
+    arcEnvironment: 'mainnet',
+    jobs: [],
+  });
   const sessionCookie = (await page.context().cookies(origin)).find(
     (cookie) => cookie.name === 'resvary_agent',
   );
