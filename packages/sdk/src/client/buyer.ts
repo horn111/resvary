@@ -13,7 +13,7 @@
  *
  * const buyer = new BuyerClient({
  *   privateKey: '0x...',
- *   rpcUrl: 'https://rpc.testnet.arc.network',
+ *   rpcUrl: 'https://rpc.mainnet.arc.io',
  *   paymentPolicy: {
  *     maxAmount: '0.10',
  *     maxTotalAmount: '1.00',
@@ -28,10 +28,12 @@
 
 import { getAddress, type Account } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-import type { PaymentRequirements, PaymentPayload } from '../types.js';
+import type { NetworkConfig, PaymentRequirements, PaymentPayload } from '../types.js';
 import { toStablecoinUnits } from '../receipts/amount.js';
 import {
+  ARC_MAINNET,
   ARC_TESTNET,
+  assertArcNetworkConfig,
   DEFAULTS,
   HTTP_402,
   USDC_DECIMALS,
@@ -47,6 +49,8 @@ export interface BuyerClientConfig {
   rpcUrl?: string;
   /** Chain ID (default: Arc Testnet) */
   chainId?: number;
+  /** Full Arc network configuration. Takes precedence over chainId. */
+  network?: NetworkConfig;
   /** Maximum number of payment retries */
   maxRetries?: number;
   /** Custom fetch implementation */
@@ -100,17 +104,21 @@ export interface PaidResponse<T = unknown> {
 export class BuyerClient {
   private readonly account: Account;
   private readonly chainId: number;
+  private readonly network: NetworkConfig;
   private readonly fetchFn: typeof globalThis.fetch;
   private readonly paymentPolicy?: BuyerPaymentPolicy;
   private signedAmountUnits = 0n;
 
   constructor(config: BuyerClientConfig) {
     this.account = privateKeyToAccount(config.privateKey);
-    this.chainId = config.chainId ?? ARC_TESTNET.chainId;
+    this.network =
+      config.network ?? (config.chainId === ARC_MAINNET.chainId ? ARC_MAINNET : ARC_TESTNET);
+    assertArcNetworkConfig(this.network);
+    this.chainId = config.chainId ?? this.network.chainId;
     this.fetchFn = config.fetch ?? globalThis.fetch;
     this.paymentPolicy = config.paymentPolicy;
-    if (this.chainId !== ARC_TESTNET.chainId) {
-      throw new Error('BuyerClient currently supports Arc Testnet only');
+    if (this.chainId !== this.network.chainId) {
+      throw new Error(`BuyerClient chain ${this.chainId} does not match ${this.network.name}`);
     }
   }
 
@@ -214,9 +222,11 @@ export class BuyerClient {
     if (
       requirements.x402Version !== DEFAULTS.x402Version ||
       requirements.scheme !== DEFAULTS.scheme ||
-      requirements.network !== DEFAULTS.network
+      requirements.network !== (this.network.id ?? DEFAULTS.network)
     ) {
-      throw new Error('Payment requirements do not match the supported x402 Arc Testnet profile');
+      throw new Error(
+        `Payment requirements do not match the configured ${this.network.name} profile`,
+      );
     }
     if (requirements.expiry !== undefined) {
       if (!Number.isSafeInteger(requirements.expiry) || requirements.expiry <= Date.now() / 1000) {
@@ -303,7 +313,7 @@ export class BuyerClient {
           name: 'USD Coin',
           version: '2',
           chainId: BigInt(this.chainId),
-          verifyingContract: ARC_TESTNET.usdcAddress,
+          verifyingContract: this.network.usdcAddress,
         },
         types: {
           TransferWithAuthorization: [

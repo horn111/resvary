@@ -1,6 +1,6 @@
 # Production Persistence
 
-Resvary 1.0 is a stable self-hosted SDK. PostgreSQL 16–18 supports multiple application and worker processes. SQLite remains for local and single-node deployments. This release does not include a hosted control plane, SLA, RBAC, compliance certification, or managed operations. Direct Arc and Circle Gateway funding remain Testnet-only.
+Resvary is a self-hosted SDK. PostgreSQL 16–18 supports multiple application and worker processes. SQLite remains for local and single-node deployments. This release does not include a hosted control plane, SLA, RBAC, compliance certification, or managed operations. Direct Arc and Circle Gateway adapters support Mainnet and Testnet; Mainnet must be selected explicitly and protected by application-level payment controls.
 
 ## Provisioning
 

@@ -1,5 +1,6 @@
 import { createRuntime } from '../src/lib/runtime';
 import { isDeepStrictEqual } from 'node:util';
+import { arcGatewayNetwork } from '@resvary/circle';
 const rt = createRuntime();
 try {
   if (rt.cfg.testMode) throw new Error('Fixture runs cannot produce live proof records');
@@ -29,12 +30,15 @@ try {
     throw new Error('Funding verification failed');
   if (funded.some((tx) => String(tx.evidence?.facilitatorReference).startsWith('TEST_FIXTURE_')))
     throw new Error('Fixture settlement cannot be published as live proof');
+  const network = arcGatewayNetwork(rt.cfg.arcEnvironment).network;
+  if (funded.some((tx) => tx.network !== network))
+    throw new Error('Funding transaction does not match the configured Arc network');
   // Allowlist output fields. Never output document, result, signature, session or credentials.
   console.log(
     JSON.stringify(
       {
         schema: 'resvary-agent-proof-v1',
-        network: 'eip155:5042002',
+        network,
         jobId: id,
         createdAt: job.created_at.toISOString(),
         reservationId: reservation.id,
@@ -50,6 +54,7 @@ try {
           fundingIntentId: tx.fundingIntentId,
           fundingTransactionId: tx.id,
           amount: tx.amount,
+          network: tx.network,
           gatewayTransferId:
             typeof tx.evidence?.facilitatorReference === 'string' &&
             /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(tx.evidence.facilitatorReference)

@@ -17,6 +17,7 @@ Resvary is an embedded, open-source prepaid credit ledger and usage billing SDK 
 - [x] Dual-rail interactive demo
 - [x] Recovery, migration, threat-boundary, video, and evidence documentation
 - [x] Publish two real public evidence records and release tag
+- [x] Add explicit Arc Mainnet configuration for direct funding and Circle Gateway
 
 The published evidence is pinned to `v0.4.0-alpha.0` and records an external Arc Testnet transaction, a Circle Gateway settlement, replay checks, and the shared credit lifecycle.
 
@@ -85,4 +86,4 @@ The published evidence is pinned to `v0.4.0-alpha.0` and records an external Arc
 - transferable or redeemable credits;
 - custody, cash-out, or marketplace wallets;
 - hosted control plane, RBAC, or managed workers;
-- Arc mainnet until public support, security review, and legal review exist.
+- representing Mainnet support as audited, compliant, or production-verified without separate evidence and review.

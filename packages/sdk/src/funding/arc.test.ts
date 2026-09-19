@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { encodeAbiParameters, encodeEventTopics, parseAbiItem } from 'viem';
-import { ARC_TESTNET_CONTRACTS } from '../constants.js';
+import { ARC_MAINNET, ARC_TESTNET_CONTRACTS } from '../constants.js';
 import { CreditLedger, InvalidCreditStateError } from '../credits/index.js';
 import {
   ARC_MEMO_ABI,
@@ -20,6 +20,73 @@ const transferEvent = parseAbiItem(
 const memoEvent = ARC_MEMO_ABI.find((item) => item.type === 'event' && item.name === 'Memo');
 
 describe('ArcCreditFunding', () => {
+  it('records direct Arc Mainnet funding with a Mainnet explorer proof', async () => {
+    const ledger = new CreditLedger({ projectId: 'project_mainnet' });
+    const proofClient = createProofClient(ARC_MAINNET.chainId);
+    const funding = new ArcCreditFunding({
+      ledger,
+      payTo,
+      network: 'arc',
+      networkConfig: ARC_MAINNET,
+      publicClient: proofClient,
+    });
+    const request = await funding.createFundingRequest({
+      customerId: 'cus_mainnet',
+      amount: '1',
+      idempotencyKey: 'intent-mainnet',
+    });
+    proofClient.setPayment(request.paymentRequest, 1_000_000n);
+    const receipt = createReceipt(request.invoice, {
+      from: payer,
+      to: payTo,
+      amount: '1',
+      memo: request.invoice.memo,
+      txHash,
+    });
+    const result = await funding.confirmPayment({
+      fundingIntentId: request.fundingIntent.id,
+      receipt,
+      idempotencyKey: 'confirm-mainnet',
+    });
+    expect(result.fundingTransaction.network).toBe('arc');
+    expect(result.fundingTransaction.evidence?.explorerUrl).toBe(
+      `${ARC_MAINNET.explorerUrl}/tx/${txHash}`,
+    );
+  });
+
+  it('rejects an Arc Mainnet proof client that cannot report its chain id', async () => {
+    const ledger = new CreditLedger({ projectId: 'project_mainnet_unpinned' });
+    const proofClient = createProofClient();
+    const funding = new ArcCreditFunding({
+      ledger,
+      payTo,
+      network: 'arc',
+      networkConfig: ARC_MAINNET,
+      publicClient: proofClient,
+    });
+    const request = await funding.createFundingRequest({
+      customerId: 'cus_mainnet_unpinned',
+      amount: '1',
+      idempotencyKey: 'intent-mainnet-unpinned',
+    });
+    proofClient.setPayment(request.paymentRequest, 1_000_000n);
+    const receipt = createReceipt(request.invoice, {
+      from: payer,
+      to: payTo,
+      amount: '1',
+      memo: request.invoice.memo,
+      txHash,
+    });
+
+    await expect(
+      funding.confirmPayment({
+        fundingIntentId: request.fundingIntent.id,
+        receipt,
+        idempotencyKey: 'confirm-mainnet-unpinned',
+      }),
+    ).rejects.toThrow('must expose getChainId');
+  });
+
   it('converts a verified payment receipt into credits exactly once', async () => {
     const ledger = new CreditLedger({ projectId: 'project_ai' });
     const receiptStore = new InMemoryReceiptStore();
@@ -203,10 +270,11 @@ describe('ArcCreditFunding', () => {
   });
 });
 
-function createProofClient() {
+function createProofClient(chainId?: number) {
   let paymentRequest: MemoPaymentRequest | undefined;
   let amountUnits = 0n;
   return {
+    ...(chainId === undefined ? {} : { getChainId: async () => chainId }),
     setPayment(request: MemoPaymentRequest, amount: bigint) {
       paymentRequest = request;
       amountUnits = amount;

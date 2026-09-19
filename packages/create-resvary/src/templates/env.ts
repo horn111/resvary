@@ -14,7 +14,7 @@ RESVARY_AI_MODEL=
   }
   return `# Seller configuration
 SELLER_ADDRESS=${config.payTo}
-ARC_RPC_URL=https://rpc.testnet.arc.network
-CHAIN_ID=5042002
+ARC_RPC_URL=https://rpc.mainnet.arc.io
+CHAIN_ID=5042
 `;
 }

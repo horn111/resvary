@@ -98,7 +98,15 @@ export {
   type WebhookRouteResult,
 } from './receipts/index.js';
 
-export { ARC_TESTNET, ARC_TESTNET_CONTRACTS, USDC_DECIMALS } from './constants.js';
+export {
+  ARC_MAINNET,
+  ARC_MAINNET_CONTRACTS,
+  ARC_TESTNET,
+  ARC_TESTNET_CONTRACTS,
+  arcNetwork,
+  assertArcNetworkConfig,
+  USDC_DECIMALS,
+} from './constants.js';
 
 export type {
   PaymentRequirements,

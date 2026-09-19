@@ -1,4 +1,6 @@
 import type { CreditLedger, FundingIntent } from '../credits/index.js';
+import { ARC_MAINNET, ARC_TESTNET } from '../constants.js';
+import type { NetworkConfig } from '../types.js';
 import {
   PersistentReceiptLedger,
   ReceiptWatcher,
@@ -19,6 +21,8 @@ export interface ArcFundingWorkerConfig {
   ledger: CreditLedger;
   receiptStore: ReceiptStore;
   payTo: `0x${string}`;
+  network?: 'arc' | 'arc-testnet';
+  networkConfig?: NetworkConfig;
   rpcUrl?: string;
   publicClient?: ReceiptWatcherClient;
   fromBlock?: bigint;
@@ -51,9 +55,14 @@ export class ArcFundingWorker {
     this.pollIntervalMs = config.pollIntervalMs ?? 5_000;
     this.onEvent = config.onEvent;
     this.onError = config.onError;
+    const networkConfig =
+      config.networkConfig ?? (config.network === 'arc' ? ARC_MAINNET : ARC_TESTNET);
+    const network = config.network ?? networkConfig.id ?? 'arc-testnet';
     this.funding = new ArcCreditFunding({
       ledger: config.ledger,
       payTo: config.payTo,
+      network,
+      networkConfig,
       receiptStore: config.receiptStore,
       rpcUrl: config.rpcUrl,
       publicClient: config.publicClient,
@@ -62,6 +71,7 @@ export class ArcFundingWorker {
     this.watcher = new ReceiptWatcher({
       ledger: receiptLedger,
       cursorStore: config.receiptStore,
+      network: networkConfig,
       rpcUrl: config.rpcUrl,
       publicClient: config.publicClient,
       fromBlock: config.fromBlock,

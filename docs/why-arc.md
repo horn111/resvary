@@ -53,13 +53,13 @@ Arc is designed with autonomous AI agents as first-class citizens:
 
 ## Network Details
 
-| Parameter   | Value                                              |
-| ----------- | -------------------------------------------------- |
-| Network     | Arc Testnet                                        |
-| Chain ID    | `5042002`                                          |
-| RPC URL     | `https://rpc.testnet.arc.network`                  |
-| Explorer    | [testnet.arcscan.app](https://testnet.arcscan.app) |
-| Faucet      | [faucet.circle.com](https://faucet.circle.com)     |
-| Currency    | USDC (6 decimals)                                  |
-| Consensus   | Malachite BFT                                      |
-| Mainnet ETA | Summer 2026                                        |
+| Parameter    | Mainnet                                    | Testnet                                                    |
+| ------------ | ------------------------------------------ | ---------------------------------------------------------- |
+| Chain ID     | `5042`                                     | `5042002`                                                  |
+| RPC URL      | `https://rpc.mainnet.arc.io`               | `https://rpc.testnet.arc.io`                               |
+| Explorer     | [explorer.arc.io](https://explorer.arc.io) | [explorer.testnet.arc.io](https://explorer.testnet.arc.io) |
+| Gateway name | `arc`                                      | `arcTestnet`                                               |
+| x402 network | `eip155:5042`                              | `eip155:5042002`                                           |
+| Faucet       | None                                       | [faucet.circle.com](https://faucet.circle.com)             |
+
+Arc's native USDC gas balance uses 18 decimals of precision. The optional ERC-20 USDC interface at `0x3600000000000000000000000000000000000000` uses 6 decimals. Do not mix those units.

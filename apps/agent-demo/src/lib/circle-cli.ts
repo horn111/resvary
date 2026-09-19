@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { resolve } from 'node:path';
-import { ARC_GATEWAY_TESTNET, type GatewayPaymentPayload } from '@resvary/circle';
+import { arcGatewayNetwork, type GatewayPaymentPayload } from '@resvary/circle';
 import { funding } from './payments';
 import type { Runtime } from './runtime';
 import { paymentToken } from './auth';
@@ -50,8 +50,10 @@ export function circle(args: string[]): Promise<unknown> {
 export async function pay(rt: Runtime, job: Job) {
   if (!job.challenge) throw new Error('Missing persisted challenge');
   const requirements = job.challenge.paymentRequired.accepts[0];
+  const network = arcGatewayNetwork(rt.cfg.arcEnvironment);
+  const chain = rt.cfg.arcEnvironment === 'mainnet' ? 'ARC' : 'ARC-TESTNET';
   if (
-    requirements.network !== ARC_GATEWAY_TESTNET.network ||
+    requirements.network !== network.network ||
     requirements.payTo.toLowerCase() !== rt.cfg.seller ||
     BigInt(requirements.amount) > 50_000n
   )
@@ -87,7 +89,7 @@ export async function pay(rt: Runtime, job: Job) {
     '--address',
     rt.cfg.wallet,
     '--chain',
-    'ARC-TESTNET',
+    chain,
     '--max-amount',
     job.challenge.fundingIntent.requestedAmount,
     '--method',
@@ -104,29 +106,30 @@ export async function paymentReadiness(rt: Runtime) {
     return { ready: true, message: 'Local test fixtures; no external payment or AI call' };
   try {
     const status = (await circle(['wallet', 'status', '--type', 'agent'])) as {
+      mainnet?: { tokenStatus?: string };
       testnet?: { tokenStatus?: string };
     };
-    const wallets = (await circle([
-      'wallet',
-      'list',
-      '--chain',
-      'ARC-TESTNET',
-      '--type',
-      'agent',
-    ])) as { wallets?: { address?: string }[] };
+    const environment = rt.cfg.arcEnvironment;
+    const chain = environment === 'mainnet' ? 'ARC' : 'ARC-TESTNET';
+    const wallets = (await circle(['wallet', 'list', '--chain', chain, '--type', 'agent'])) as {
+      wallets?: { address?: string }[];
+    };
     // The CLI takes the Agent Wallet SCA, but Gateway authorizations use its backing EOA.
     if (
-      status?.testnet?.tokenStatus !== 'VALID' ||
+      status?.[environment]?.tokenStatus !== 'VALID' ||
       !wallets.wallets?.some((wallet) => wallet.address?.toLowerCase() === rt.cfg.wallet)
     )
-      return { ready: false, message: 'Configured Agent Wallet or Testnet session is unavailable' };
+      return {
+        ready: false,
+        message: `Configured Agent Wallet or ${environment} session is unavailable`,
+      };
     const balance = (await circle([
       'gateway',
       'balance',
       '--address',
       rt.cfg.wallet,
       '--chain',
-      'ARC-TESTNET',
+      chain,
     ])) as { total?: string; backingEOA?: string };
     if (balance.backingEOA?.toLowerCase() !== rt.cfg.payer)
       return { ready: false, message: 'Gateway payer does not match the Agent Wallet backing EOA' };
@@ -138,7 +141,7 @@ export async function paymentReadiness(rt: Runtime) {
       ready,
       message: ready
         ? 'Circle session and Gateway funds checked'
-        : 'Gateway needs at least 0.05 Testnet USDC',
+        : `Gateway needs at least 0.05 ${environment === 'mainnet' ? 'USDC' : 'Testnet USDC'}`,
     };
   } catch {
     return {

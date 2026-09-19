@@ -16,6 +16,7 @@ import type {
 import {
   ARC_GATEWAY_TESTNET,
   requireArcGatewayKind,
+  type ArcGatewayNetworkConfig,
   type GatewaySupportedResponse,
 } from './gateway.js';
 
@@ -86,6 +87,8 @@ export interface GatewayFacilitator {
 export interface GatewayNanopaymentFundingConfig {
   ledger: CreditLedger;
   sellerAddress: `0x${string}`;
+  /** Arc network to settle on. Defaults to Testnet for backward compatibility. */
+  network?: ArcGatewayNetworkConfig;
   facilitator?: GatewayFacilitator;
   facilitatorUrl?: string;
   resourceUrl?: string;
@@ -141,6 +144,7 @@ export interface GatewayFundingResult {
 export class GatewayNanopaymentFunding {
   private readonly ledger: CreditLedger;
   private readonly sellerAddress: `0x${string}`;
+  private readonly network: ArcGatewayNetworkConfig;
   private readonly facilitator: GatewayFacilitator;
   private readonly paymentScheme = new GatewayEvmScheme();
   private readonly resourceUrl: string;
@@ -151,19 +155,19 @@ export class GatewayNanopaymentFunding {
   constructor(config: GatewayNanopaymentFundingConfig) {
     this.ledger = config.ledger;
     this.sellerAddress = normalizeAddress(config.sellerAddress, 'sellerAddress');
+    this.network = config.network ?? ARC_GATEWAY_TESTNET;
     this.facilitator =
       config.facilitator ??
       (new BatchFacilitatorClient({
-        url: config.facilitatorUrl ?? ARC_GATEWAY_TESTNET.facilitatorUrl,
+        url: config.facilitatorUrl ?? this.network.facilitatorUrl,
       }) as unknown as GatewayFacilitator);
     this.resourceUrl = config.resourceUrl ?? '/api/credits/gateway';
-    this.intentTtlMs =
-      config.intentTtlMs ?? ARC_GATEWAY_TESTNET.authorizationValiditySeconds * 1_000;
+    this.intentTtlMs = config.intentTtlMs ?? this.network.authorizationValiditySeconds * 1_000;
     this.authorizationValiditySeconds =
-      config.authorizationValiditySeconds ?? ARC_GATEWAY_TESTNET.authorizationValiditySeconds;
+      config.authorizationValiditySeconds ?? this.network.authorizationValiditySeconds;
     if (
       !Number.isSafeInteger(this.authorizationValiditySeconds) ||
-      this.authorizationValiditySeconds < ARC_GATEWAY_TESTNET.authorizationValiditySeconds
+      this.authorizationValiditySeconds < this.network.authorizationValiditySeconds
     ) {
       throw new Error('authorizationValiditySeconds must cover the Gateway minimum window');
     }
@@ -176,18 +180,24 @@ export class GatewayNanopaymentFunding {
   async createFundingRequest(
     input: CreateGatewayFundingRequestInput,
   ): Promise<GatewayFundingRequest> {
+    const expectedPayer = input.expectedPayer
+      ? normalizeAddress(input.expectedPayer, 'expectedPayer')
+      : undefined;
+    if (this.network.name === 'arc' && !expectedPayer) {
+      throw new Error('Arc Mainnet Gateway funding requires an expectedPayer');
+    }
     const expiresAt = this.now() + this.intentTtlMs;
     const fundingIntent = await this.ledger.createFundingIntent({
       customerId: input.customerId,
       amount: input.amount,
       rail: 'circle_gateway_nanopayment',
-      network: ARC_GATEWAY_TESTNET.network,
+      network: this.network.network,
       invoiceId: `gateway:${input.idempotencyKey}`,
       expiresAt,
       idempotencyKey: input.idempotencyKey,
       metadata: {
         ...input.metadata,
-        expectedPayer: input.expectedPayer?.toLowerCase(),
+        expectedPayer,
       },
     });
     const requirements = await this.buildRequirements(fundingIntent);
@@ -226,7 +236,7 @@ export class GatewayNanopaymentFunding {
     );
     const existing = await this.ledger.store.getFundingTransactionByExternalPayment(
       'circle_gateway_nanopayment',
-      ARC_GATEWAY_TESTNET.network,
+      this.network.network,
       authorizationHash,
     );
     if (existing) {
@@ -237,7 +247,14 @@ export class GatewayNanopaymentFunding {
     }
 
     const requirements = await this.buildRequirements(intent);
-    validatePayload(intent, requirements, input.paymentPayload, this.sellerAddress, this.now());
+    validatePayload(
+      intent,
+      requirements,
+      input.paymentPayload,
+      this.sellerAddress,
+      this.network,
+      this.now(),
+    );
 
     const verification = await this.facilitator.verify(input.paymentPayload, requirements);
     if (!verification.isValid) {
@@ -258,7 +275,7 @@ export class GatewayNanopaymentFunding {
         }`,
       );
     }
-    if (settlement.network !== ARC_GATEWAY_TESTNET.network) {
+    if (settlement.network !== this.network.network) {
       throw new Error(`Gateway settled on unexpected network: ${settlement.network}`);
     }
     if (settlement.amount !== undefined && settlement.amount !== intent.requestedUnits) {
@@ -270,7 +287,7 @@ export class GatewayNanopaymentFunding {
     const credited = await this.ledger.confirmFunding({
       fundingIntentId: intent.id,
       rail: 'circle_gateway_nanopayment',
-      network: ARC_GATEWAY_TESTNET.network,
+      network: this.network.network,
       externalPaymentId: authorizationHash,
       txHash: isHexTransaction(settlement.transaction)
         ? (settlement.transaction as `0x${string}`)
@@ -288,7 +305,7 @@ export class GatewayNanopaymentFunding {
         recipient: this.sellerAddress,
         facilitatorReference: settlement.transaction,
         metadata: {
-          gatewayDomain: ARC_GATEWAY_TESTNET.gatewayDomain,
+          gatewayDomain: this.network.gatewayDomain,
           verifyingContract: requirements.extra.verifyingContract,
         },
       },
@@ -319,11 +336,11 @@ export class GatewayNanopaymentFunding {
 
   private async buildRequirements(intent: FundingIntent): Promise<GatewayPaymentRequirements> {
     const supported = await this.facilitator.getSupported();
-    const kind = requireArcGatewayKind(supported);
+    const kind = requireArcGatewayKind(supported, this.network);
     const baseRequirements: PaymentRequirements = {
       scheme: CIRCLE_BATCHING_SCHEME,
-      network: ARC_GATEWAY_TESTNET.network as Network,
-      asset: ARC_GATEWAY_TESTNET.usdcAddress,
+      network: this.network.network as Network,
+      asset: this.network.usdcAddress,
       amount: intent.requestedUnits,
       payTo: this.sellerAddress,
       maxTimeoutSeconds: this.authorizationValiditySeconds,
@@ -383,6 +400,7 @@ function validatePayload(
   requirements: GatewayPaymentRequirements,
   payload: GatewayPaymentPayload,
   sellerAddress: `0x${string}`,
+  network: ArcGatewayNetworkConfig,
   now: number,
 ): void {
   if (payload.x402Version !== 2) throw new Error('Gateway payment must use x402 version 2');
@@ -390,10 +408,10 @@ function validatePayload(
   if (!accepted) throw new Error('Gateway payment is missing accepted requirements');
   if (accepted.scheme !== CIRCLE_BATCHING_SCHEME)
     throw new Error(`Unsupported Gateway scheme: ${accepted.scheme}`);
-  if (accepted.network !== ARC_GATEWAY_TESTNET.network)
+  if (accepted.network !== network.network)
     throw new Error(`Unsupported Gateway network: ${accepted.network}`);
-  if (accepted.asset.toLowerCase() !== ARC_GATEWAY_TESTNET.usdcAddress.toLowerCase())
-    throw new Error('Gateway payment asset is not Arc Testnet USDC');
+  if (accepted.asset.toLowerCase() !== network.usdcAddress.toLowerCase())
+    throw new Error(`Gateway payment asset is not ${network.name} USDC`);
   if (accepted.payTo.toLowerCase() !== sellerAddress.toLowerCase())
     throw new Error('Gateway payment recipient does not match the seller');
   if (accepted.amount !== intent.requestedUnits)

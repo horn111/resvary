@@ -1,24 +1,24 @@
 # Resvary agent demo
 
-Resvary shows an AI agent buying a paid document-analysis service with product credits. If the visitor account lacks credits, the server uses a Circle Agent Wallet to fund the shortfall through Circle Gateway on Arc Testnet. Resvary reserves the quoted product credits, saves the provider result, charges measured usage, and returns the saved result with its receipt.
+Resvary shows an AI agent buying a paid document-analysis service with product credits. If the visitor account lacks credits, the server uses a Circle Agent Wallet to fund the shortfall through Circle Gateway on the configured Arc network. The Vercel production configuration explicitly selects Mainnet; an omitted network remains on Testnet. Resvary reserves the quoted product credits, saves the provider result, charges measured usage, and returns the saved result with its receipt.
 
 The Vercel deployment keeps the OpenAI Agents SDK for the agent loop. The selected Nous configuration uses `qwen/qwen3.8-flash` for the buying agent and `openai/gpt-4.1-mini` for the document-analysis service.
 
 ## Deployment status
 
-| Item                    | Current status                                                                                                                               |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| Vercel project          | `resvary-agent-demo`                                                                                                                         |
-| Production URL          | <https://agent.resvary.xyz> is the canonical interactive origin on a `READY` production deployment.                                          |
-| Web and execution stack | Next.js 16, Vercel Workflow `4.8.8`, Node.js 24                                                                                              |
-| Database                | Managed Neon PostgreSQL, free plan, `fra1`; migrations passed.                                                                               |
-| Source verification     | 43 agent-demo tests, 17 nanopayment and credit-gate tests, and the compiled Workflow browser E2E passed.                                     |
-| AI provider             | Nous selected for both roles                                                                                                                 |
-| Hyperbolic              | A key probe returned HTTP 401. Hyperbolic has not passed provider verification.                                                              |
-| Circle readiness        | Operator and deployed-cloud checks passed for the Testnet session, Agent Wallet, backing EOA, and Gateway balance.                           |
-| Circle payment          | Gateway accepted one real 0.02 Testnet USDC payment; Resvary issued one funding grant. Batch onchain confirmation remains unverified.        |
-| Vercel build            | Linux production build passed. Runtime CLI resolution and `@vercel/nft` tracing package Circle CLI dependencies.                             |
-| Public readiness        | Two real analyses completed. Saved-result replay and a second analysis from remaining credits passed; a separate live isolation test passed. |
+| Item                    | Current status                                                                                                                                   |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Vercel project          | `resvary-agent-demo`                                                                                                                             |
+| Production URL          | <https://agent.resvary.xyz> is the canonical interactive origin on a `READY` production deployment.                                              |
+| Web and execution stack | Next.js 16, Vercel Workflow `4.8.8`, Node.js 24                                                                                                  |
+| Database                | Managed Neon PostgreSQL, free plan, `fra1`; migrations passed.                                                                                   |
+| Source verification     | 43 agent-demo tests, 21 Circle integration tests, and the compiled Workflow browser E2E passed.                                                  |
+| AI provider             | Nous selected for both roles                                                                                                                     |
+| Hyperbolic              | A key probe returned HTTP 401. Hyperbolic has not passed provider verification.                                                                  |
+| Circle readiness        | The archived Testnet session passed. Mainnet requires a new session, wallet identity check, Gateway balance, and deployed-cloud readiness check. |
+| Circle payment          | The archived proof records a completed 0.02 Testnet USDC Gateway payment. No Mainnet payment proof is claimed yet.                               |
+| Vercel build            | Linux production build passed. Runtime CLI resolution and `@vercel/nft` tracing package Circle CLI dependencies.                                 |
+| Public readiness        | Two real analyses completed. Saved-result replay and a second analysis from remaining credits passed; a separate live isolation test passed.     |
 
 This is a working prototype with a verified live payment-and-analysis path, not a production-maturity claim. See the [sanitized evidence](public/proofs/2026-09-10.json) and [verification qualifications](../../docs/ethonline-continuity.md#evidence-status). No user documents, model results, signatures, session cookies, or credentials appear in the evidence.
 
@@ -28,7 +28,7 @@ This is a working prototype with a verified live payment-and-analysis path, not 
 2. PostgreSQL deduplicates the request, applies quotas, and allocates a non-returnable `$0.40` demo-budget hold.
 3. Vercel Workflow starts a durable run with the job ID. PostgreSQL grants one global execution claim, so the deployment performs one paid agent run at a time.
 4. The OpenAI Agents SDK agent checks the visitor's product-credit balance and quote.
-5. If the balance cannot cover the quote, the server constrains a Circle CLI payment to the stored service URL, Arc Testnet, the configured wallet, seller, and maximum amount.
+5. If the balance cannot cover the quote, the server constrains a Circle CLI payment to the stored service URL, configured Arc network, wallet, seller, and maximum amount.
 6. Resvary reserves product credits. The service calls the selected analysis model, saves the result and measured usage, then commits the charge with stable idempotency keys.
 7. The browser polls the job and can replay the saved result without another provider call.
 8. A supervisor reconciles recoverable database state and clears document text and result text after 24 hours.
@@ -73,7 +73,7 @@ Remove-Item Env:\AGENT_DEMO_TEST_EXECUTION_MODE
 
 Install Playwright Chromium if the runner reports that it is missing: `npx playwright install chromium`. For manual fixture inspection, run `node scripts/test-server.mjs` from this directory with `TEST_DATABASE_URL` set. Keep that harness on loopback.
 
-The latest source verification passed 43 agent-demo tests, 17 nanopayment and credit-gate tests, and the compiled Workflow browser E2E. These checks use deterministic AI and payment fixtures; the separate live evidence records genuine Circle and Nous calls.
+The latest source verification passed 43 agent-demo tests and 21 Circle integration tests. These checks use deterministic AI and payment fixtures; the archived live evidence records genuine Circle Testnet and Nous calls.
 
 ## Vercel configuration
 
@@ -87,7 +87,8 @@ The application expects these server-side variables. Store secret values as Verc
 | `AGENT_DEMO_ORIGIN`              | Exact HTTPS production origin                                                                 |
 | `AGENT_DEMO_SECRET`              | HMAC secret for visitor sessions and internal payment tokens                                  |
 | `CRON_SECRET`                    | Bearer secret for `/api/internal/maintenance`                                                 |
-| `AGENT_DEMO_SELLER`              | Arc Testnet seller address                                                                    |
+| `AGENT_DEMO_SELLER`              | Seller address on the configured Arc network                                                  |
+| `AGENT_DEMO_ARC_NETWORK`         | Set `mainnet` explicitly for production; omission defaults to `testnet`                       |
 | `AGENT_DEMO_WALLET`              | Circle Agent Wallet SCA                                                                       |
 | `AGENT_DEMO_PAYER`               | Gateway backing EOA                                                                           |
 | `AGENT_DEMO_EXECUTION_MODE`      | Must equal `workflow` on Vercel                                                               |
@@ -99,14 +100,14 @@ The application expects these server-side variables. Store secret values as Verc
 | `AGENT_DEMO_ANALYSIS_PROVIDER`   | `nous` for the selected deployment                                                            |
 | `AGENT_DEMO_ANALYSIS_MODEL`      | `openai/gpt-4.1-mini`                                                                         |
 | `NOUS_API_KEY`                   | Nous API credential for both selected models                                                  |
-| `CIRCLE_AGENT_SESSION_BUNDLE`    | Encrypted Testnet Agent Wallet session snapshot                                               |
+| `CIRCLE_AGENT_SESSION_BUNDLE`    | Encrypted Agent Wallet session snapshot for the selected network                              |
 | `CIRCLE_SESSION_ENCRYPTION_KEY`  | Separate AES-256-GCM key for the snapshot                                                     |
 
 `scripts/sync-vercel-env.mjs` reads the ignored local configuration, checks that the linked project name is `resvary-agent-demo`, and streams values to the Vercel CLI through child-process stdin. It does not put secret values in command arguments or logs.
 
 ## Circle session handling
 
-Run Circle CLI `1.0.0` login on an operator machine, then use `scripts/export-circle-session.ts`. The exporter selects the Testnet Agent Wallet slot, encrypts it with AES-256-GCM, and writes two values to the ignored `.env.circle-session.local` file. Each Vercel invocation decrypts the bundle into a new mode-`0700` directory under the platform temporary directory, writes credential files with mode `0600`, gives that directory to the Circle child process, and removes it in `finally`.
+Run Circle CLI `1.1.3` login on an operator machine, set `AGENT_DEMO_ARC_NETWORK`, then use `scripts/export-circle-session.ts`. The exporter selects only the matching Mainnet or Testnet Agent Wallet slot, encrypts it with AES-256-GCM, and writes two values to the ignored `.env.circle-session.local` file. Each Vercel invocation decrypts the bundle into a new mode-`0700` directory under the platform temporary directory, writes credential files with mode `0600`, gives that directory to the Circle child process, and removes it in `finally`.
 
 The current exported session expires on October 7, 2026. Treat that date as the expiry of this snapshot, not a promised session lifetime. Check the exact stored timestamp and Circle readiness before a production run. The CLI does not refresh the snapshot inside Vercel, so an operator must log in and export a new bundle before expiry.
 
@@ -118,7 +119,7 @@ The current exported session expires on October 7, 2026. Treat that date as the 
 - Each accepted job allocates `400,000` micro-USD (`$0.40`) and the application never returns that allocation. With the recorded probe holds, a fresh budget can admit at most 24 jobs. This limit controls exposure; it does not report a provider invoice total.
 - Product credits use `$2` per million input tokens and `$8` per million output tokens. The receipt reports this product charge, not the Nous invoice.
 - The Circle payment policy rejects a request above `50,000` Gateway units and passes the stored funding amount again as the CLI `--max-amount` value.
-- Readiness requires a valid Testnet session, the configured Agent Wallet SCA, the expected backing EOA, and at least `0.05` Testnet Gateway USDC.
+- Readiness requires a valid session for the configured network, the Agent Wallet SCA, the expected backing EOA, and at least `0.05` Gateway USDC.
 
 ## Recovery rules
 
@@ -130,7 +131,7 @@ The service saves provider output before `commitUsage`. A `result_saved` job can
 
 The payment endpoint stores the first authorization's hash, nonce, and validity deadline before contacting the facilitator. It does not store the signature. A later delivery returns an existing settled funding transaction or refuses a second settlement attempt. An operator must reconcile an unknown payment with Circle and the ledger before changing state.
 
-Circle CLI `1.0.0` rewrites the authorization window to 30 days. The demo sets the adapter's `authorizationValiditySeconds` to match; strict requirement comparison and the funding-intent expiry remain unchanged. A successful facilitator response permits the credit grant before Gateway's later onchain batch. A ledger funding status of `settled` does not prove batch finality.
+Circle CLI `1.1.3` rewrites the authorization window to 30 days. The demo sets the adapter's `authorizationValiditySeconds` to match; strict requirement comparison and the funding-intent expiry remain unchanged. A successful facilitator response permits the credit grant before Gateway's later onchain batch. A ledger funding status of `settled` does not prove batch finality.
 
 ## Privacy and security
 
@@ -147,7 +148,7 @@ Circle CLI `1.0.0` rewrites the authorization window to 30 days. The demo sets t
 - The Hyperbolic credential probe returned HTTP 401. The deployment uses Nous, and no documentation should describe Hyperbolic as verified.
 - Vercel Workflow provides durable orchestration, but an external call can finish while its response or following database write disappears. The demo stops those cases for operator review and makes no exactly-once claim about AI providers or Circle settlement.
 - `vercel.json` does not register a periodic maintenance cron. Each started Workflow schedules its own 24-hour expiry. Operators must invoke the authenticated maintenance route to recover abandoned dispatches and clean expired rows whose Workflow never started.
-- Circle CLI `1.0.0` brings unresolved transitive `npm audit --omit=dev` advisories involving `ws`, `toml`, `uuid`, and `stream-json`. The application confines the CLI to fixed child-process commands and a private temporary home, but that boundary does not fix upstream packages.
+- Circle CLI runs only through fixed child-process commands and a private temporary home. The current production audit still reports transitive high-severity advisories in the Circle CLI and Vercel Workflow dependency trees, with no automatic fix for the direct packages. Keep admission closed by default, maintain the runtime boundary, and repeat the audit before deployment.
 - The Neon free-plan limits and Vercel platform limits can throttle or suspend work. The application surfaces failed readiness and pauses new jobs; operators still need live platform monitoring.
 
 See the [architecture](../../docs/agent-demo-architecture.md), [Vercel runbook](../../docs/agent-demo-vercel-runbook.md), and [ETHOnline continuity disclosure](../../docs/ethonline-continuity.md).

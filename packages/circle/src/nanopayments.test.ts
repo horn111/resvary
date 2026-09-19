@@ -6,7 +6,7 @@ import {
   type GatewayFundingRequest,
   type GatewayPaymentPayload,
 } from './nanopayments.js';
-import { ARC_GATEWAY_TESTNET } from './gateway.js';
+import { ARC_GATEWAY_MAINNET, ARC_GATEWAY_TESTNET } from './gateway.js';
 
 const NOW = Date.UTC(2026, 7, 23);
 const SELLER = '0x1111111111111111111111111111111111111111';
@@ -101,7 +101,115 @@ async function fixture() {
 }
 
 describe('GatewayNanopaymentFunding', () => {
-  it('rejects the CLI 1.0.0 timeout rewrite before calling Gateway', async () => {
+  it('creates and settles an Arc Mainnet funding request with Mainnet contracts', async () => {
+    const ledger = new CreditLedger({ projectId: 'project_mainnet', now: () => NOW });
+    const facilitator: GatewayFacilitator = {
+      async getSupported() {
+        return {
+          kinds: [
+            {
+              x402Version: 2,
+              scheme: 'exact',
+              network: ARC_GATEWAY_MAINNET.network,
+              extra: { verifyingContract: ARC_GATEWAY_MAINNET.gatewayWallet },
+            },
+          ],
+          extensions: [],
+          signers: {},
+        };
+      },
+      async verify() {
+        return { isValid: true, payer: PAYER };
+      },
+      async settle(_payload, requirements) {
+        return {
+          success: true,
+          payer: PAYER,
+          transaction: SETTLEMENT,
+          network: ARC_GATEWAY_MAINNET.network,
+          amount: requirements.amount,
+        };
+      },
+    };
+    const funding = new GatewayNanopaymentFunding({
+      ledger,
+      sellerAddress: SELLER,
+      facilitator,
+      network: ARC_GATEWAY_MAINNET,
+      now: () => NOW,
+    });
+    const request = await funding.createFundingRequest({
+      customerId: 'mainnet_customer',
+      amount: '0.05',
+      expectedPayer: PAYER,
+      idempotencyKey: 'mainnet_request',
+    });
+    expect(request.paymentRequired.accepts[0]).toMatchObject({
+      network: 'eip155:5042',
+      asset: ARC_GATEWAY_MAINNET.usdcAddress,
+      extra: { verifyingContract: ARC_GATEWAY_MAINNET.gatewayWallet },
+    });
+
+    const result = await funding.verifySettleAndCredit({
+      fundingIntentId: request.fundingIntent.id,
+      paymentPayload: payloadFor(request),
+      idempotencyKey: 'mainnet_settle',
+    });
+    expect(result.fundingTransaction.network).toBe('eip155:5042');
+    expect(result.account.availableAmount).toBe('0.05');
+  });
+
+  it('requires an authoritative payer for Arc Mainnet intents', async () => {
+    const ledger = new CreditLedger({ projectId: 'project_mainnet_payer', now: () => NOW });
+    const funding = new GatewayNanopaymentFunding({
+      ledger,
+      sellerAddress: SELLER,
+      network: ARC_GATEWAY_MAINNET,
+      facilitator: new FakeFacilitator(),
+      now: () => NOW,
+    });
+    await expect(
+      funding.createFundingRequest({
+        customerId: 'mainnet_customer',
+        amount: '0.05',
+        idempotencyKey: 'mainnet_without_payer',
+      }),
+    ).rejects.toThrow('requires an expectedPayer');
+  });
+
+  it('rejects a Mainnet facilitator that advertises another GatewayWallet', async () => {
+    const ledger = new CreditLedger({ projectId: 'project_mainnet_contract', now: () => NOW });
+    const facilitator = new FakeFacilitator();
+    facilitator.getSupported = async () => ({
+      kinds: [
+        {
+          x402Version: 2,
+          scheme: 'exact',
+          network: ARC_GATEWAY_MAINNET.network,
+          extra: { verifyingContract: ARC_GATEWAY_TESTNET.gatewayWallet },
+        },
+      ],
+      extensions: [],
+      signers: {},
+    });
+    const funding = new GatewayNanopaymentFunding({
+      ledger,
+      sellerAddress: SELLER,
+      network: ARC_GATEWAY_MAINNET,
+      facilitator,
+      now: () => NOW,
+    });
+    await expect(
+      funding.createFundingRequest({
+        customerId: 'mainnet_customer',
+        amount: '0.05',
+        expectedPayer: PAYER,
+        idempotencyKey: 'mainnet_wrong_contract',
+      }),
+    ).rejects.toThrow('does not advertise arc batching support');
+  });
+
+  it('rejects a CLI timeout rewrite before calling Gateway', async () => {
     const { funding, request, payload, facilitator } = await fixture();
     payload.accepted.maxTimeoutSeconds = 30 * 24 * 60 * 60;
     await expect(

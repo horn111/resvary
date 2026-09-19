@@ -7,8 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added Arc Mainnet network constants, direct funding proof support, and Circle Gateway Nanopayment settlement through `eip155:5042`.
+- Added explicit Mainnet/Testnet selection to the agent demo and portable Circle session bundle.
+
 ### Fixed
 
+- Required observed Arc chain identity before accepting Mainnet payment proofs, and bound durable watcher invoices, receipts, and configured networks to one canonical Arc profile.
+- Required authenticated payer binding for Mainnet Gateway funding intents and pinned facilitator requirements to the selected network's official GatewayWallet contract.
 - Added a durable execution claim to `runMetered`, blocked provider callbacks for closed reservations, and serialized matching calls within one process.
 - Persisted reservation expiry when `commitUsage` discovers an overdue reservation.
 - Bound Operator Console idempotency to normalized command parameters, including amounts and expiry cutoffs.
@@ -20,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Agent Demo now replaces a completed run's fixed budget hold with measured provider spend while retaining the hold for unknown outcomes.
 - Added Agent Demo image vulnerability reporting and weekly dependency update checks.
 - Documented replay-safe Stripe webhook funding and added `stripe` as a credit grant source.
+- Updated Circle CLI to `1.1.3` and `@circle-fin/x402-batching` to `3.5.0` for Arc Mainnet support.
 
 ## [1.0.0] - 2026-09-06
 

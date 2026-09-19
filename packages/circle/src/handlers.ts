@@ -29,9 +29,7 @@ export function createGatewayTopUpHandler(config: GatewayTopUpHandlerConfig): Ga
     if (!enabled) {
       return Response.json(
         {
-          error:
-            config.disabledMessage ??
-            'Circle Gateway Testnet top-up is disabled for this deployment',
+          error: config.disabledMessage ?? 'Circle Gateway top-up is disabled for this deployment',
         },
         {
           status: 503,

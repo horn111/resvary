@@ -17,7 +17,9 @@ x-env: &env
   DATABASE_URL: postgresql://agent:${AGENT_DEMO_DB_PASSWORD:?Set database password}@db:5432/agent_demo
   AGENT_DEMO_SECRET: ${AGENT_DEMO_SECRET:?Set session secret}
   AGENT_DEMO_ORIGIN: ${AGENT_DEMO_ORIGIN:?Set HTTPS origin}
-  AGENT_DEMO_PAYER: ${AGENT_DEMO_PAYER:?Set Agent Wallet address}
+  AGENT_DEMO_ARC_NETWORK: ${AGENT_DEMO_ARC_NETWORK:-testnet}
+  AGENT_DEMO_WALLET: ${AGENT_DEMO_WALLET:?Set Circle Agent Wallet SCA address}
+  AGENT_DEMO_PAYER: ${AGENT_DEMO_PAYER:?Set Agent Wallet backing EOA address}
   AGENT_DEMO_SELLER: ${AGENT_DEMO_SELLER:?Set seller address}
   AGENT_DEMO_ACCEPTING: ${AGENT_DEMO_ACCEPTING:-false}
   AGENT_DEMO_TEST_MODE: 'false'

@@ -153,6 +153,7 @@ export async function handle(request: Request) {
         balance: balance.availableAmount,
         jobs,
         testMode: rt.cfg.testMode,
+        arcEnvironment: rt.cfg.arcEnvironment,
       });
     }
     if (path === '/api/jobs' && request.method === 'POST') {

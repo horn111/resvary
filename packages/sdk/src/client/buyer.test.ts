@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ARC_MAINNET } from '../constants.js';
 import type { PaymentRequirements } from '../types.js';
 import { BuyerClient, type BuyerPaymentPolicy } from './buyer.js';
 
@@ -35,6 +36,16 @@ function policy(overrides: Partial<BuyerPaymentPolicy> = {}): BuyerPaymentPolicy
 }
 
 describe('BuyerClient payment policy', () => {
+  it('rejects a mixed Arc network identity tuple', () => {
+    expect(
+      () =>
+        new BuyerClient({
+          privateKey,
+          network: { ...ARC_MAINNET, id: 'arc-testnet' },
+        }),
+    ).toThrow('does not match Arc');
+  });
+
   it('fails closed when no payment policy is configured', async () => {
     const client = new BuyerClient({
       privateKey,

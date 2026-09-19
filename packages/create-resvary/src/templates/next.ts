@@ -66,7 +66,7 @@ export const GET = nextPaywall(
   // This legacy middleware fails closed until a trusted verifyPayment callback is configured.
   { 
     price: '${price}', 
-    network: 'arc-testnet',
+    network: 'arc',
     description: 'Premium Data API (${config.pricing} pricing)'
   },
   async (request) => {
