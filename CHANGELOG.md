@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-20
+
 ### Added
 
 - Added Arc Mainnet network constants, direct funding proof support, and Circle Gateway Nanopayment settlement through `eip155:5042`.
@@ -28,6 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added Agent Demo image vulnerability reporting and weekly dependency update checks.
 - Documented replay-safe Stripe webhook funding and added `stripe` as a credit grant source.
 - Updated Circle CLI to `1.1.3` and `@circle-fin/x402-batching` to `3.5.0` for Arc Mainnet support.
+
+### Compatibility
+
+- Arc funding stays on Testnet unless the application selects Mainnet. Existing Testnet integrations keep their current defaults.
 
 ## [1.0.0] - 2026-09-06
 
@@ -291,7 +297,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI/CD pipeline with GitHub Actions
 - Security policy and contribution guidelines
 
-[unreleased]: https://github.com/horn111/resvary/compare/v1.0.0...HEAD
+[unreleased]: https://github.com/horn111/resvary/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/horn111/resvary/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/horn111/resvary/compare/v0.8.0...v1.0.0
 [0.8.0]: https://github.com/horn111/resvary/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/horn111/resvary/compare/v0.6.1...v0.7.0

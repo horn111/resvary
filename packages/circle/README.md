@@ -15,7 +15,7 @@ Credits are granted only after a direct Arc RPC proof or successful Gateway faci
 
 ## Credit gate (workspace source)
 
-`createGatewayCreditGate` tries a credit reservation and returns a Gateway funding challenge when the account lacks credits. It rounds the shortfall up to a cent. This export is part of the agent-demo work; it is not in the published 1.0.0 package yet.
+`createGatewayCreditGate` tries a credit reservation and returns a Gateway funding challenge when the account lacks credits. It rounds the shortfall up to a cent. The export is available from `@resvary/circle` 1.1.0.
 
 Circle CLI raises the accepted batching timeout to at least 30 days. For that client, construct `GatewayNanopaymentFunding` with `authorizationValiditySeconds: 30 * 24 * 60 * 60` so the advertised and accepted requirements match. This option does not extend the funding intent TTL. The adapter still checks the exact amount, recipient, network, and funding intent.
 

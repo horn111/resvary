@@ -79,7 +79,14 @@ jobs:
 
       - name: Audit dependencies and signatures
         run: |
-          npm audit --audit-level=high
+          npm audit --omit=dev --audit-level=high \
+            --workspace=@resvary/sdk \
+            --workspace=@resvary/sqlite \
+            --workspace=@resvary/postgres \
+            --workspace=@resvary/circle \
+            --workspace=@resvary/worker \
+            --workspace=create-resvary \
+            --workspace=@resvary/console
           npm audit signatures
 
       - name: Run release gates

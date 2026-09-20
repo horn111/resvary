@@ -15,7 +15,7 @@ After all six trust relationships work, set package publishing access to require
 
 The workflow has three modes and always checks out the exact `release_sha` from `main`:
 
-1. `dry_run` runs release gates, packs one immutable archive set, verifies SHA-256, and installs the archives outside the monorepo.
+1. `dry_run` audits the production dependencies of the six public packages and Operator Console, runs the release gates, packs one immutable archive set, verifies SHA-256, and installs the archives outside the monorepo. CI builds and scans private applications in separate jobs.
 2. `publish` requires `release_sha` to equal the `main` commit that supplies the workflow, waits for the single `Production` approval, obtains short-lived npm credentials through OIDC, and publishes the checked archives in dependency order: SDK; SQLite, PostgreSQL, and Circle; Worker; `create-resvary`. The same job verifies all six public versions, dist-tags, `gitHead`, provenance, clean installs, exports, CLIs, and starters. It then publishes the multi-architecture Operator Console image with SBOM and provenance, scans its immutable digest, and creates the annotated Git tag and GitHub Release.
 3. `reconcile` is a read-only recovery check for a release that is already public. It accepts an older `release_sha` plus the expected immutable `console_digest`, verifies npm metadata and provenance, clean installs, exports, CLIs, starters, the annotated tag, GitHub Release notes and state, and matching version/channel GHCR tags for `amd64` and `arm64`. It never publishes a package, pushes an image, or creates a tag or Release.
 

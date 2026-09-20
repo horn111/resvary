@@ -36,6 +36,7 @@ const manifests = [
   ['package.json', await readJson('package.json')],
   ['apps/demo/package.json', await readJson('apps/demo/package.json')],
   ['apps/console/package.json', await readJson('apps/console/package.json')],
+  ['apps/agent-demo/package.json', await readJson('apps/agent-demo/package.json')],
 ];
 for (const packageInfo of publicPackages) {
   const path = `${packageInfo.directory}/package.json`;
