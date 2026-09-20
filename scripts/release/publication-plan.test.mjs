@@ -198,6 +198,25 @@ test('release Docker context excludes generated build state', async () => {
   assert.match(dockerignore, /^\*\*\/\*\.tsbuildinfo$/m);
 });
 
+test('release audit covers published production artifacts', async () => {
+  const workflow = await readFile(
+    new URL('../../.github/workflows/release.yml', import.meta.url),
+    'utf8',
+  );
+  assert.match(workflow, /npm audit --omit=dev --audit-level=high/);
+  for (const workspace of [
+    '@resvary/sdk',
+    '@resvary/sqlite',
+    '@resvary/postgres',
+    '@resvary/circle',
+    '@resvary/worker',
+    'create-resvary',
+    '@resvary/console',
+  ]) {
+    assert.match(workflow, new RegExp(`--workspace=${workspace.replace('/', '\\/')}`));
+  }
+});
+
 test('Operator Console runtime applies Debian security updates', async () => {
   const dockerfile = await readFile(
     new URL('../../apps/console/Dockerfile', import.meta.url),

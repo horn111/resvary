@@ -8,7 +8,7 @@
   "endOfLine": "auto",
   "overrides": [
     {
-      "files": "apps/demo/next-env.d.ts",
+      "files": "apps/*/next-env.d.ts",
       "options": { "singleQuote": false }
     }
   ]
