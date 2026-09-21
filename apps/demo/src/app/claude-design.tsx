@@ -7,28 +7,44 @@ const FOOTER_ISSUES_LINK =
 const FOOTER_X_LINK =
   '<a href="https://x.com/resvaryAI" rel="me" style="transition:color .2s">X / Twitter</a>';
 const FOOTER_PRICING_LINK = '<a href="/pricing.md" style="transition:color .2s">Pricing data</a>';
+const PRIMARY_HOW_LINK = '<a href="#how" style="transition:color .2s">How it works</a>';
 const PRIMARY_USE_CASES_LINK = '<a href="#use-cases" style="transition:color .2s">Use cases</a>';
 const PRIMARY_CONSOLE_LINK = '<a href="#operator-console" style="transition:color .2s">Console</a>';
+const PRIMARY_ACCESS_LINK = '<a href="#pricing" style="transition:color .2s">Access</a>';
+const PRIMARY_GET_STARTED_LINK = '<a href="#pricing" style="transition:color .2s">Get started</a>';
+const PRIMARY_GITHUB_LINK =
+  '<a href="https://github.com/horn111/resvary" style="transition:color .2s">GitHub</a>';
+const MOBILE_HOW_LINK = '<a href="#how">How it works</a>';
 const MOBILE_USE_CASES_LINK = '<a href="#use-cases">Use cases</a>';
 const MOBILE_CONSOLE_LINK = '<a href="#operator-console">Console</a>';
+const MOBILE_ACCESS_LINK = '<a href="#pricing">Access</a>';
+const MOBILE_GET_STARTED_LINK = '<a href="#pricing">Get started</a>';
+const MOBILE_GITHUB_LINK = '<a href="https://github.com/horn111/resvary">GitHub</a>';
 const MOBILE_MENU_SUMMARY = `<summary>
         <span data-mobile-nav-label="true">Menu</span>
         <span data-mobile-nav-icon="true" aria-hidden="true"><span></span><span></span></span>
       </summary>`;
 const PRICING_SECTION_MARKER = '<section id="pricing"';
+const SDK_CODE_PANEL_MARKER =
+  '<div style="border:1px solid var(--color-line);background:var(--color-code-surface)">';
+const SDK_INSTALL_BLOCK = `<div data-sdk-install="true" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin:0 0 14px;padding:14px 18px;border:1px solid var(--color-line);background:var(--color-surface-raised)">
+        <span style="font-family:var(--font-mono),'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-ink-muted)">Install the local stack</span>
+        <code style="font-family:var(--font-mono),'JetBrains Mono',monospace;font-size:12.5px;color:var(--color-ink);overflow-wrap:anywhere">npm install @resvary/sdk @resvary/sqlite</code>
+      </div>`;
 const OPERATOR_CONSOLE_SECTION = `<section id="operator-console" data-operator-console-section="true" data-reveal="1" style="border-top:1px solid var(--color-line);padding:100px 34px">
     <div style="max-width:1280px;margin:0 auto">
       <div style="display:grid;grid-template-columns:minmax(0,0.72fr) minmax(0,1.28fr);gap:min(8vw,110px);align-items:start">
         <div>
-          <div style="font-family:var(--font-mono),'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--color-ink-muted);margin-bottom:26px">10 / Operator Console</div>
+          <div style="font-family:var(--font-mono),'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--color-ink-muted);margin-bottom:26px">09 / Operator Console</div>
           <h2 style="margin:0;font-size:clamp(30px,3.6vw,54px);line-height:1.02;letter-spacing:-0.032em;font-weight:500;max-width:17ch;text-wrap:balance">Explain every balance. Recover known ledger incidents safely.</h2>
-          <p style="margin:26px 0 0;max-width:48ch;font-size:16.5px;line-height:1.6;color:var(--color-ink-body)">A self-hosted command ledger for one Resvary project. Search customers, trace a charge through its receipt and price version, and run only the recovery actions the ledger can prove are safe.</p>
+          <p style="margin:26px 0 0;max-width:48ch;font-size:16.5px;line-height:1.6;color:var(--color-ink-body)">A self-hosted command ledger for one Resvary project. Search customers, trace a charge through its receipt and price version, and run only the recovery actions the ledger can prove are safe. The panel uses synthetic data to illustrate the interface.</p>
           <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:30px">
-            <a href="https://github.com/horn111/resvary/blob/main/docs/operator-console.md" style="display:inline-flex;align-items:center;padding:14px 22px;background:var(--color-ink);color:var(--color-canvas);font-family:var(--font-mono),'JetBrains Mono',monospace;font-size:12px;letter-spacing:0.12em;text-transform:uppercase">Open setup guide</a>
-            <a href="https://github.com/horn111/resvary/blob/main/docs/migration-1.0.md" style="display:inline-flex;align-items:center;padding:14px 22px;border:1px solid var(--color-line-strong);font-family:var(--font-mono),'JetBrains Mono',monospace;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-ink-strong)">Migration guide</a>
+            <a href="https://github.com/horn111/resvary/blob/main/docs/operator-console.md" style="display:inline-flex;align-items:center;padding:14px 22px;background:var(--color-ink);color:var(--color-canvas);font-family:var(--font-mono),'JetBrains Mono',monospace;font-size:12px;letter-spacing:0.12em;text-transform:uppercase">Deploy the console</a>
+            <a href="https://github.com/horn111/resvary/blob/main/docs/migration-1.0.md" style="display:inline-flex;align-items:center;padding:14px 22px;border:1px solid var(--color-line-strong);font-family:var(--font-mono),'JetBrains Mono',monospace;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-ink-strong)">Upgrade to 1.0</a>
           </div>
         </div>
         <div style="border:1px solid var(--color-line-strong);font-family:var(--font-mono),'JetBrains Mono',monospace">
+          <div style="display:flex;justify-content:space-between;gap:20px;padding:12px 18px;border-bottom:1px solid var(--color-line);color:var(--color-ink-muted);font-size:10.5px;letter-spacing:0.08em;text-transform:uppercase"><span>Operator Console</span><span>Illustrative preview</span></div>
           <div data-operator-console-metrics="true" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-bottom:1px solid var(--color-line-strong)">
             <div style="padding:18px;border-right:1px solid var(--color-line)"><span style="display:block;font-size:10.5px;letter-spacing:0.1em;text-transform:uppercase;color:var(--color-ink-muted)">Available</span><strong style="display:block;margin-top:9px;font-size:24px;font-weight:400">$12,375.60</strong></div>
             <div style="padding:18px;border-right:1px solid var(--color-line)"><span style="display:block;font-size:10.5px;letter-spacing:0.1em;text-transform:uppercase;color:var(--color-ink-muted)">Overdue</span><strong style="display:block;margin-top:9px;font-size:24px;font-weight:400">1</strong></div>
@@ -40,7 +56,7 @@ const OPERATOR_CONSOLE_SECTION = `<section id="operator-console" data-operator-c
             <div style="min-height:138px;padding:20px;background:var(--color-canvas)"><span style="font-size:10.5px;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-ink-muted)">Guarded operations</span><p style="margin:16px 0 0;font-size:13.5px;line-height:1.6;color:var(--color-ink-body)">Positive grants, reasoned adjustments, overdue expiry sweeps, and dead-letter requeue only.</p></div>
             <div style="min-height:138px;padding:20px;background:var(--color-canvas)"><span style="font-size:10.5px;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-ink-muted)">Self-hosted boundary</span><p style="margin:16px 0 0;font-size:13.5px;line-height:1.6;color:var(--color-ink-body)">Postgres in production, SQLite for local and single-node use. No outbound telemetry.</p></div>
           </div>
-          <div style="display:flex;justify-content:space-between;gap:20px;padding:14px 18px;color:var(--color-ink-muted);font-size:10.5px;letter-spacing:0.08em;text-transform:uppercase"><span>One instance / one project</span><span>Read-only synthetic preview mode</span></div>
+          <div style="display:flex;justify-content:space-between;gap:20px;padding:14px 18px;color:var(--color-ink-muted);font-size:10.5px;letter-spacing:0.08em;text-transform:uppercase"><span>One instance / one project</span><span>Synthetic example data</span></div>
         </div>
       </div>
     </div>
@@ -48,14 +64,14 @@ const OPERATOR_CONSOLE_SECTION = `<section id="operator-console" data-operator-c
 const ACCESS_SECTION = `<section id="pricing" data-reveal="1" style="border-top:1px solid var(--color-line);padding:100px 34px">
     <div style="max-width:1280px;margin:0 auto;display:grid;grid-template-columns:minmax(0,0.72fr) minmax(0,1.28fr);gap:min(8vw,110px);align-items:start">
       <div>
-        <div style="font-family:var(--font-mono),'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--color-ink-muted);margin-bottom:26px">11 / Access</div>
+        <div style="font-family:var(--font-mono),'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--color-ink-muted);margin-bottom:26px">10 / Get started</div>
         <h2 style="margin:0;font-size:clamp(30px,3.6vw,54px);line-height:1.02;letter-spacing:-0.032em;font-weight:500;max-width:17ch;text-wrap:balance">Install version 1.0. Run it in your stack.</h2>
       </div>
       <div style="display:flex;flex-direction:column;gap:28px">
-        <p style="margin:0;max-width:65ch;font-size:17px;line-height:1.6;color:var(--color-ink-body);text-wrap:pretty">The Apache-2.0 packages are published on npm. Use SQLite locally or on one node; use Postgres and the worker for multi-process deployments. The Operator Console, signed webhooks, and Testnet funding adapters ship with the self-hosted release.</p>
+        <p style="margin:0;max-width:65ch;font-size:17px;line-height:1.6;color:var(--color-ink-body);text-wrap:pretty">The Apache-2.0 packages are published on npm. Use SQLite locally or on one node; use Postgres and the worker for multi-process deployments. The Operator Console, signed webhooks, and explicit Mainnet and Testnet funding adapters ship with the self-hosted release.</p>
         <div style="display:grid;grid-template-columns:minmax(0,0.35fr) minmax(0,0.65fr);border-top:1px solid var(--color-line);font-size:15px;line-height:1.55">
           <span style="padding:18px 18px 18px 0;font-family:var(--font-mono),'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--color-ink-muted)">Not included</span>
-          <span style="padding:18px 0;color:var(--color-ink-body)">Hosted cloud, enterprise SLA, Mainnet settlement, tax invoices, and transferable or redeemable balances.</span>
+          <span style="padding:18px 0;color:var(--color-ink-body)">Hosted cloud, enterprise SLA, tax invoices, custody, and transferable or redeemable balances.</span>
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:12px">
           <a href="https://github.com/horn111/resvary" style="display:inline-flex;align-items:center;padding:14px 22px;background:var(--color-ink);color:var(--color-canvas);font-family:var(--font-mono),'JetBrains Mono',monospace;font-size:12px;letter-spacing:0.12em;text-transform:uppercase">Open the repository</a>
@@ -81,6 +97,20 @@ let SITE_HTML = CLAUDE_DESIGN_HTML.replaceAll(
 )
   .replaceAll('0.5 stable', '1.0 stable')
   .replace('<summary>Menu</summary>', MOBILE_MENU_SUMMARY)
+  .replaceAll('Run the live demo', 'Explore the ledger')
+  .replace('Run the credit lifecycle in one demo', 'Inspect the credit lifecycle in one place')
+  .replace(
+    'The current Arc integration is Testnet-first development infrastructure.',
+    'Arc adapters support explicit Mainnet and Testnet configuration. Mainnet funding moves real USDC and requires application-level controls.',
+  )
+  .replace(
+    'Run the lifecycle in the demo, then evaluate the open-source SDK inside your application.',
+    'Inspect the lifecycle in the published ledger, then evaluate the open-source SDK inside your application.',
+  )
+  .replace(
+    '<a href="#interactive-demo" style="transition:color .2s">Live demo</a>',
+    '<a href="#interactive-demo" style="transition:color .2s">Ledger demo</a>',
+  )
   .replace(
     'Version 0.5 supports linear multi-dimensional rates. Tiering, packages, subscriptions, monthly minimums, and allowances are outside the current scope.',
     'Version 1.0 supports linear, graduated, and package price components with integer-only rating. Package pricing charges each started block and does not create reusable entitlements.',
@@ -91,7 +121,7 @@ let SITE_HTML = CLAUDE_DESIGN_HTML.replaceAll(
   )
   .replace(
     'The deterministic demo needs no AI key. Grant credits, run a request, replay it without a second charge, or trigger a provider failure and inspect the stored result.',
-    'The deterministic ledger demo needs no AI key. The buyer-agent prototype shows the full Testnet path with OpenAI Agents SDK, Circle Agent Wallet, Gateway, and Arc.',
+    'The published ledger is a read-only preview and needs no AI key. Enter the admin token from your own deployment to run grants, usage, replay, failure, and funding scenarios. The separate buyer-agent prototype has an archived Testnet proof; its current source supports explicit Mainnet configuration.',
   )
   .replace(
     '<code style="font-family:var(--font-mono),\'JetBrains Mono\',monospace;font-size:13.5px;color:var(--color-ink)">runMetered</code> releases the full reservation when the provider callback throws. The account keeps its posted credits.',
@@ -99,16 +129,32 @@ let SITE_HTML = CLAUDE_DESIGN_HTML.replaceAll(
   )
   .replace(
     'Run the interactive demo <span style="opacity:0.5">→</span></a>',
-    'Run the ledger demo <span style="opacity:0.5">→</span></a>\n        <a href="https://agent.resvary.xyz" style="align-self:flex-start;display:inline-flex;align-items:center;gap:10px;padding:14px 22px;border:1px solid var(--color-line-strong);font-family:var(--font-mono),\'JetBrains Mono\',monospace;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-ink-strong)">Open the agent demo <span style="opacity:0.5">→</span></a>',
+    'Explore the ledger <span style="opacity:0.5">→</span></a>\n        <a href="https://github.com/horn111/resvary/blob/main/docs/ethonline-continuity.md#evidence-status" style="align-self:flex-start;display:inline-flex;align-items:center;gap:10px;padding:14px 22px;border:1px solid var(--color-line-strong);font-family:var(--font-mono),\'JetBrains Mono\',monospace;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-ink-strong)">Review the archived Testnet proof <span style="opacity:0.5">→</span></a>',
   )
-  .replace(PRIMARY_USE_CASES_LINK, `${PRIMARY_CONSOLE_LINK}\n      ${PRIMARY_USE_CASES_LINK}`)
-  .replace(MOBILE_USE_CASES_LINK, `${MOBILE_CONSOLE_LINK}\n        ${MOBILE_USE_CASES_LINK}`)
+  .replace(
+    'No. Manual grants work without a blockchain. Direct Arc USDC and Gateway Nanopayments are Testnet funding options; neither changes the usage ledger.',
+    'No. Manual grants work without a blockchain. Direct Arc USDC and Gateway Nanopayments are optional Mainnet or Testnet funding adapters; neither changes the usage ledger.',
+  )
+  .replace(
+    'Run the deterministic demo without an AI key, or open the repository and follow the getting-started guide.',
+    'Inspect the published read-only ledger without an AI key, or install the SDK and follow the getting-started guide.',
+  )
+  .replace(SDK_CODE_PANEL_MARKER, `${SDK_INSTALL_BLOCK}\n      ${SDK_CODE_PANEL_MARKER}`)
+  .replace(PRIMARY_HOW_LINK, '')
+  .replace(PRIMARY_USE_CASES_LINK, PRIMARY_CONSOLE_LINK)
+  .replace(PRIMARY_ACCESS_LINK, PRIMARY_GET_STARTED_LINK)
+  .replace(PRIMARY_GITHUB_LINK, '')
+  .replace(MOBILE_HOW_LINK, '')
+  .replace(MOBILE_USE_CASES_LINK, MOBILE_CONSOLE_LINK)
+  .replace(MOBILE_ACCESS_LINK, MOBILE_GET_STARTED_LINK)
+  .replace(MOBILE_GITHUB_LINK, '')
   .replace(
     FOOTER_ISSUES_LINK,
     `${FOOTER_ISSUES_LINK}\n        ${FOOTER_X_LINK}\n        ${FOOTER_PRICING_LINK}`,
   );
 
 SITE_HTML = replaceSectionByLabel(SITE_HTML, '04 / Included in 0.5');
+SITE_HTML = replaceSectionByLabel(SITE_HTML, '10 / Credit model');
 SITE_HTML = replaceSectionByLabel(SITE_HTML, '11 / Self-hosted boundary');
 SITE_HTML = replaceSectionByLabel(SITE_HTML, '12 / Open source');
 SITE_HTML = replaceSectionByLabel(SITE_HTML, '13 / Access', ACCESS_SECTION)
@@ -117,8 +163,7 @@ SITE_HTML = replaceSectionByLabel(SITE_HTML, '13 / Access', ACCESS_SECTION)
   .replaceAll('07 / Demo', '06 / Demo')
   .replaceAll('08 / Use cases', '07 / Use cases')
   .replaceAll('09 / Transactions', '08 / Transactions')
-  .replaceAll('10 / Credit model', '09 / Credit model')
-  .replaceAll('14 / FAQ', '12 / FAQ')
+  .replaceAll('14 / FAQ', '11 / FAQ')
   .replace(PRICING_SECTION_MARKER, `${OPERATOR_CONSOLE_SECTION}\n\n  ${PRICING_SECTION_MARKER}`);
 
 assertSiteHtml(SITE_HTML);
@@ -128,7 +173,9 @@ function assertSiteHtml(html: string) {
     '1.0 stable',
     'data-operator-console-section="true"',
     'Install version 1.0. Run it in your stack.',
-    'https://agent.resvary.xyz',
+    'npm install @resvary/sdk @resvary/sqlite',
+    'Review the archived Testnet proof',
+    'Synthetic example data',
     'keeps the execution claim when the callback throws',
   ];
   const forbidden = [
@@ -136,6 +183,13 @@ function assertSiteHtml(html: string) {
     '04 / Included in 0.5',
     'Hosted Postgres service',
     'until public package releases are available',
+    'Run the live demo',
+    '10 / Credit model',
+    '09 / Credit model',
+    'Mainnet settlement',
+    'Read-only synthetic preview mode',
+    'Testnet-first development infrastructure',
+    'Run the lifecycle in the demo',
   ];
   for (const value of required) {
     if (!html.includes(value))

@@ -104,7 +104,6 @@ export function InteractiveCreditDemo() {
   async function run(action: DemoAction, replay = false) {
     if (busy) return;
     const idempotencyKey = replay && lastRunKey ? lastRunKey : crypto.randomUUID();
-    if (action === 'run' && !replay) setLastRunKey(idempotencyKey);
     mutationController.current?.abort();
     const controller = new AbortController();
     mutationController.current = controller;
@@ -140,10 +139,10 @@ export function InteractiveCreditDemo() {
       });
       const payload = (await response.json()) as DemoState | { error: string; state: DemoState };
       if ('error' in payload) {
-        setState(payload.state);
         throw new Error(payload.error);
       }
       setState(payload);
+      if (action === 'run' && !replay) setLastRunKey(idempotencyKey);
       setMessage(
         replay
           ? 'Replay returned the stored result. No second charge was created.'
@@ -167,12 +166,8 @@ export function InteractiveCreditDemo() {
       );
     } catch (requestError) {
       if (requestError instanceof DOMException && requestError.name === 'AbortError') return;
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : 'The operation failed. The persisted ledger state is unchanged.',
-      );
-      setMessage('Operation failed.');
+      setError(getDemoErrorMessage(requestError));
+      setMessage('The last loaded ledger preview is unchanged.');
     } finally {
       if (!controller.signal.aborted) setBusy('');
       if (mutationController.current === controller) mutationController.current = null;
@@ -185,151 +180,181 @@ export function InteractiveCreditDemo() {
   const latestGatewayFunding = state?.gatewayFundingTransaction ?? null;
   const ledger = state?.ledgerEntries.slice(-6) ?? [];
   const explorerUrl = getExplorerUrl(latestFunding);
+  const canMutate = adminToken.trim().length > 0;
+  const writeActionsDisabled = Boolean(busy) || !canMutate;
+  const reservationStatus = readString(latestReservation, 'status') ?? 'Not created';
+  const reservationAmount = readString(latestReservation, 'reservedAmount');
+  const receiptAmount = readString(latestReceipt, 'amount');
+  const releasedAmount = readString(latestReceipt, 'releasedAmount');
 
   return (
     <div className={styles.demo} aria-busy={Boolean(busy)}>
       <div className={styles.headingRow}>
         <div>
-          <span className={styles.label}>Interactive ledger</span>
-          <h3>Run the actual API-backed lifecycle</h3>
+          <span className={styles.label}>API-backed ledger</span>
+          <h3>Inspect the credit lifecycle</h3>
         </div>
-        <span className={styles.persistence}>{state?.persistence ?? 'SQLite'}</span>
+        <div className={styles.demoMeta}>
+          <span className={styles.persistence}>{state?.persistence ?? 'Loading backend'}</span>
+          <span>{canMutate ? 'Token entered' : 'Read-only preview'}</span>
+        </div>
       </div>
 
-      <div className={styles.actions} aria-label="Credit demo actions">
-        <label className={styles.adminAccess}>
-          <span>Demo admin token</span>
-          <input
-            autoComplete="off"
-            onChange={(event) => setAdminToken(event.target.value)}
-            placeholder="RESVARY_DEMO_ADMIN_TOKEN"
-            type="password"
-            value={adminToken}
-          />
-        </label>
-        <button disabled={Boolean(busy)} onClick={() => void run('grant')} type="button">
-          Grant $5
-        </button>
-        <button
-          className={styles.primaryAction}
-          disabled={Boolean(busy) || !state?.balance}
-          onClick={() => void run('run')}
-          type="button"
-        >
-          Run simulated AI
-        </button>
-        <button
-          disabled={Boolean(busy) || !lastRunKey}
-          onClick={() => void run('run', true)}
-          type="button"
-        >
-          Replay same request
-        </button>
-        <button
-          disabled={Boolean(busy) || !state?.balance}
-          onClick={() => void run('fail')}
-          type="button"
-        >
-          Simulate failure
-        </button>
-      </div>
-
-      <div className={styles.actions} aria-label="Funding method">
-        <button
-          className={fundingMethod === 'arc' ? styles.primaryAction : undefined}
-          disabled={Boolean(busy)}
-          onClick={() => setFundingMethod('arc')}
-          type="button"
-        >
-          Arc USDC
-        </button>
-        <button
-          className={fundingMethod === 'gateway' ? styles.primaryAction : undefined}
-          disabled={Boolean(busy)}
-          onClick={() => setFundingMethod('gateway')}
-          type="button"
-        >
-          Gateway Nanopayment
-        </button>
-      </div>
-
-      <div className={styles.actions} aria-label="Funding actions">
-        {fundingMethod === 'arc' ? (
-          <>
-            <button disabled={Boolean(busy)} onClick={() => void run('arc')} type="button">
-              Simulate Arc $2
-            </button>
-            <button
-              disabled={Boolean(busy) || !state?.arcLiveConfigured}
-              onClick={() => void run('arc_prepare')}
-              title={
-                state?.arcLiveConfigured
-                  ? 'Create calldata for a real Arc Testnet payment'
-                  : 'Set RESVARY_ARC_FUNDING_RECIPIENT to enable live proof'
-              }
-              type="button"
-            >
-              Create live Arc request
-            </button>
-          </>
-        ) : (
-          <>
-            <button
-              disabled={Boolean(busy)}
-              onClick={() => void run('gateway_prepare')}
-              type="button"
-            >
-              Create Gateway request
-            </button>
-            <button
-              disabled={
-                Boolean(busy) ||
-                !state?.gatewayFundingRequest ||
-                state.gatewayFundingRequest.status !== 'pending'
-              }
-              onClick={() => void run('gateway_settle')}
-              type="button"
-            >
-              Verify, settle, and credit
-            </button>
-            <button
-              disabled={
-                Boolean(busy) ||
-                !state?.gatewayFundingRequest ||
-                state.gatewayFundingRequest.status !== 'confirmed'
-              }
-              onClick={() => void run('gateway_replay')}
-              type="button"
-            >
-              Replay authorization
-            </button>
-          </>
-        )}
-      </div>
-
-      <div className={styles.statusRow}>
+      <div className={`${styles.statusRow} ${error ? styles.statusRowError : ''}`}>
         <span className={busy ? styles.statusPulse : styles.statusDot} aria-hidden="true" />
         <p aria-live="polite" role="status">
           {busy ? message : error || message}
         </p>
         {error ? (
           <button className={styles.retry} onClick={() => void refresh()} type="button">
-            Retry
+            Refresh preview
           </button>
         ) : null}
       </div>
 
+      <div className={styles.balanceHeading}>
+        <span>USD-denominated product credits</span>
+        <span>Six-decimal precision</span>
+      </div>
       <dl className={styles.balances}>
-        <Metric label="Posted" value={state?.balance?.postedAmount ?? '0'} />
-        <Metric label="Reserved" value={state?.balance?.reservedAmount ?? '0'} />
-        <Metric label="Available" value={state?.balance?.availableAmount ?? '0'} />
+        <Metric label="Posted" value={state?.balance?.postedAmount ?? '—'} />
+        <Metric label="Reserved" value={state?.balance?.reservedAmount ?? '—'} />
+        <Metric label="Available" value={state?.balance?.availableAmount ?? '—'} />
       </dl>
+
+      <div className={styles.primaryControls}>
+        <label className={styles.adminAccess}>
+          <span>Demo admin token</span>
+          <input
+            aria-describedby="demo-token-help"
+            autoComplete="off"
+            onChange={(event) => setAdminToken(event.target.value)}
+            placeholder="Token configured for this deployment"
+            type="password"
+            value={adminToken}
+          />
+          <small id="demo-token-help">
+            The published ledger is a read-only preview. Enter your deployment token to run write
+            actions.
+          </small>
+        </label>
+        <div className={styles.actions} aria-label="Credit demo actions">
+          <button disabled={writeActionsDisabled} onClick={() => void run('grant')} type="button">
+            Grant $5
+          </button>
+          <button
+            className={styles.primaryAction}
+            disabled={writeActionsDisabled || !state?.balance}
+            onClick={() => void run('run')}
+            type="button"
+          >
+            Run simulated usage
+          </button>
+          <button
+            disabled={writeActionsDisabled || !lastRunKey}
+            onClick={() => void run('run', true)}
+            type="button"
+          >
+            Replay completed request
+          </button>
+        </div>
+      </div>
+
+      <details className={styles.advancedActions}>
+        <summary>Failure and funding scenarios</summary>
+        <div className={styles.advancedActionsBody}>
+          <div className={styles.actions} aria-label="Failure scenario">
+            <button
+              disabled={writeActionsDisabled || !state?.balance}
+              onClick={() => void run('fail')}
+              type="button"
+            >
+              Simulate provider failure
+            </button>
+          </div>
+          <div className={styles.actions} aria-label="Funding method">
+            <button
+              className={fundingMethod === 'arc' ? styles.primaryAction : undefined}
+              disabled={Boolean(busy)}
+              onClick={() => setFundingMethod('arc')}
+              type="button"
+            >
+              Arc USDC
+            </button>
+            <button
+              className={fundingMethod === 'gateway' ? styles.primaryAction : undefined}
+              disabled={Boolean(busy)}
+              onClick={() => setFundingMethod('gateway')}
+              type="button"
+            >
+              Gateway Nanopayment
+            </button>
+          </div>
+          <div className={styles.actions} aria-label="Funding actions">
+            {fundingMethod === 'arc' ? (
+              <>
+                <button
+                  disabled={writeActionsDisabled}
+                  onClick={() => void run('arc')}
+                  type="button"
+                >
+                  Simulate Arc $2
+                </button>
+                <button
+                  disabled={writeActionsDisabled || !state?.arcLiveConfigured}
+                  onClick={() => void run('arc_prepare')}
+                  title={
+                    state?.arcLiveConfigured
+                      ? 'Create calldata for a real Arc Testnet payment'
+                      : 'Set RESVARY_ARC_FUNDING_RECIPIENT to enable live proof'
+                  }
+                  type="button"
+                >
+                  Create live Arc request
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  disabled={writeActionsDisabled}
+                  onClick={() => void run('gateway_prepare')}
+                  type="button"
+                >
+                  Create Gateway request
+                </button>
+                <button
+                  disabled={
+                    writeActionsDisabled ||
+                    !state?.gatewayFundingRequest ||
+                    state.gatewayFundingRequest.status !== 'pending'
+                  }
+                  onClick={() => void run('gateway_settle')}
+                  type="button"
+                >
+                  Verify, settle, and credit
+                </button>
+                <button
+                  disabled={
+                    writeActionsDisabled ||
+                    !state?.gatewayFundingRequest ||
+                    state.gatewayFundingRequest.status !== 'confirmed'
+                  }
+                  onClick={() => void run('gateway_replay')}
+                  type="button"
+                >
+                  Replay authorization
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </details>
 
       {state?.gatewayFundingRequest ? (
         <section className={styles.arcProof} aria-labelledby="gateway-proof-title">
           <div className={styles.arcProofHeading}>
             <div>
-              <span className={styles.label}>Circle Gateway � Arc Testnet</span>
+              <span className={styles.label}>Circle Gateway on Arc Testnet</span>
               <h4 id="gateway-proof-title">
                 {state.gatewayFundingRequest.status === 'confirmed'
                   ? 'Settled once; replay returns the same grant'
@@ -339,7 +364,7 @@ export function InteractiveCreditDemo() {
             <span className={styles.arcAmount}>{state.gatewayFundingRequest.amount} USDC</span>
           </div>
           <p className={styles.arcInstructions}>
-            This deterministic demo uses the same verify � settle � credit adapter with a local
+            This deterministic demo uses the same verify, settle, and credit adapter with a local
             facilitator fixture. The public evidence flow replaces that fixture with Circle&apos;s
             Testnet facilitator and records its settlement reference.
           </p>
@@ -354,7 +379,7 @@ export function InteractiveCreditDemo() {
               value={state.gatewayFundingRequest.paymentRequired}
             />
             {latestGatewayFunding ? (
-              <Record title="Gateway payment!� credit grant" value={latestGatewayFunding} />
+              <Record title="Gateway payment to credit grant" value={latestGatewayFunding} />
             ) : null}
           </div>
         </section>
@@ -430,13 +455,37 @@ export function InteractiveCreditDemo() {
         </section>
       ) : null}
 
+      <section className={styles.evidenceSummary} aria-labelledby="latest-evidence-title">
+        <div className={styles.evidenceHeading}>
+          <h4 id="latest-evidence-title">Latest evidence</h4>
+          <span>Records are shown independently</span>
+        </div>
+        <div className={styles.evidenceItems}>
+          <EvidenceItem
+            detail={reservationAmount ? `${reservationAmount} reserved` : 'No reserved amount'}
+            label="Latest reservation"
+            value={reservationStatus}
+          />
+          <EvidenceItem
+            detail={releasedAmount ? `${releasedAmount} released` : 'No release recorded'}
+            label="Latest receipt"
+            value={receiptAmount ? `${receiptAmount} charged` : 'Not created'}
+          />
+          <EvidenceItem
+            detail="Current preview snapshot"
+            label="Available balance"
+            value={state?.balance?.availableAmount ?? 'Unavailable'}
+          />
+        </div>
+      </section>
+
       <div className={styles.records}>
         <Record
           title="Allowance, promotion priority, and expiry scenario"
           value={state?.policyScenario ?? { status: 'Loading policy scenario' }}
         />
         <Record
-          title="0.8 graduated tiers and package pricing"
+          title="Graduated tiers and package pricing"
           value={state?.price ?? { status: 'Loading advanced price' }}
         />
         <Record title="Latest reservation" value={latestReservation} />
@@ -458,10 +507,23 @@ function Metric({ label, value }: { label: string; value: string }) {
 
 function Record({ title, value }: { title: string; value: unknown }) {
   return (
-    <article>
-      <h4>{title}</h4>
+    <details className={styles.record}>
+      <summary>
+        <span>{title}</span>
+        <span aria-hidden="true">View JSON</span>
+      </summary>
       <pre tabIndex={0}>{JSON.stringify(value, null, 2)}</pre>
-    </article>
+    </details>
+  );
+}
+
+function EvidenceItem({ detail, label, value }: { detail: string; label: string; value: string }) {
+  return (
+    <div>
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <small>{detail}</small>
+    </div>
   );
 }
 
@@ -478,4 +540,19 @@ function getExplorerUrl(value: Record<string, unknown> | null): string | null {
   if (!value || typeof value.metadata !== 'object' || value.metadata === null) return null;
   const url = (value.metadata as Record<string, unknown>).explorerUrl;
   return typeof url === 'string' && url.startsWith('https://') ? url : null;
+}
+
+function readString(value: unknown, key: string): string | null {
+  if (!value || typeof value !== 'object') return null;
+  const field = (value as Record<string, unknown>)[key];
+  return typeof field === 'string' ? field : null;
+}
+
+function getDemoErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : '';
+  if (/unauthorized|token/i.test(message)) {
+    return 'Write actions require the admin token configured for this deployment.';
+  }
+  if (message) return `The action was not completed: ${message}`;
+  return 'The action was not completed. Refresh the preview and try again.';
 }

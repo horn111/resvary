@@ -59,17 +59,13 @@
   overflow: hidden;
 }
 
-.claudeDesign :global(section:not(#top)) {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 52rem;
+.claudeDesign :global(section[id]),
+.claudeDesign :global([id='interactive-demo']) {
+  scroll-margin-top: 5rem;
 }
 
 .claudeDesign :global([data-benefit-grid]) {
   grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-}
-
-.claudeDesign :global([data-credit-model-table]) {
-  table-layout: fixed;
 }
 
 @media (min-width: 48rem) {
@@ -251,79 +247,21 @@
     flex-direction: column;
   }
 
-  .claudeDesign :global([data-credit-model-table]),
-  .claudeDesign :global([data-credit-model-table] tbody),
-  .claudeDesign :global([data-credit-model-table] tr),
-  .claudeDesign :global([data-credit-model-table] td) {
-    display: block;
-    width: 100%;
-  }
-
-  .claudeDesign :global([data-credit-model-table] thead) {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-
-  .claudeDesign :global([data-credit-model-table] tr) {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.875rem 1rem;
-    padding: 1.125rem 0;
-    border-bottom: 1px solid var(--color-line-soft);
-  }
-
-  .claudeDesign :global([data-credit-model-table] td) {
-    padding: 0 !important;
-    border: 0 !important;
-  }
-
-  .claudeDesign :global([data-credit-model-table] td:first-child) {
-    grid-column: 1 / -1;
-    color: var(--color-ink-body);
-    font-family: var(--font-sans), sans-serif;
-    font-size: 0.95rem;
-    line-height: 1.45;
-  }
-
-  .claudeDesign :global([data-credit-model-table] td:nth-child(n + 2))::before {
-    display: block;
-    margin-bottom: 0.375rem;
-    color: var(--color-ink-muted);
-    font-family: var(--font-mono), monospace;
-    font-size: 0.625rem;
-    letter-spacing: 0.1em;
-    line-height: 1.4;
-    text-transform: uppercase;
-  }
-
-  .claudeDesign :global([data-credit-model-table] td:nth-child(2))::before {
-    content: 'Balance column';
-  }
-
-  .claudeDesign :global([data-credit-model-table] td:nth-child(3))::before {
-    content: 'Resvary 1.0 stable';
-  }
-
   .claudeDesign :global(#top) {
-    min-height: calc(100svh - 3.75rem) !important;
+    min-height: auto !important;
   }
 
   .claudeDesign :global(#top > div:nth-child(2)) {
-    min-height: 31rem;
+    min-height: clamp(18.5rem, 50svh, 23rem);
     align-items: flex-start !important;
-    padding: 4.25rem 1.125rem 0 !important;
+    padding: 2.75rem 1.125rem 0 !important;
   }
 
   .claudeDesign :global(#top > div:nth-child(2) > div:first-child) {
-    top: 58% !important;
-    width: min(78vw, 25rem) !important;
-    height: min(78vw, 25rem) !important;
-    opacity: 0.68;
+    top: 54% !important;
+    width: min(68vw, 20rem) !important;
+    height: min(68vw, 20rem) !important;
+    opacity: 0.62;
   }
 
   .claudeDesign :global(#top h1) {
@@ -344,12 +282,16 @@
 
   .claudeDesign :global(#top > div:last-child) {
     align-items: flex-start !important;
-    padding: 0 1.125rem 2rem !important;
+    gap: 1rem !important;
+    padding: 0 1.125rem 1.5rem !important;
+  }
+
+  .claudeDesign :global(#top > div:last-child > div:first-child) {
+    gap: 0.875rem !important;
   }
 
   .claudeDesign :global(#top > div:last-child > div:last-child) {
-    align-items: flex-start !important;
-    white-space: normal !important;
+    display: none !important;
   }
 
   .claudeDesign :global(h2) {
@@ -387,6 +329,15 @@
 }
 
 @media (max-width: 22.99rem) {
+  .claudeDesign :global(#top > div:nth-child(2)) {
+    min-height: 16.5rem;
+    padding-top: 2.25rem !important;
+  }
+
+  .claudeDesign :global(#top h1) {
+    font-size: clamp(2.15rem, 11vw, 3.6rem) !important;
+  }
+
   .claudeDesign :global(footer nav) {
     grid-template-columns: minmax(0, 1fr) !important;
   }
