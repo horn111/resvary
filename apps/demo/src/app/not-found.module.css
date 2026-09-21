@@ -1,0 +1,150 @@
+.page {
+  display: grid;
+  min-height: 100svh;
+  grid-template-rows: auto 1fr auto;
+  padding: 0 2.125rem;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans), sans-serif;
+}
+
+.header,
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  border-color: var(--color-line);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.6875rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.header {
+  min-height: 4.75rem;
+  border-bottom: 1px solid var(--color-line);
+  color: var(--color-ink-muted);
+}
+
+.brand {
+  color: var(--color-ink);
+  font-family: var(--font-sans), sans-serif;
+  font-size: 1.125rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  text-decoration: none;
+  text-transform: none;
+}
+
+.content {
+  display: flex;
+  width: min(100%, 58rem);
+  flex-direction: column;
+  justify-content: center;
+  padding: 5rem 0;
+}
+
+.code {
+  margin-bottom: 1.75rem;
+  color: var(--color-ink-muted);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.6875rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.content h1 {
+  max-width: 13ch;
+  margin: 0;
+  font-size: clamp(3rem, 8vw, 7.5rem);
+  font-weight: 500;
+  letter-spacing: -0.05em;
+  line-height: 0.92;
+  text-wrap: balance;
+}
+
+.content p {
+  max-width: 57ch;
+  margin: 2rem 0 0;
+  color: var(--color-ink-body);
+  font-size: 1.0625rem;
+  line-height: 1.65;
+  text-wrap: pretty;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 2rem;
+}
+
+.actions a {
+  display: inline-flex;
+  min-height: 3rem;
+  align-items: center;
+  padding: 0.875rem 1.375rem;
+  border: 1px solid var(--color-line-strong);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.primary {
+  background: var(--color-ink);
+  color: var(--color-canvas);
+}
+
+.secondary {
+  color: var(--color-ink);
+}
+
+.actions a:focus-visible,
+.footer a:focus-visible,
+.brand:focus-visible {
+  outline: 1px solid var(--color-ink);
+  outline-offset: 4px;
+}
+
+.footer {
+  min-height: 4.75rem;
+  justify-content: flex-start;
+  border-top: 1px solid var(--color-line);
+}
+
+.footer a {
+  color: var(--color-ink-muted);
+  text-decoration: none;
+}
+
+@media (max-width: 40rem) {
+  .page {
+    padding: 0 1.125rem;
+  }
+
+  .content {
+    padding: 4rem 0;
+  }
+
+  .content h1 {
+    font-size: clamp(3rem, 16vw, 5rem);
+  }
+
+  .actions,
+  .actions a {
+    width: 100%;
+  }
+
+  .actions a {
+    justify-content: center;
+  }
+
+  .footer {
+    min-height: 5.5rem;
+    flex-wrap: wrap;
+    align-content: center;
+  }
+}

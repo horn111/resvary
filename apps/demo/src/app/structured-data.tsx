@@ -39,7 +39,7 @@ const FAQ_ITEMS = [
   {
     question: 'Do I need crypto or Arc to use Resvary?',
     answer:
-      'No. Manual grants work without a blockchain. Direct Arc USDC and Gateway Nanopayments are Testnet funding options; neither changes the usage ledger.',
+      'No. Manual grants work without a blockchain. Direct Arc USDC and Gateway Nanopayments are optional Mainnet or Testnet funding adapters; neither changes the usage ledger.',
   },
   {
     question: 'Is SQLite production-ready?',
@@ -64,7 +64,7 @@ const FAQ_ITEMS = [
   {
     question: 'How do I try Resvary?',
     answer:
-      'Run the deterministic demo without an AI key, or open the repository and follow the getting-started guide.',
+      'Inspect the published read-only ledger without an AI key, or install the SDK and follow the getting-started guide.',
   },
 ] as const;
 
