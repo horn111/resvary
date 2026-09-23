@@ -24,6 +24,7 @@
     "@resvary/circle": "1.1.1",
     "@resvary/postgres": "1.1.1",
     "@resvary/sdk": "1.1.1",
+    "@vercel/nft": "1.11.0",
     "next": "^16.3.3",
     "openai": "7.10.0",
     "pg": "^8.16.3",
@@ -39,7 +40,6 @@
     "@types/pg": "^8.15.5",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.5",
-    "@vercel/nft": "1.11.0",
     "typescript": "^5.6.0",
     "vitest": "^4.1.11"
   }
