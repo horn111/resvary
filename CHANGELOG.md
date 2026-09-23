@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Update Workflow to `4.8.9` and pin compatible patched `undici`, `nanoid`, and `ws` transitive dependencies.
 - Block unapproved high/critical production dependency and Agent Demo image findings in CI; document two version-scoped `toml@3.0.0` advisory exceptions expiring on October 21, 2026.
-- Prune development dependencies from the Agent Demo image, apply Debian security updates, remove its unused npm runtime tooling, and retain a CI SBOM and dependency report.
+- Prune development dependencies from the Agent Demo image, run it on a nonroot Debian 13 distroless Node runtime, verify startup in CI, and retain a CI SBOM and dependency report.
 - Run npm dependency update checks weekly.
 
 ### Compatibility

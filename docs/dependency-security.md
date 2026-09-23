@@ -2,7 +2,7 @@
 
 Reviewed on September 21, 2026 for the 1.1.1 candidate. Run `npm run audit:production` from the repository root after `npm ci`. It checks every workspace's production dependency graph, saves the raw report to `.resvary/npm-audit.json`, and rejects unapproved high or critical advisories. Registry failures and expired exceptions fail the gate too.
 
-The Agent Demo CI job also scans its runtime image with Trivy, blocks high/critical findings (including unfixed ones), and uploads a CycloneDX SBOM with the npm report. The runtime image prunes development dependencies and applies Debian security updates. Its scan covers operating-system packages as well as npm dependencies; a passing npm audit alone does not establish that the image passes.
+The Agent Demo CI job also scans its runtime image with Trivy, blocks high/critical findings (including unfixed ones), and uploads a CycloneDX SBOM with the npm report. The runtime image prunes development dependencies and uses the maintained [Debian 13 distroless Node.js 24 runtime](https://github.com/GoogleContainerTools/distroless#what-images-are-available) without a shell or npm. CI starts the built image and checks its homepage before scanning. The scan covers operating-system packages as well as npm dependencies; a passing npm audit alone does not establish that the image passes.
 
 ## Changes in 1.1.1
 

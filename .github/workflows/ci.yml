@@ -129,6 +129,17 @@ jobs:
       - run: npm run test:e2e --workspace @resvary/agent-demo
       - name: Build deployment image
         run: docker build --tag resvary-agent-demo:ci --file apps/agent-demo/Dockerfile .
+      - name: Smoke test Agent Demo runtime image
+        run: |
+          docker run --detach --name resvary-agent-demo-ci --publish 3111:3100 resvary-agent-demo:ci
+          trap 'docker logs resvary-agent-demo-ci; docker rm --force resvary-agent-demo-ci' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3111/ > /dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          exit 1
       - name: Generate Agent Demo software bill of materials
         uses: aquasecurity/trivy-action@v0.36.0
         with:

@@ -16,21 +16,19 @@ RUN npm ci --ignore-scripts
 COPY . .
 RUN npm run build:core && npm run build --workspace @resvary/agent-demo
 RUN npm prune --omit=dev --ignore-scripts
+RUN mkdir -p /home/nonroot/.circle-cli \
+    && chown -R 65532:65532 /home/nonroot \
+    && chmod 700 /home/nonroot/.circle-cli
 
-FROM node:24-bookworm-slim AS runtime
+FROM gcr.io/distroless/nodejs24-debian13:nonroot AS runtime
 WORKDIR /workspace
-ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 HOME=/home/node
-RUN apt-get update \
-    && apt-get upgrade --yes \
-    && rm -rf /var/lib/apt/lists/* \
-    && rm -rf /usr/local/lib/node_modules/npm \
-    && rm -f /usr/local/bin/npm /usr/local/bin/npx
-COPY --from=build --chown=node:node /workspace/node_modules ./node_modules
-COPY --from=build --chown=node:node /workspace/packages ./packages
-COPY --from=build --chown=node:node /workspace/apps/agent-demo ./apps/agent-demo
-COPY --from=build --chown=node:node /workspace/package.json ./package.json
-RUN mkdir -p /home/node/.circle-cli && chown node:node /home/node/.circle-cli && chmod 700 /home/node/.circle-cli
-USER node
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 HOME=/home/nonroot
+COPY --from=build --chown=65532:65532 /workspace/node_modules ./node_modules
+COPY --from=build --chown=65532:65532 /workspace/packages ./packages
+COPY --from=build --chown=65532:65532 /workspace/apps/agent-demo ./apps/agent-demo
+COPY --from=build --chown=65532:65532 /workspace/package.json ./package.json
+COPY --from=build --chown=65532:65532 /home/nonroot/.circle-cli /home/nonroot/.circle-cli
+USER 65532:65532
 WORKDIR /workspace/apps/agent-demo
 EXPOSE 3100
-CMD ["node", "../../node_modules/next/dist/bin/next", "start", "--port", "3100", "--hostname", "0.0.0.0"]
+CMD ["../../node_modules/next/dist/bin/next", "start", "--port", "3100", "--hostname", "0.0.0.0"]
