@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-09-23
+
 ### Added
 
 - Added `DurableMeteredOperations` for queued provider calls with a project-scoped operation state separate from the credit reservation. Workers claim execution once, persist a compact result and usage before settlement, and can settle that result after a restart.
@@ -15,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Added SQLite schema v7 with automatic migration and PostgreSQL schema v5 with an explicit migration for the operation journal. Existing `CreditLedger` commands and 1.x store implementations remain source-compatible; custom stores need the optional operation methods to use the new coordinator.
+- Updated production and development dependencies, including Next.js `^16.3.5`, React `^19.3.0`, OpenAI Agents `0.18.0`, x402 `^2.26.0`, Prettier `^3.9.8`, Vitest `^5.0.1`, and Playwright `^1.63.0`. Kept TypeScript 5.9 and Node types 22 after the TypeScript 7 compiler failed the runtime image scan.
+
+### Security
+
+- Pinned `undici` to 7.29.0 in Agent Demo and overrode Workflow's vulnerable 7.28.0 dependency.
 
 ## [1.1.1] - 2026-09-23
 
