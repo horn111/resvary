@@ -44,12 +44,18 @@ export {
   type UpdateFundingSettlementInput,
 } from './ledger.js';
 export {
+  DurableMeteredOperations,
+  type SaveMeteredResultInput,
+  type RecoverMeteredResultInput,
+} from './operations.js';
+export {
   InMemoryCreditStore,
   isCreditPolicyStore,
   type CreditPolicyStore,
   type CreditPolicyStoreReader,
   type CreditPolicyStoreTransaction,
   type CreditReservationFilter,
+  type MeteredOperationFilter,
   type CreditStore,
   type CreditStoreReader,
   type CreditStoreTransaction,
@@ -91,6 +97,9 @@ export type {
   LedgerEntry,
   LedgerEntryType,
   MeterDefinition,
+  MeteredOperation,
+  MeteredOperationStatus,
+  MeteredProviderResult,
   OutboxEventFilter,
   OutboxEventStatus,
   PackagePriceComponent,

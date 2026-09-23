@@ -17,7 +17,7 @@ await store.close();
 
 Pass either `connectionString` or an existing `pg.Pool`. A store created from a connection string owns and closes its pool. A store given a pool never closes it.
 
-Credit transactions and bundled receipt ledger operations run at `SERIALIZABLE` isolation with bounded retry. Schema v4 adds normalized admin query columns, timeline indexes, and the append-only operator action journal. Apply migrations before starting application, worker, or console processes.
+Credit transactions and bundled receipt ledger operations run at `SERIALIZABLE` isolation with bounded retry. Schema v4 adds normalized admin query columns, timeline indexes, and the append-only operator action journal. Schema v5 adds durable metered operations. Apply migrations before starting application, worker, or console processes.
 
 CLI commands:
 

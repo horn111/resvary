@@ -14,6 +14,14 @@ export type FundingRail = 'arc_direct' | 'circle_gateway_nanopayment';
 export type FundingIntentStatus = 'pending' | 'confirmed' | 'failed';
 export type FundingSettlementStatus = 'accepted' | 'settled' | 'failed' | 'reconciliation_required';
 export type ReservationStatus = 'open' | 'committed' | 'released' | 'expired';
+export type MeteredOperationStatus =
+  | 'queued'
+  | 'running'
+  | 'outcome_unknown'
+  | 'result_saved'
+  | 'needs_reconciliation'
+  | 'settled'
+  | 'cancelled';
 export type LedgerEntryType = 'grant' | 'adjustment' | 'reserve' | 'release' | 'charge' | 'expire';
 export type LedgerBucket = 'posted' | 'reserved';
 export type CreditEventType =
@@ -282,6 +290,38 @@ export interface CreditReservation {
   expiresAt: number;
   closedAt?: number;
   metadata?: Record<string, unknown>;
+}
+
+export interface MeteredProviderResult {
+  value: unknown;
+  actualUsage: UsageQuantities;
+  usageEventId: string;
+  occurredAt?: number;
+  metadata?: Record<string, unknown>;
+}
+
+export interface MeteredOperation {
+  id: string;
+  projectId: string;
+  operationKey: string;
+  customerId: string;
+  priceId: string;
+  reservationId: string;
+  requestHash: string;
+  status: MeteredOperationStatus;
+  createdAt: number;
+  updatedAt: number;
+  workerId?: string;
+  claimToken?: string;
+  claimedAt?: number;
+  savedResult?: MeteredProviderResult;
+  resultHash?: string;
+  resultSavedAt?: number;
+  settlementReservationId?: string;
+  reconciliationAttempt?: number;
+  receiptId?: string;
+  evidenceReference?: string;
+  lastError?: string;
 }
 
 export interface UsageEvent {

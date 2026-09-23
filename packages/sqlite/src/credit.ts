@@ -23,6 +23,8 @@ import type {
   GrantPolicyApplicationFilter,
   LedgerEntry,
   MeterDefinition,
+  MeteredOperation,
+  MeteredOperationFilter,
   OutboxEventFilter,
   OutboxDeliveryStore,
   ClaimOutboxEventsInput,
@@ -34,7 +36,7 @@ import type {
 import { parseReceiptStoreValue, serializeReceiptStoreValue } from '@resvary/sdk/receipts';
 import { hardenSqliteDatabaseFiles, prepareSqliteDatabasePath } from './filesystem.js';
 
-export const SQLITE_SCHEMA_VERSION = 6;
+export const SQLITE_SCHEMA_VERSION = 7;
 
 export interface SqliteCreditStoreConfig {
   path: string;
@@ -109,6 +111,12 @@ export class SqliteCreditStore implements CreditPolicyStore, OutboxDeliveryStore
   }
   listReservations(filter?: CreditReservationFilter) {
     return reader(this.db).listReservations(filter);
+  }
+  getMeteredOperation(projectId: string, operationKey: string) {
+    return reader(this.db).getMeteredOperation(projectId, operationKey);
+  }
+  listMeteredOperations(filter: MeteredOperationFilter) {
+    return reader(this.db).listMeteredOperations(filter);
   }
   getUsageEvent(id: string) {
     return reader(this.db).getUsageEvent(id);
@@ -400,6 +408,45 @@ export class SqliteCreditStore implements CreditPolicyStore, OutboxDeliveryStore
     this.migrateFundingTransactionHashV4();
     this.migrateCreditLotsV5();
     this.migrateAdminV6();
+    this.migrateMeteredOperationsV7();
+  }
+
+  private migrateMeteredOperationsV7(): void {
+    const row = this.db
+      .prepare('SELECT MAX(version) AS version FROM resvary_schema_migrations')
+      .get() as { version?: number | null } | undefined;
+    if ((row?.version ?? 0) >= 7) return;
+    this.db.exec('BEGIN IMMEDIATE;');
+    try {
+      this.db.exec(`
+        CREATE TABLE IF NOT EXISTS resvary_metered_operations (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL,
+          operation_key TEXT NOT NULL,
+          customer_id TEXT NOT NULL,
+          reservation_id TEXT NOT NULL REFERENCES resvary_credit_reservations(id),
+          status TEXT NOT NULL CHECK (status IN (
+            'queued', 'running', 'outcome_unknown', 'result_saved',
+            'needs_reconciliation', 'settled', 'cancelled'
+          )),
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          payload TEXT NOT NULL,
+          UNIQUE(project_id, operation_key)
+        );
+        CREATE INDEX IF NOT EXISTS resvary_metered_operations_status
+          ON resvary_metered_operations(project_id, status, updated_at);
+        CREATE INDEX IF NOT EXISTS resvary_metered_operations_customer
+          ON resvary_metered_operations(project_id, customer_id, created_at);
+      `);
+      this.db
+        .prepare('INSERT INTO resvary_schema_migrations(version, applied_at) VALUES (7, ?)')
+        .run(Date.now());
+      this.db.exec('COMMIT;');
+    } catch (error) {
+      this.db.exec('ROLLBACK;');
+      throw error;
+    }
   }
 
   private migrateFundingV2(): void {
@@ -1144,6 +1191,12 @@ class SqliteCreditTransaction implements CreditPolicyStoreTransaction {
   listReservations(filter?: CreditReservationFilter) {
     return reader(this.db).listReservations(filter);
   }
+  getMeteredOperation(projectId: string, operationKey: string) {
+    return reader(this.db).getMeteredOperation(projectId, operationKey);
+  }
+  listMeteredOperations(filter: MeteredOperationFilter) {
+    return reader(this.db).listMeteredOperations(filter);
+  }
   getUsageEvent(id: string) {
     return reader(this.db).getUsageEvent(id);
   }
@@ -1295,6 +1348,33 @@ class SqliteCreditTransaction implements CreditPolicyStoreTransaction {
         value.reservedUnits,
         value.expiresAt,
         value.createdAt,
+      ],
+      value,
+    );
+  }
+  async saveMeteredOperation(value: MeteredOperation) {
+    upsert(
+      this.db,
+      'resvary_metered_operations',
+      [
+        'id',
+        'project_id',
+        'operation_key',
+        'customer_id',
+        'reservation_id',
+        'status',
+        'created_at',
+        'updated_at',
+      ],
+      [
+        value.id,
+        value.projectId,
+        value.operationKey,
+        value.customerId,
+        value.reservationId,
+        value.status,
+        value.createdAt,
+        value.updatedAt,
       ],
       value,
     );
@@ -1524,7 +1604,11 @@ class SqliteCreditTransaction implements CreditPolicyStoreTransaction {
   }
 }
 
-function reader(db: DatabaseSyncType): CreditStoreReader & CreditPolicyStoreReader {
+function reader(
+  db: DatabaseSyncType,
+): CreditStoreReader &
+  CreditPolicyStoreReader &
+  Required<Pick<CreditStoreReader, 'getMeteredOperation' | 'listMeteredOperations'>> {
   return {
     async getAccount(id) {
       return one<CreditAccount>(db, 'SELECT payload FROM resvary_credit_accounts WHERE id = ?', [
@@ -1606,6 +1690,31 @@ function reader(db: DatabaseSyncType): CreditStoreReader & CreditPolicyStoreRead
             (filter.expiresBefore === undefined || item.expiresAt <= filter.expiresBefore),
         )
         .slice(0, filter.limit ?? Number.MAX_SAFE_INTEGER);
+    },
+    async getMeteredOperation(projectId, operationKey) {
+      return one<MeteredOperation>(
+        db,
+        'SELECT payload FROM resvary_metered_operations WHERE project_id = ? AND operation_key = ?',
+        [projectId, operationKey],
+      );
+    },
+    async listMeteredOperations(filter) {
+      const where = ['project_id = ?'];
+      const values: unknown[] = [filter.projectId];
+      if (filter.customerId) {
+        where.push('customer_id = ?');
+        values.push(filter.customerId);
+      }
+      if (filter.status) {
+        where.push('status = ?');
+        values.push(filter.status);
+      }
+      values.push(filter.limit ?? 100);
+      return all<MeteredOperation>(
+        db,
+        `SELECT payload FROM resvary_metered_operations WHERE ${where.join(' AND ')} ORDER BY created_at, id LIMIT ?`,
+        values,
+      );
     },
     async getUsageEvent(id) {
       return one<UsageEvent>(db, 'SELECT payload FROM resvary_usage_events WHERE id = ?', [id]);

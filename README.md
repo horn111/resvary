@@ -236,6 +236,7 @@ The old payment operations APIs remain under `/api/receipts`, `/api/receipts/pro
 ## Documentation
 
 - [Prepaid credits](docs/prepaid-credits.md)
+- [Durable metered operations](docs/operation-recovery.md)
 - [Usage rating](docs/usage-rating.md)
 - [Architecture](docs/architecture.md)
 - [Persistence](docs/persistence.md)
