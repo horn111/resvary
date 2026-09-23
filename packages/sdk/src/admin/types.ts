@@ -103,10 +103,7 @@ export interface AdminUsageEvidence {
 }
 
 export type OperatorActionType =
-  | 'credit.grant'
-  | 'credit.adjust'
-  | 'reservation.expire_overdue'
-  | 'outbox.requeue';
+  'credit.grant' | 'credit.adjust' | 'reservation.expire_overdue' | 'outbox.requeue';
 
 export type OperatorActionStatus = 'pending' | 'succeeded' | 'failed';
 
