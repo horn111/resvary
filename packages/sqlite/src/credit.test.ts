@@ -76,6 +76,66 @@ describe('SqliteCreditStore', () => {
     secondStore.close();
   });
 
+  it('persists runMetered expiry across restarts without invoking the provider', async () => {
+    const path = tempDatabasePath();
+    let now = 1_000;
+    let store = createSqliteCreditStore({ path });
+    let ledger = new CreditLedger({
+      projectId: 'expired_run',
+      store,
+      now: () => now,
+      reservationTtlMs: 100,
+    });
+    const meter = await ledger.registerMeter({
+      key: 'jobs',
+      dimensions: ['jobs'],
+      idempotencyKey: 'meter',
+    });
+    const price = await ledger.createPriceVersion({
+      meterKey: meter.key,
+      rates: [{ dimension: 'jobs', unitSize: '1', amount: '1' }],
+      idempotencyKey: 'price',
+    });
+    await ledger.grantCredits({ customerId: 'customer', amount: '2', idempotencyKey: 'grant' });
+    const input = {
+      customerId: 'customer',
+      priceId: price.id,
+      estimatedUsage: { jobs: '1' },
+      idempotencyKey: 'run',
+    };
+    const reservation = await ledger.reserveCredits(input);
+    store.close();
+    now = reservation.expiresAt;
+    store = createSqliteCreditStore({ path });
+    ledger = new CreditLedger({ projectId: 'expired_run', store, now: () => now });
+    let calls = 0;
+    try {
+      await expect(
+        ledger.runMetered(input, async () => {
+          calls++;
+          return { value: 'unexpected', usageEventId: 'late', actualUsage: { jobs: '1' } };
+        }),
+      ).rejects.toThrow('expired reservation');
+    } finally {
+      store.close();
+    }
+    store = createSqliteCreditStore({ path });
+    try {
+      expect(calls).toBe(0);
+      expect(await store.getReservation(reservation.id)).toMatchObject({ status: 'expired' });
+      expect(await store.getAccountByCustomer('expired_run', 'customer')).toMatchObject({
+        availableAmount: '2',
+        reservedAmount: '0',
+      });
+      expect(await store.listUsageReceipts()).toHaveLength(0);
+      expect(
+        await store.getIdempotencyRecord('expired_run:run_metered_execution', 'run'),
+      ).toBeUndefined();
+    } finally {
+      store.close();
+    }
+  });
+
   it('round-trips advanced price components and receipt breakdowns without a schema change', async () => {
     const path = tempDatabasePath();
     const firstStore = createSqliteCreditStore({ path });

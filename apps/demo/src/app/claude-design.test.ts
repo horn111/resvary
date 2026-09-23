@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { SITE_HTML } from './claude-design';
+import { version } from '../../../../package.json';
 
 describe('landing page content', () => {
   it('builds the maintained copy instead of stale generated sections', () => {
     const header = SITE_HTML.match(/<header[\s\S]*?<\/header>/)?.[0] ?? '';
 
-    expect(SITE_HTML).toContain('1.0 stable');
+    expect(SITE_HTML).toContain(`${version} stable`);
+    expect(SITE_HTML).toContain(`Install version ${version}.`);
+    expect(SITE_HTML).toContain('open and unexpired');
+    expect(SITE_HTML).not.toContain('1.0 stable');
+    expect(SITE_HTML).not.toContain('The reservation stays open. Retry the commit');
     expect(SITE_HTML).toContain('data-operator-console-section="true"');
     expect(SITE_HTML).toContain('Recover known ledger incidents safely.');
     expect(SITE_HTML).toContain('keeps the execution claim when the callback throws');

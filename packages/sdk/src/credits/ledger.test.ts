@@ -815,6 +815,84 @@ describe('CreditLedger', () => {
     expect(callback).toHaveBeenCalledTimes(1);
   });
 
+  it('expires an unclaimed reservation at the TTL boundary without calling the provider', async () => {
+    const { ledger, price, setNow } = await createFixture();
+    await ledger.grantCredits({ customerId: 'cus_1', amount: '1', idempotencyKey: 'grant-1' });
+    const input = {
+      customerId: 'cus_1',
+      priceId: price.id,
+      estimatedUsage: { input_tokens: '100' },
+      idempotencyKey: 'run-expired',
+    };
+    const reservation = await ledger.reserveCredits(input);
+    setNow(reservation.expiresAt);
+    const callback = vi.fn(async () => ({
+      value: 'must not execute',
+      usageEventId: 'late-usage',
+      actualUsage: { input_tokens: '10' },
+    }));
+    await expect(ledger.runMetered(input, callback)).rejects.toThrow(
+      'Cannot execute provider for expired reservation',
+    );
+    await expect(ledger.runMetered(input, callback)).rejects.toThrow('expired reservation');
+    expect(callback).not.toHaveBeenCalled();
+    expect(await ledger.store.getReservation(reservation.id)).toMatchObject({ status: 'expired' });
+    expect(await ledger.getBalance('cus_1')).toMatchObject({
+      availableAmount: '1',
+      reservedAmount: '0',
+    });
+    expect(await ledger.listUsageReceipts()).toHaveLength(0);
+    expect(
+      await ledger.store.getIdempotencyRecord(
+        'project_ai:run_metered_execution',
+        input.idempotencyKey,
+      ),
+    ).toBeUndefined();
+    expect(
+      (await ledger.listLedgerEntries('cus_1')).filter((entry) => entry.type === 'release'),
+    ).toHaveLength(1);
+  });
+
+  it('rechecks a reservation closed by another transaction before the execution claim', async () => {
+    const { ledger, price } = await createFixture();
+    await ledger.grantCredits({ customerId: 'cus_1', amount: '1', idempotencyKey: 'grant-1' });
+    const input = {
+      customerId: 'cus_1',
+      priceId: price.id,
+      estimatedUsage: { input_tokens: '100' },
+      idempotencyKey: 'run-race',
+    };
+    const reservation = await ledger.reserveCredits(input);
+    const transaction = ledger.store.transaction.bind(ledger.store);
+    let transactions = 0;
+    const spy = vi.spyOn(ledger.store, 'transaction').mockImplementation(async (handler) => {
+      if (++transactions === 2) {
+        await ledger.releaseReservation({
+          reservationId: reservation.id,
+          idempotencyKey: 'other-release',
+        });
+      }
+      return transaction(handler);
+    });
+    const callback = vi.fn(async () => ({
+      value: 'unexpected',
+      usageEventId: 'race-usage',
+      actualUsage: { input_tokens: '10' },
+    }));
+    try {
+      await expect(ledger.runMetered(input, callback)).rejects.toThrow('released reservation');
+      expect(callback).not.toHaveBeenCalled();
+      expect(
+        await ledger.store.getIdempotencyRecord(
+          'project_ai:run_metered_execution',
+          input.idempotencyKey,
+        ),
+      ).toBeUndefined();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('persists reservation expiry when commitUsage discovers an overdue reservation', async () => {
     const { ledger, price, setNow } = await createFixture();
     await ledger.grantCredits({ customerId: 'cus_1', amount: '1', idempotencyKey: 'grant-1' });

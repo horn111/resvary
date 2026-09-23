@@ -503,6 +503,66 @@ suite('Postgres stores', () => {
     expect((await first.getBalance(customerId)).availableAmount).toBe('1');
   });
 
+  it('serializes expired execution claims and maintenance across independent stores', async () => {
+    const suffix = randomUUID();
+    const projectId = `expired_run_${suffix}`;
+    let now = 1_000;
+    const firstStore = createPostgresCreditStore({ pool: pool!, schema });
+    const secondStore = createPostgresCreditStore({ pool: pool!, schema });
+    const first = new CreditLedger({
+      projectId,
+      store: firstStore,
+      now: () => now,
+      reservationTtlMs: 100,
+    });
+    const second = new CreditLedger({ projectId, store: secondStore, now: () => now });
+    await first.grantCredits({ customerId: 'customer', amount: '2', idempotencyKey: 'grant' });
+    const meter = await first.registerMeter({
+      key: 'jobs',
+      dimensions: ['jobs'],
+      idempotencyKey: 'meter',
+    });
+    const price = await first.createPriceVersion({
+      meterKey: meter.key,
+      rates: [{ dimension: 'jobs', unitSize: '1', amount: '1' }],
+      idempotencyKey: 'price',
+    });
+    const input = {
+      customerId: 'customer',
+      priceId: price.id,
+      estimatedUsage: { jobs: '1' },
+      idempotencyKey: 'run',
+    };
+    const reservation = await first.reserveCredits(input);
+    now = reservation.expiresAt;
+    let calls = 0;
+    const callback = async () => {
+      calls++;
+      return { value: 'unexpected', usageEventId: `late_${suffix}`, actualUsage: { jobs: '1' } };
+    };
+    const [claim, competingClaim, sweep] = await Promise.allSettled([
+      first.runMetered(input, callback),
+      second.runMetered(input, callback),
+      second.releaseExpiredReservations({ idempotencyKey: 'sweep' }),
+    ]);
+    expect(claim.status).toBe('rejected');
+    expect(competingClaim.status).toBe('rejected');
+    expect(sweep.status).toBe('fulfilled');
+    expect(calls).toBe(0);
+    expect(await secondStore.getReservation(reservation.id)).toMatchObject({ status: 'expired' });
+    expect(await second.getBalance('customer')).toMatchObject({
+      availableAmount: '2',
+      reservedAmount: '0',
+    });
+    expect(await second.listUsageReceipts()).toHaveLength(0);
+    expect(
+      (await second.listLedgerEntries('customer')).filter((entry) => entry.type === 'release'),
+    ).toHaveLength(1);
+    expect(
+      await secondStore.getIdempotencyRecord(`${projectId}:run_metered_execution`, 'run'),
+    ).toBeUndefined();
+  });
+
   it('round-trips advanced prices and receipt breakdowns on schema v3', async () => {
     const store = createPostgresCreditStore({ pool: pool!, schema });
     const ledger = new CreditLedger({ projectId: 'postgres_advanced', store });

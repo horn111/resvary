@@ -79,6 +79,7 @@ jobs:
 
       - name: Audit dependencies and signatures
         run: |
+          npm run audit:production
           npm audit --omit=dev --audit-level=high \
             --workspace=@resvary/sdk \
             --workspace=@resvary/sqlite \

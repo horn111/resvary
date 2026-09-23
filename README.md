@@ -112,7 +112,9 @@ console.log(result.balance.availableAmount);
 
 `runMetered` stores an execution claim before it calls the provider. Concurrent matching calls on one `CreditLedger` instance wait for the first execution; calls through another instance receive `MeteredExecutionAlreadyClaimedError` instead of calling the provider again. Pass the same key to the provider when it supports idempotent requests.
 
-If the callback throws, `runMetered` releases the reservation and keeps the claim. Start a new operation only after confirming the provider did not complete the first one, or when a duplicate result is acceptable. If the provider returns a result but the credit commit fails, save that result and call `commitUsage` with the same usage event and commit key. Do not retry the whole `runMetered` callback.
+`runMetered` checks the reservation's status and expiry in the same transaction that records its execution claim. An expired reservation releases its remaining hold without starting the provider callback. This check does not extend the reservation TTL or keep it open while the provider runs.
+
+If the callback throws, `runMetered` releases the reservation and keeps the claim. Start a new operation only after confirming the provider did not complete the first one, or when a duplicate result is acceptable. Save a successful provider result and its usage inside the callback, before returning to the credit commit. After a commit failure, retry `commitUsage` with the saved usage event and commit key only while the reservation remains open and unexpired. A committed event replays its receipt. If the reservation expired or was released, reconcile the saved result and charge explicitly; do not call the provider again or assume that the old hold can still be charged.
 
 For a multi-process deployment, install Postgres persistence and apply migrations before the application starts:
 

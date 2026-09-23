@@ -67,6 +67,8 @@ The console exposes four narrow commands:
 
 Every command receives a UUID that is also the idempotency identity. The console records the normalized command parameters, including amount or expiry cutoff, in an append-only `OperatorAction` before execution and appends the outcome afterward. Reusing a UUID with changed parameters returns a conflict. If the process stops between journal records, retry the same command unchanged; the underlying idempotency record prevents a second mutation.
 
+For overdue sweeps, the HTTP handler lets `OperatorService` select and persist the cutoff on the first request. Retrying the same UUID after a lost response uses that original cutoff and result, even if more reservations have expired since then. Use a new UUID to start a new sweep.
+
 The console does not expose arbitrary reservation release, usage commit, funding confirmation, pricing/policy CRUD, refund, or history deletion.
 
 ## Library contracts

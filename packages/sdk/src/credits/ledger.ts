@@ -1161,31 +1161,15 @@ export class CreditLedger {
     reservationId: string,
     callback: () => Promise<RunMeteredCallbackResult<T>>,
   ): Promise<RunMeteredResult<T>> {
-    const reservation = await this.requireReservationFromStore(reservationId);
-    if (reservation.status === 'committed' && reservation.usageReceiptId) {
-      return this.replayMeteredResult<T>(reservation.id);
-    }
-    if (reservation.status !== 'open') {
-      throw new InvalidCreditStateError(
-        `Cannot execute provider for ${reservation.status} reservation: ${reservation.id}`,
-      );
-    }
-
-    const claimed = await this.claimMeteredExecution(input, reservation.id);
-    if (!claimed) {
-      const current = await this.requireReservationFromStore(reservation.id);
-      if (current.status === 'committed' && current.usageReceiptId) {
-        return this.replayMeteredResult<T>(current.id);
-      }
-      throw new MeteredExecutionAlreadyClaimedError(reservation.id);
-    }
+    const claimed = await this.claimMeteredExecution(input, reservationId);
+    if (!claimed) return this.replayMeteredResult<T>(reservationId);
 
     let result: RunMeteredCallbackResult<T>;
     try {
       result = await callback();
     } catch (error) {
       await this.releaseReservation({
-        reservationId: reservation.id,
+        reservationId,
         idempotencyKey: `${input.idempotencyKey}:provider_error`,
         reason: 'provider_error',
       });
@@ -1193,7 +1177,7 @@ export class CreditLedger {
     }
 
     const committed = await this.commitUsage({
-      reservationId: reservation.id,
+      reservationId,
       usageEventId: result.usageEventId,
       actualUsage: result.actualUsage,
       occurredAt: result.occurredAt,
@@ -1224,6 +1208,15 @@ export class CreditLedger {
 
   private claimMeteredExecution(input: RunMeteredInput, reservationId: string): Promise<boolean> {
     return this.store.transaction(async (tx) => {
+      // Authorize execution against the current reservation in the claim transaction.
+      // Return instead of throwing so an expiry and its released credits stay committed.
+      const reservation = await this.requireReservation(tx, reservationId);
+      if (reservation.status !== 'open') return false;
+      const now = this.now();
+      if (reservation.expiresAt <= now) {
+        await this.expireReservation(tx, reservation, now);
+        return false;
+      }
       const key = requireText(input.idempotencyKey, 'idempotencyKey');
       const scope = `${this.projectId}:run_metered_execution`;
       const requestHash = hashRequest(input);
@@ -1237,7 +1230,7 @@ export class CreditLedger {
         key,
         requestHash,
         result: { reservationId },
-        createdAt: this.now(),
+        createdAt: now,
       };
       if (tx.claimIdempotencyRecord) return tx.claimIdempotencyRecord(claim);
       await tx.saveIdempotencyRecord(claim);

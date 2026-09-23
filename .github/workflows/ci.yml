@@ -120,6 +120,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci --ignore-scripts
+      - name: Gate production dependency advisories
+        run: npm run audit:production
       - run: npm run build:core
       - run: npm test --workspace @resvary/agent-demo
       - run: npm run build --workspace @resvary/agent-demo
@@ -127,14 +129,31 @@ jobs:
       - run: npm run test:e2e --workspace @resvary/agent-demo
       - name: Build deployment image
         run: docker build --tag resvary-agent-demo:ci --file apps/agent-demo/Dockerfile .
-      - name: Report Agent Demo image vulnerabilities
+      - name: Generate Agent Demo software bill of materials
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: resvary-agent-demo:ci
+          format: cyclonedx
+          output: agent-demo.cdx.json
+      - name: Scan Agent Demo image
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: resvary-agent-demo:ci
+          trivyignores: .resvary/agent-trivyignore.yaml
           format: table
           severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          exit-code: '0'
+          ignore-unfixed: false
+          exit-code: '1'
+      - name: Upload Agent Demo dependency report and SBOM
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: agent-demo-dependencies
+          path: |
+            .resvary/npm-audit.json
+            agent-demo.cdx.json
+          include-hidden-files: true
+          retention-days: 14
 
   console-e2e:
     name: Operator Console browser tests

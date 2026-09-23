@@ -76,7 +76,9 @@ complete price and receipt breakdown in their existing payload columns.
 
 `runMetered` is a convenience orchestrator for one-process provider execution. It stores a durable execution claim before the callback. The claim blocks another ledger instance from calling the provider with the same operation key, while a retry on the active instance waits for the first call. A thrown callback releases the reservation and retains the claim.
 
-An external call and a database transaction cannot form one atomic operation. Use the operation key as the provider idempotency key when the provider supports it. Save a successful provider result before calling `commitUsage`. If the commit fails, retry `commitUsage` with the same usage event and idempotency key; do not retry the provider callback.
+The execution claim transaction also checks the reservation's status and expiry. An overdue reservation expires durably and releases its remaining hold without calling the provider. This does not extend the TTL or prevent expiry after execution starts.
+
+An external call and a database transaction cannot form one atomic operation. Use the operation key as the provider idempotency key when the provider supports it. Save a successful provider result before calling `commitUsage` (inside the callback when using `runMetered`). If the commit fails, retry `commitUsage` with the same usage event and idempotency key only while the reservation remains open and unexpired; a previously committed event replays its receipt. An expired or released reservation requires explicit reconciliation of the saved result and charge. Do not retry the provider callback.
 
 ## Payment compatibility
 
