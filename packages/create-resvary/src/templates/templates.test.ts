@@ -25,8 +25,8 @@ describe('starter templates', () => {
     };
     expect(ai.type).toBe('module');
     expect(ai.engines.node).toBe('>=24');
-    expect(ai.dependencies['@resvary/sdk']).toBe('1.1.1');
-    expect(ai.dependencies['@resvary/sqlite']).toBe('1.1.1');
+    expect(ai.dependencies['@resvary/sdk']).toBe('1.2.0');
+    expect(ai.dependencies['@resvary/sqlite']).toBe('1.2.0');
     expect(ai.dependencies.next).toBe('16.3.5');
     expect(ai.dependencies.react).toBe('19.3.0');
     expect(ai.dependencies['react-dom']).toBe('19.3.0');
@@ -70,8 +70,8 @@ describe('starter templates', () => {
     expect(express).not.toContain('const { customerId');
     const postgres = { ...base, database: 'postgres' as const };
     expect(nextTemplate(postgres)).toContain('createPostgresCreditStore');
-    expect(JSON.parse(packageTemplate(postgres)).dependencies['@resvary/postgres']).toBe('1.1.1');
-    expect(JSON.parse(packageTemplate(postgres)).dependencies['@resvary/worker']).toBe('1.1.1');
+    expect(JSON.parse(packageTemplate(postgres)).dependencies['@resvary/postgres']).toBe('1.2.0');
+    expect(JSON.parse(packageTemplate(postgres)).dependencies['@resvary/worker']).toBe('1.2.0');
     expect(JSON.parse(packageTemplate(postgres)).scripts['resvary:migrate']).toBe(
       'resvary-postgres migrate',
     );

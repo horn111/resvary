@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added `DurableMeteredOperations` for queued provider calls with a project-scoped operation state separate from the credit reservation. Workers claim execution once, persist a compact result and usage before settlement, and can settle that result after a restart.
+- Added explicit reconciliation of saved results after reservation expiry or an undersized hold. Unknown provider outcomes require external evidence before recovery or cancellation; they never trigger an automatic provider retry.
+
+### Changed
+
+- Added SQLite schema v7 with automatic migration and PostgreSQL schema v5 with an explicit migration for the operation journal. Existing `CreditLedger` commands and 1.x store implementations remain source-compatible; custom stores need the optional operation methods to use the new coordinator.
+
 ## [1.1.1] - 2026-09-23
 
 ### Fixed

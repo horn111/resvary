@@ -83,22 +83,22 @@ The published evidence is pinned to `v0.4.0-alpha.0` and records an external Arc
 
 Published Testnet evidence does not establish production Mainnet verification.
 
-## 1.1.1 candidate: expiry and replay correctness
+## 1.1.1 released: expiry and replay correctness
 
 - [x] Check status and expiry atomically with the provider execution claim
 - [x] Persist expired holds without starting the provider callback
 - [x] Preserve an operator sweep's cutoff across HTTP retries
 - [x] Synchronize release copy and document post-expiry recovery limits
 - [x] Gate production dependency advisories and Agent Demo image findings with expiring, version-scoped exceptions
-- [ ] Complete PostgreSQL, browser, and container CI for the release commit
-- [ ] Publish checked 1.1.1 artifacts through the release workflow
+- [x] Complete PostgreSQL, browser, and container CI for the release commit
+- [x] Publish checked 1.1.1 artifacts through the release workflow
 
-## Proposed 1.2: durable operation recovery
+## 1.2 candidate: durable operation recovery
 
-- Define separate operation and reservation lifecycles for queued or long-running provider calls.
-- Persist provider results and usage before credit settlement; expose reconciliation for expired holds and unknown provider outcomes.
-- Test restart recovery and concurrent workers without repeating external side effects.
-- Keep the 1.x ledger API compatible and specify migrations before implementation.
+- [x] Define separate operation and reservation lifecycles for queued or long-running provider calls.
+- [x] Persist provider results and usage before credit settlement; expose reconciliation for expired holds and unknown provider outcomes.
+- [x] Verify restart recovery and concurrent workers on PostgreSQL in CI without repeating external side effects.
+- [x] Keep the 1.x ledger API compatible and specify SQLite v7 and PostgreSQL v5 migrations.
 
 ## Later
 

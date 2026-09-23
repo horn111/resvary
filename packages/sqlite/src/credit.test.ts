@@ -3,7 +3,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { describe, expect, it } from 'vitest';
-import { CreditLedger, InsufficientCreditsError, type CreditAccount } from '@resvary/sdk/credits';
+import {
+  CreditLedger,
+  DurableMeteredOperations,
+  InsufficientCreditsError,
+  type CreditAccount,
+} from '@resvary/sdk/credits';
 import { createSqliteCreditStore } from './credit.js';
 
 describe('SqliteCreditStore', () => {
@@ -74,6 +79,95 @@ describe('SqliteCreditStore', () => {
     expect(replay.account.postedAmount).toBe('2');
     expect((await second.getBalance('cus_1')).postedAmount).toBe('1.996');
     secondStore.close();
+  });
+
+  it('recovers a saved provider result after SQLite closes without repeating execution', async () => {
+    const path = tempDatabasePath();
+    const firstStore = createSqliteCreditStore({ path });
+    const first = new CreditLedger({
+      projectId: 'durable_operation',
+      store: firstStore,
+      now: () => 1_000,
+      reservationTtlMs: 10_000,
+    });
+    const meter = await first.registerMeter({
+      key: 'jobs',
+      dimensions: ['jobs'],
+      idempotencyKey: 'meter',
+    });
+    const price = await first.createPriceVersion({
+      meterKey: meter.key,
+      rates: [{ dimension: 'jobs', unitSize: '1', amount: '1' }],
+      idempotencyKey: 'price',
+    });
+    await first.grantCredits({ customerId: 'customer', amount: '5', idempotencyKey: 'grant' });
+    const operations = new DurableMeteredOperations(first, { now: () => 1_000 });
+    await operations.create({
+      customerId: 'customer',
+      priceId: price.id,
+      estimatedUsage: { jobs: '1' },
+      idempotencyKey: 'durable-job',
+    });
+    const claim = await operations.claim({ operationKey: 'durable-job', workerId: 'worker-a' });
+    await operations.saveResult({
+      operationKey: 'durable-job',
+      claimToken: claim!.claimToken!,
+      result: {
+        value: { providerId: 'answer-1' },
+        actualUsage: { jobs: '1' },
+        usageEventId: 'provider-usage-1',
+      },
+    });
+    firstStore.close();
+
+    const secondStore = createSqliteCreditStore({ path });
+    const second = new CreditLedger({
+      projectId: 'durable_operation',
+      store: secondStore,
+      now: () => 1_001,
+    });
+    const recovered = new DurableMeteredOperations(second, { now: () => 1_001 });
+    expect((await recovered.get('durable-job'))?.savedResult?.value).toEqual({
+      providerId: 'answer-1',
+    });
+    expect(
+      await recovered.claim({ operationKey: 'durable-job', workerId: 'worker-b' }),
+    ).toBeUndefined();
+    expect((await recovered.settle('durable-job')).receipt?.usageEventId).toBe('provider-usage-1');
+    expect(await second.listUsageReceipts('customer')).toHaveLength(1);
+    secondStore.close();
+
+    const db = new DatabaseSync(path);
+    const version = db
+      .prepare('SELECT MAX(version) AS version FROM resvary_schema_migrations')
+      .get() as { version: number };
+    expect(version.version).toBe(7);
+    db.close();
+  });
+
+  it('adds the operation journal when opening an existing v6 database', async () => {
+    const path = tempDatabasePath();
+    const current = createSqliteCreditStore({ path });
+    const ledger = new CreditLedger({ projectId: 'migration_v6', store: current });
+    await ledger.grantCredits({ customerId: 'customer', amount: '2', idempotencyKey: 'grant' });
+    current.close();
+
+    const old = new DatabaseSync(path);
+    old.exec(
+      'DROP TABLE resvary_metered_operations; DELETE FROM resvary_schema_migrations WHERE version = 7;',
+    );
+    old.close();
+
+    const upgraded = createSqliteCreditStore({ path });
+    expect(
+      (
+        await new CreditLedger({ projectId: 'migration_v6', store: upgraded }).getBalance(
+          'customer',
+        )
+      ).postedAmount,
+    ).toBe('2');
+    expect(await upgraded.listMeteredOperations({ projectId: 'migration_v6' })).toEqual([]);
+    upgraded.close();
   });
 
   it('persists runMetered expiry across restarts without invoking the provider', async () => {
@@ -197,7 +291,7 @@ describe('SqliteCreditStore', () => {
           version: number;
         }
       ).version,
-    ).toBe(6);
+    ).toBe(7);
     database.close();
   });
 
@@ -336,7 +430,7 @@ describe('SqliteCreditStore', () => {
           version: number;
         }
       ).version,
-    ).toBe(6);
+    ).toBe(7);
     migrated.close();
   });
 

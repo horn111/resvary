@@ -141,22 +141,27 @@ describe('portable Circle network session', () => {
     expect(env).toEqual({ NO_COLOR: '1', NODE_ENV: 'production', PATH: '/usr/bin' });
   });
 
-  it('the pinned CLI reads the hydrated fixture session without an OS keychain or network call', async () => {
-    const require = createRequire(import.meta.url);
-    const cli = require.resolve('@circle-fin/cli');
-    await withCircleSession(async (env) => {
-      const { stdout } = await promisify(execFile)(
-        process.execPath,
-        [cli, 'wallet', 'status', '--type', 'agent', '--output', 'json'],
-        {
-          env: { ...env, CIRCLE_VERSION_CHECK: 'off' },
-          timeout: 20_000,
-          windowsHide: true,
-        },
-      );
-      const response = JSON.parse(stdout);
-      expect(response.data.mainnet.tokenStatus).toBe('VALID');
-      expect(response.data.testnet.tokenStatus).toBe('NOT_LOGGED_IN');
-    }, configuredEnv());
-  }, 25_000);
+  it(
+    'the pinned CLI reads the hydrated fixture session without an OS keychain or network call',
+    async () => {
+      const require = createRequire(import.meta.url);
+      const cli = require.resolve('@circle-fin/cli');
+      const timeout = process.platform === 'win32' ? 35_000 : 20_000;
+      await withCircleSession(async (env) => {
+        const { stdout } = await promisify(execFile)(
+          process.execPath,
+          [cli, 'wallet', 'status', '--type', 'agent', '--output', 'json'],
+          {
+            env: { ...env, CIRCLE_VERSION_CHECK: 'off' },
+            timeout,
+            windowsHide: true,
+          },
+        );
+        const response = JSON.parse(stdout);
+        expect(response.data.mainnet.tokenStatus).toBe('VALID');
+        expect(response.data.testnet.tokenStatus).toBe('NOT_LOGGED_IN');
+      }, configuredEnv());
+    },
+    process.platform === 'win32' ? 40_000 : 25_000,
+  );
 });

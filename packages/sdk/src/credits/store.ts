@@ -15,6 +15,8 @@ import type {
   GrantPolicyApplicationFilter,
   LedgerEntry,
   MeterDefinition,
+  MeteredOperation,
+  MeteredOperationStatus,
   OutboxEventFilter,
   PriceVersion,
   UsageEvent,
@@ -24,6 +26,13 @@ import type {
 export interface CreditReservationFilter extends CreditBalanceFilter {
   status?: CreditReservation['status'];
   expiresBefore?: number;
+  limit?: number;
+}
+
+export interface MeteredOperationFilter {
+  projectId: string;
+  customerId?: string;
+  status?: MeteredOperationStatus;
   limit?: number;
 }
 
@@ -39,6 +48,11 @@ export interface CreditStoreReader {
   listPriceVersions(meterId?: string): Promise<PriceVersion[]>;
   getReservation(id: string): Promise<CreditReservation | undefined>;
   listReservations(filter?: CreditReservationFilter): Promise<CreditReservation[]>;
+  getMeteredOperation?(
+    projectId: string,
+    operationKey: string,
+  ): Promise<MeteredOperation | undefined>;
+  listMeteredOperations?(filter: MeteredOperationFilter): Promise<MeteredOperation[]>;
   getUsageEvent(id: string): Promise<UsageEvent | undefined>;
   getUsageReceipt(id: string): Promise<UsageReceipt | undefined>;
   listUsageReceipts(accountId?: string): Promise<UsageReceipt[]>;
@@ -67,6 +81,7 @@ export interface CreditStoreTransaction extends CreditStoreReader {
   saveMeter(meter: MeterDefinition): Promise<void>;
   savePriceVersion(price: PriceVersion): Promise<void>;
   saveReservation(reservation: CreditReservation): Promise<void>;
+  saveMeteredOperation?(operation: MeteredOperation): Promise<void>;
   saveUsageEvent(event: UsageEvent): Promise<void>;
   saveUsageReceipt(receipt: UsageReceipt): Promise<void>;
   saveLedgerEntry(entry: LedgerEntry): Promise<void>;
@@ -158,6 +173,7 @@ type MemoryState = {
   accounts: Map<string, CreditAccount>;
   grants: Map<string, CreditGrant>;
   meters: Map<string, MeterDefinition>;
+  meteredOperations: Map<string, MeteredOperation>;
   prices: Map<string, PriceVersion>;
   reservations: Map<string, CreditReservation>;
   usageEvents: Map<string, UsageEvent>;
@@ -230,6 +246,12 @@ export class InMemoryCreditStore implements CreditPolicyStore, OutboxDeliverySto
   }
   listReservations(filter?: CreditReservationFilter) {
     return reader(this.state).listReservations(filter);
+  }
+  getMeteredOperation(projectId: string, operationKey: string) {
+    return reader(this.state).getMeteredOperation(projectId, operationKey);
+  }
+  listMeteredOperations(filter: MeteredOperationFilter) {
+    return reader(this.state).listMeteredOperations(filter);
   }
   getUsageEvent(id: string) {
     return reader(this.state).getUsageEvent(id);
@@ -446,6 +468,12 @@ class MemoryCreditTransaction implements CreditPolicyStoreTransaction {
   listReservations(filter?: CreditReservationFilter) {
     return reader(this.state).listReservations(filter);
   }
+  getMeteredOperation(projectId: string, operationKey: string) {
+    return reader(this.state).getMeteredOperation(projectId, operationKey);
+  }
+  listMeteredOperations(filter: MeteredOperationFilter) {
+    return reader(this.state).listMeteredOperations(filter);
+  }
   getUsageEvent(id: string) {
     return reader(this.state).getUsageEvent(id);
   }
@@ -533,6 +561,12 @@ class MemoryCreditTransaction implements CreditPolicyStoreTransaction {
   async saveReservation(value: CreditReservation) {
     this.state.reservations.set(value.id, structuredClone(value));
   }
+  async saveMeteredOperation(value: MeteredOperation) {
+    this.state.meteredOperations.set(
+      idempotencyId(value.projectId, value.operationKey),
+      structuredClone(value),
+    );
+  }
   async saveUsageEvent(value: UsageEvent) {
     this.state.usageEvents.set(value.id, structuredClone(value));
   }
@@ -577,7 +611,11 @@ class MemoryCreditTransaction implements CreditPolicyStoreTransaction {
   }
 }
 
-function reader(state: MemoryState): CreditStoreReader & CreditPolicyStoreReader {
+function reader(
+  state: MemoryState,
+): CreditStoreReader &
+  CreditPolicyStoreReader &
+  Required<Pick<CreditStoreReader, 'getMeteredOperation' | 'listMeteredOperations'>> {
   return {
     async getAccount(id) {
       return clone(state.accounts.get(id));
@@ -637,6 +675,22 @@ function reader(state: MemoryState): CreditStoreReader & CreditPolicyStoreReader
               (filter.expiresBefore === undefined || item.expiresAt <= filter.expiresBefore),
           )
           .slice(0, filter.limit ?? Number.MAX_SAFE_INTEGER),
+      );
+    },
+    async getMeteredOperation(projectId, operationKey) {
+      return clone(state.meteredOperations.get(idempotencyId(projectId, operationKey)));
+    },
+    async listMeteredOperations(filter) {
+      return clones(
+        [...state.meteredOperations.values()]
+          .filter(
+            (item) =>
+              item.projectId === filter.projectId &&
+              (!filter.customerId || item.customerId === filter.customerId) &&
+              (!filter.status || item.status === filter.status),
+          )
+          .sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id))
+          .slice(0, filter.limit ?? 100),
       );
     },
     async getUsageEvent(id) {
@@ -794,6 +848,7 @@ function createMemoryState(): MemoryState {
     accounts: new Map(),
     grants: new Map(),
     meters: new Map(),
+    meteredOperations: new Map(),
     prices: new Map(),
     reservations: new Map(),
     usageEvents: new Map(),
@@ -815,6 +870,7 @@ function cloneMemoryState(state: MemoryState): MemoryState {
     accounts: new Map(clones([...state.accounts.entries()])),
     grants: new Map(clones([...state.grants.entries()])),
     meters: new Map(clones([...state.meters.entries()])),
+    meteredOperations: new Map(clones([...state.meteredOperations.entries()])),
     prices: new Map(clones([...state.prices.entries()])),
     reservations: new Map(clones([...state.reservations.entries()])),
     usageEvents: new Map(clones([...state.usageEvents.entries()])),

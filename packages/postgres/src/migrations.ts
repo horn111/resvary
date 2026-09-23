@@ -9,7 +9,7 @@ import type {
 import { parseReceiptStoreValue, serializeReceiptStoreValue } from '@resvary/sdk/receipts';
 import { createPostgresHandle, table, type PostgresConnectionConfig } from './connection.js';
 
-export const POSTGRES_SCHEMA_VERSION = 4;
+export const POSTGRES_SCHEMA_VERSION = 5;
 const MIGRATION_LOCK_ID = 7_226_519_918;
 
 export interface PostgresMigrationStatus {
@@ -74,6 +74,7 @@ export async function migratePostgres(
     if (currentVersion < 2) await applyV2(client, handle.schema);
     if (currentVersion < 3) await applyV3(client, handle.schema);
     if (currentVersion < 4) await applyV4(client, handle.schema);
+    if (currentVersion < 5) await applyV5(client, handle.schema);
   } finally {
     await client.query('SELECT pg_advisory_unlock($1)', [MIGRATION_LOCK_ID]).catch(() => undefined);
     client.release();
@@ -671,6 +672,43 @@ export async function applyV4(client: PoolClient, schema: string): Promise<void>
 
     await client.query(
       `INSERT INTO ${t('resvary_schema_migrations')}(version, applied_at) VALUES (4, $1)`,
+      [Date.now()],
+    );
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  }
+}
+
+/** @internal Exported for sequential-migration verification. */
+export async function applyV5(client: PoolClient, schema: string): Promise<void> {
+  const t = (name: string) => table({ schema }, name);
+  await client.query('BEGIN');
+  try {
+    await client.query(`
+      CREATE TABLE ${t('resvary_metered_operations')} (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL,
+        operation_key TEXT NOT NULL,
+        customer_id TEXT NOT NULL,
+        reservation_id TEXT NOT NULL REFERENCES ${t('resvary_credit_reservations')}(id),
+        status TEXT NOT NULL CHECK (status IN (
+          'queued', 'running', 'outcome_unknown', 'result_saved',
+          'needs_reconciliation', 'settled', 'cancelled'
+        )),
+        created_at BIGINT NOT NULL,
+        updated_at BIGINT NOT NULL,
+        payload JSONB NOT NULL,
+        UNIQUE(project_id, operation_key)
+      );
+      CREATE INDEX resvary_metered_operations_status
+        ON ${t('resvary_metered_operations')}(project_id, status, updated_at);
+      CREATE INDEX resvary_metered_operations_customer
+        ON ${t('resvary_metered_operations')}(project_id, customer_id, created_at);
+    `);
+    await client.query(
+      `INSERT INTO ${t('resvary_schema_migrations')}(version, applied_at) VALUES (5, $1)`,
       [Date.now()],
     );
     await client.query('COMMIT');

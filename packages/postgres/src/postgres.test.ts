@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Pool } from 'pg';
-import { CreditLedger } from '@resvary/sdk/credits';
+import { CreditLedger, DurableMeteredOperations } from '@resvary/sdk/credits';
 import { OperatorService } from '@resvary/sdk/admin';
 import {
   PersistentReceiptLedger,
@@ -55,7 +55,58 @@ suite('Postgres stores', () => {
 
   it('applies schema migrations idempotently', async () => {
     const status = await migratePostgres({ pool: pool!, schema });
-    expect(status).toMatchObject({ currentVersion: 4, latestVersion: 4, pendingVersions: [] });
+    expect(status).toMatchObject({ currentVersion: 5, latestVersion: 5, pendingVersions: [] });
+  });
+
+  it('claims a metered operation once across PostgreSQL workers and settles after restart', async () => {
+    const projectId = `operation_${randomUUID().replaceAll('-', '')}`;
+    const firstStore = createPostgresCreditStore({ pool: pool!, schema });
+    const secondStore = createPostgresCreditStore({ pool: pool!, schema });
+    const first = new CreditLedger({ projectId, store: firstStore, now: () => 1_000 });
+    const second = new CreditLedger({ projectId, store: secondStore, now: () => 1_000 });
+    const meter = await first.registerMeter({
+      key: 'jobs',
+      dimensions: ['jobs'],
+      idempotencyKey: 'meter',
+    });
+    const price = await first.createPriceVersion({
+      meterKey: meter.key,
+      rates: [{ dimension: 'jobs', unitSize: '1', amount: '1' }],
+      idempotencyKey: 'price',
+    });
+    await first.grantCredits({ customerId: 'customer', amount: '5', idempotencyKey: 'grant' });
+    const firstOperations = new DurableMeteredOperations(first, { now: () => 1_000 });
+    const secondOperations = new DurableMeteredOperations(second, { now: () => 1_000 });
+    await firstOperations.create({
+      customerId: 'customer',
+      priceId: price.id,
+      estimatedUsage: { jobs: '1' },
+      idempotencyKey: 'job',
+    });
+    const claims = await Promise.all([
+      firstOperations.claim({ operationKey: 'job', workerId: 'a' }),
+      secondOperations.claim({ operationKey: 'job', workerId: 'b' }),
+    ]);
+    expect(claims.filter(Boolean)).toHaveLength(1);
+    await firstOperations.saveResult({
+      operationKey: 'job',
+      claimToken: claims.find(Boolean)!.claimToken!,
+      result: {
+        value: { id: 'provider-1' },
+        actualUsage: { jobs: '1' },
+        usageEventId: 'provider-1',
+      },
+    });
+    const afterRestart = new DurableMeteredOperations(
+      new CreditLedger({
+        projectId,
+        store: createPostgresCreditStore({ pool: pool!, schema }),
+        now: () => 1_001,
+      }),
+      { now: () => 1_001 },
+    );
+    expect((await afterRestart.settle('job')).receipt?.usageEventId).toBe('provider-1');
+    expect(await second.listUsageReceipts('customer')).toHaveLength(1);
   });
 
   it('matches the admin query and operator-action contract', async () => {
@@ -175,7 +226,7 @@ suite('Postgres stores', () => {
     const health = await checkPostgresHealth({ pool: pool!, schema });
     expect(health).toMatchObject({
       ok: true,
-      schemaVersion: 4,
+      schemaVersion: 5,
       reconciliationRequiredFunding: 0,
     });
     expect(health.deadLetterEvents).toBeGreaterThanOrEqual(1);
@@ -232,7 +283,7 @@ suite('Postgres stores', () => {
       `);
       await applyV1(client, upgradeSchema);
       const status = await migratePostgres({ pool: pool!, schema: upgradeSchema });
-      expect(status).toMatchObject({ currentVersion: 4, latestVersion: 4, pendingVersions: [] });
+      expect(status).toMatchObject({ currentVersion: 5, latestVersion: 5, pendingVersions: [] });
       const constraint = await pool!.query<{ exists: boolean }>(
         `SELECT EXISTS (
            SELECT 1 FROM pg_constraint
@@ -408,7 +459,7 @@ suite('Postgres stores', () => {
         );
       }
       const status = await migratePostgres({ pool: pool!, schema: upgradeSchema });
-      expect(status).toMatchObject({ currentVersion: 4, latestVersion: 4 });
+      expect(status).toMatchObject({ currentVersion: 5, latestVersion: 5 });
       const store = createPostgresCreditStore({ pool: pool!, schema: upgradeSchema });
       await expect(store.listCreditLots({ customerId: account.customerId })).resolves.toMatchObject(
         [{ kind: 'legacy', originalAmount: '10', availableAmount: '5', reservedAmount: '5' }],

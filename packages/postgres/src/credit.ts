@@ -23,6 +23,8 @@ import type {
   IdempotencyRecord,
   LedgerEntry,
   MeterDefinition,
+  MeteredOperation,
+  MeteredOperationFilter,
   OutboxDeliveryStore,
   OutboxEventFilter,
   PriceVersion,
@@ -127,6 +129,12 @@ export class PostgresCreditStore implements CreditPolicyStore, OutboxDeliverySto
   }
   listReservations(filter?: CreditReservationFilter) {
     return reader(this.handle.pool, this.handle).listReservations(filter);
+  }
+  getMeteredOperation(projectId: string, operationKey: string) {
+    return reader(this.handle.pool, this.handle).getMeteredOperation(projectId, operationKey);
+  }
+  listMeteredOperations(filter: MeteredOperationFilter) {
+    return reader(this.handle.pool, this.handle).listMeteredOperations(filter);
   }
   getUsageEvent(id: string) {
     return reader(this.handle.pool, this.handle).getUsageEvent(id);
@@ -324,6 +332,12 @@ class PostgresCreditTransaction implements CreditPolicyStoreTransaction {
   listReservations(filter?: CreditReservationFilter) {
     return reader(this.client, this.handle).listReservations(filter);
   }
+  getMeteredOperation(projectId: string, operationKey: string) {
+    return reader(this.client, this.handle).getMeteredOperation(projectId, operationKey);
+  }
+  listMeteredOperations(filter: MeteredOperationFilter) {
+    return reader(this.client, this.handle).listMeteredOperations(filter);
+  }
   getUsageEvent(id: string) {
     return reader(this.client, this.handle).getUsageEvent(id);
   }
@@ -490,6 +504,34 @@ class PostgresCreditTransaction implements CreditPolicyStoreTransaction {
         value.reservedUnits,
         value.expiresAt,
         value.createdAt,
+      ],
+      value,
+    );
+  }
+  saveMeteredOperation(value: MeteredOperation) {
+    return upsert(
+      this.client,
+      this.handle,
+      'resvary_metered_operations',
+      [
+        'id',
+        'project_id',
+        'operation_key',
+        'customer_id',
+        'reservation_id',
+        'status',
+        'created_at',
+        'updated_at',
+      ],
+      [
+        value.id,
+        value.projectId,
+        value.operationKey,
+        value.customerId,
+        value.reservationId,
+        value.status,
+        value.createdAt,
+        value.updatedAt,
       ],
       value,
     );
@@ -782,7 +824,9 @@ class PostgresCreditTransaction implements CreditPolicyStoreTransaction {
 function reader(
   db: Queryable,
   handle: PostgresHandle,
-): CreditStoreReader & CreditPolicyStoreReader {
+): CreditStoreReader &
+  CreditPolicyStoreReader &
+  Required<Pick<CreditStoreReader, 'getMeteredOperation' | 'listMeteredOperations'>> {
   const t = (name: string) => table(handle, name);
   return {
     getAccount: (id) =>
@@ -853,6 +897,25 @@ function reader(
       return all(
         db,
         `SELECT payload::text AS payload FROM ${t('resvary_credit_reservations')} ${query.where} ORDER BY created_at ASC ${limit.sql}`,
+        limit.values,
+      );
+    },
+    getMeteredOperation: (projectId, operationKey) =>
+      one(
+        db,
+        `SELECT payload::text AS payload FROM ${t('resvary_metered_operations')} WHERE project_id = $1 AND operation_key = $2`,
+        [projectId, operationKey],
+      ),
+    listMeteredOperations: (filter) => {
+      const query = sqlFilter([
+        ['project_id', filter.projectId],
+        ['customer_id', filter.customerId],
+        ['status', filter.status],
+      ]);
+      const limit = sqlLimit(filter.limit ?? 100, query.values);
+      return all(
+        db,
+        `SELECT payload::text AS payload FROM ${t('resvary_metered_operations')} ${query.where} ORDER BY created_at, id ${limit.sql}`,
         limit.values,
       );
     },

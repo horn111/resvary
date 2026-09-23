@@ -16,4 +16,4 @@ service account and restrict the database directory with NTFS ACLs.
 
 The existing `createSqliteReceiptStore` remains available for payment invoices, receipts, webhook deliveries, and Arc watcher cursors. Both stores can use the same file.
 
-Requires Node.js 24+ and local filesystem access. The credit store uses WAL, `BEGIN IMMEDIATE`, rollback-safe writes, and versioned schema metadata. Opening an older database applies migrations automatically. Schema v5 adds credit policies and verified legacy-lot backfill; schema v6 adds normalized admin query columns, timeline indexes, and the operator action journal.
+Requires Node.js 24+ and local filesystem access. The credit store uses WAL, `BEGIN IMMEDIATE`, rollback-safe writes, and versioned schema metadata. Opening an older database applies migrations automatically. Schema v5 adds credit policies and verified legacy-lot backfill; schema v6 adds normalized admin query columns, timeline indexes, and the operator action journal; schema v7 adds durable metered operations.
