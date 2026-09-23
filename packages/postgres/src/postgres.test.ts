@@ -226,7 +226,7 @@ suite('Postgres stores', () => {
     const health = await checkPostgresHealth({ pool: pool!, schema });
     expect(health).toMatchObject({
       ok: true,
-      schemaVersion: 4,
+      schemaVersion: 5,
       reconciliationRequiredFunding: 0,
     });
     expect(health.deadLetterEvents).toBeGreaterThanOrEqual(1);

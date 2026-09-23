@@ -97,7 +97,7 @@ Published Testnet evidence does not establish production Mainnet verification.
 
 - [x] Define separate operation and reservation lifecycles for queued or long-running provider calls.
 - [x] Persist provider results and usage before credit settlement; expose reconciliation for expired holds and unknown provider outcomes.
-- [ ] Verify restart recovery and concurrent workers on PostgreSQL in CI without repeating external side effects.
+- [x] Verify restart recovery and concurrent workers on PostgreSQL in CI without repeating external side effects.
 - [x] Keep the 1.x ledger API compatible and specify SQLite v7 and PostgreSQL v5 migrations.
 
 ## Later
