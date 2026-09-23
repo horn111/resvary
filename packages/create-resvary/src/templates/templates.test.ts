@@ -27,7 +27,9 @@ describe('starter templates', () => {
     expect(ai.engines.node).toBe('>=24');
     expect(ai.dependencies['@resvary/sdk']).toBe('1.1.1');
     expect(ai.dependencies['@resvary/sqlite']).toBe('1.1.1');
-    expect(ai.dependencies.next).toBe('16.3.3');
+    expect(ai.dependencies.next).toBe('16.3.5');
+    expect(ai.dependencies.react).toBe('19.3.0');
+    expect(ai.dependencies['react-dom']).toBe('19.3.0');
     expect(ai.devDependencies['@types/node']).toBe('^22.20.1');
     expect(ai.devDependencies['@types/react-dom']).toBe('^19.2.5');
     expect(ai.devDependencies.typescript).toBe('5.9.3');
