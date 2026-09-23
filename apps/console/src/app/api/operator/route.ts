@@ -48,7 +48,6 @@ export async function POST(request: Request) {
           await runtime.operator.expireOverdueReservations({
             actionId,
             reason,
-            before: Date.now(),
           }),
         );
       case 'requeue':

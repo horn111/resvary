@@ -1,6 +1,7 @@
 import { ClaudeDesignController } from './claude-design-controller';
 import { CLAUDE_DESIGN_HTML } from './claude-design.generated';
 import styles from './claude-design.module.css';
+import { version as RELEASE_VERSION } from '../../../../package.json';
 
 const FOOTER_ISSUES_LINK =
   '<a href="https://github.com/horn111/resvary/issues" style="transition:color .2s">Issues</a>';
@@ -65,7 +66,7 @@ const ACCESS_SECTION = `<section id="pricing" data-reveal="1" style="border-top:
     <div style="max-width:1280px;margin:0 auto;display:grid;grid-template-columns:minmax(0,0.72fr) minmax(0,1.28fr);gap:min(8vw,110px);align-items:start">
       <div>
         <div style="font-family:var(--font-mono),'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--color-ink-muted);margin-bottom:26px">10 / Get started</div>
-        <h2 style="margin:0;font-size:clamp(30px,3.6vw,54px);line-height:1.02;letter-spacing:-0.032em;font-weight:500;max-width:17ch;text-wrap:balance">Install version 1.0. Run it in your stack.</h2>
+        <h2 style="margin:0;font-size:clamp(30px,3.6vw,54px);line-height:1.02;letter-spacing:-0.032em;font-weight:500;max-width:17ch;text-wrap:balance">Install version ${RELEASE_VERSION}. Run it in your stack.</h2>
       </div>
       <div style="display:flex;flex-direction:column;gap:28px">
         <p style="margin:0;max-width:65ch;font-size:17px;line-height:1.6;color:var(--color-ink-body);text-wrap:pretty">The Apache-2.0 packages are published on npm. Use SQLite locally or on one node; use Postgres and the worker for multi-process deployments. The Operator Console, signed webhooks, and explicit Mainnet and Testnet funding adapters ship with the self-hosted release.</p>
@@ -95,7 +96,7 @@ let SITE_HTML = CLAUDE_DESIGN_HTML.replaceAll(
   'Hosted Postgres service',
   'Postgres deployment backend',
 )
-  .replaceAll('0.5 stable', '1.0 stable')
+  .replaceAll('0.5 stable', `${RELEASE_VERSION} stable`)
   .replace('<summary>Menu</summary>', MOBILE_MENU_SUMMARY)
   .replaceAll('Run the live demo', 'Explore the ledger')
   .replace('Run the credit lifecycle in one demo', 'Inspect the credit lifecycle in one place')
@@ -113,11 +114,19 @@ let SITE_HTML = CLAUDE_DESIGN_HTML.replaceAll(
   )
   .replace(
     'Version 0.5 supports linear multi-dimensional rates. Tiering, packages, subscriptions, monthly minimums, and allowances are outside the current scope.',
-    'Version 1.0 supports linear, graduated, and package price components with integer-only rating. Package pricing charges each started block and does not create reusable entitlements.',
+    `Version ${RELEASE_VERSION} supports linear, graduated, and package price components with integer-only rating. Package pricing charges each started block and does not create reusable entitlements.`,
   )
   .replace(
     'The packages currently live in the Resvary monorepo. Use the <a href="https://github.com/horn111/resvary/blob/main/docs/getting-started.md" style="color:var(--color-ink);border-bottom:1px solid rgba(242,242,240,0.35)">setup guide</a> until public package releases are available.',
-    'Install the published 1.0 packages from npm. Use @resvary/sdk with @resvary/sqlite locally; add @resvary/postgres and @resvary/worker for multi-process deployments.',
+    `Install the ${RELEASE_VERSION} packages from npm. Use @resvary/sdk with @resvary/sqlite locally; add @resvary/postgres and @resvary/worker for multi-process deployments.`,
+  )
+  .replace(
+    'If provider execution succeeds but the commit fails, the reservation stays open so your application can retry the same commit without giving away completed usage.',
+    'Save the provider result and usage before committing. If the commit fails, retry only the commit with the same key while the reservation remains open and unexpired. An expired reservation is released and requires reconciliation; do not rerun the provider.',
+  )
+  .replace(
+    'The reservation stays open. Retry the commit with the same idempotency key to record the completed usage without charging twice.',
+    'Save the provider result and usage. Retry the commit with the same idempotency key only while the reservation remains open and unexpired. Expired reservations require reconciliation. Do not repeat the provider call.',
   )
   .replace(
     'The deterministic demo needs no AI key. Grant credits, run a request, replay it without a second charge, or trigger a provider failure and inspect the stored result.',
@@ -170,9 +179,9 @@ assertSiteHtml(SITE_HTML);
 
 function assertSiteHtml(html: string) {
   const required = [
-    '1.0 stable',
+    `${RELEASE_VERSION} stable`,
     'data-operator-console-section="true"',
-    'Install version 1.0. Run it in your stack.',
+    `Install version ${RELEASE_VERSION}. Run it in your stack.`,
     'npm install @resvary/sdk @resvary/sqlite',
     'Review the archived Testnet proof',
     'Synthetic example data',

@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-09-23
+
+### Fixed
+
+- Check reservation status and expiry inside the `runMetered` execution-claim transaction. Persist overdue expiry and release the hold without calling the provider; recheck reservations closed by another process before claiming execution.
+- Reuse the persisted expiry cutoff when an Operator Console sweep is retried through HTTP with the same command UUID.
+- Read the website release badge and install version from the root manifest, update getting-started commands, and distinguish Testnet evidence from configured Mainnet support.
+- Explain saved-result recovery after commit failures, including the open, unexpired reservation requirement and explicit reconciliation after expiry.
+
+### Changed
+
+- Update Workflow to `4.8.9` and pin compatible patched `undici`, `nanoid`, and `ws` transitive dependencies.
+- Block unapproved high/critical production dependency and Agent Demo image findings in CI; document two version-scoped `toml@3.0.0` advisory exceptions expiring on October 21, 2026.
+- Prune development dependencies from the Agent Demo image, run it on a nonroot Debian 13 distroless Node runtime, verify startup in CI, and retain a CI SBOM and dependency report.
+- Run npm dependency update checks weekly.
+
+### Compatibility
+
+- Public method signatures and database schema versions are unchanged. Expired reservations now stop before the `runMetered` provider callback; reservation TTLs are not extended during execution.
+
 ## [1.1.0] - 2026-09-20
 
 ### Added
@@ -297,7 +317,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI/CD pipeline with GitHub Actions
 - Security policy and contribution guidelines
 
-[unreleased]: https://github.com/horn111/resvary/compare/v1.1.0...HEAD
+[unreleased]: https://github.com/horn111/resvary/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/horn111/resvary/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/horn111/resvary/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/horn111/resvary/compare/v0.8.0...v1.0.0
 [0.8.0]: https://github.com/horn111/resvary/compare/v0.7.0...v0.8.0

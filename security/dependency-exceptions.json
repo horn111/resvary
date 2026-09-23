@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "exceptions": [
+    {
+      "advisory": "GHSA-82x6-q7mm-w9cf",
+      "cve": "CVE-2026-77465",
+      "package": "toml",
+      "version": "3.0.0",
+      "path": "node_modules/toml",
+      "owner": "horn111",
+      "expires": "2026-10-21",
+      "reason": "Circle CLI 1.1.3 imports Anchor 0.31.1. Anchor parses local Anchor.toml only through its Solana workspace API. Resvary invokes fixed Arc/Gateway CLI commands and accepts no user-supplied TOML or workspace files. Upgrade the upstream chain or remove this dependency before expiry; see docs/dependency-security.md."
+    },
+    {
+      "advisory": "GHSA-v5mp-jgw5-2x6j",
+      "cve": "CVE-2026-63376",
+      "package": "toml",
+      "version": "3.0.0",
+      "path": "node_modules/toml",
+      "owner": "horn111",
+      "expires": "2026-10-21",
+      "reason": "Circle CLI 1.1.3 imports Anchor 0.31.1. Anchor parses local Anchor.toml only through its Solana workspace API. Resvary invokes fixed Arc/Gateway CLI commands and accepts no user-supplied TOML or workspace files. Upgrade the upstream chain or remove this dependency before expiry; see docs/dependency-security.md."
+    }
+  ]
+}

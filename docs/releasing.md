@@ -21,7 +21,9 @@ The workflow has three modes and always checks out the exact `release_sha` from 
 
 A version containing a prerelease suffix, such as `1.0.0-rc.1`, is published to npm `next` and creates a GitHub prerelease. The existing stable `latest` tag stays unchanged. A stable version is published to `latest`; the historical `next` and `alpha` tags remain pinned.
 
-Every root, application, and public package manifest must contain the requested version, and internal public-package dependencies plus generated starter templates must use that exact version. Prepare `1.0.0-rc.1` as its own version commit. Prepare `1.0.0` as a later GA commit after the RC fixes and compatibility freeze.
+Every root, application, and public package manifest must contain the requested version, and internal public-package dependencies plus generated starter templates must use that exact version. Update the current getting-started commands and changelog in the same version commit. The website derives its release badge and install version from the root manifest. When using a release candidate, prepare the prerelease as its own version commit, then prepare GA after the RC fixes and compatibility freeze.
+
+`npm run audit:production` gates every workspace's production graph during CI and release preflight. Any temporary exception must identify an exact advisory, package version and install path, owner, reason, and future expiry. See [dependency security](./dependency-security.md) for the reviewed scope and removal plan. The Agent Demo CI job additionally gates its runtime image and saves an SBOM; release preflight requires a successful CI run for the exact release commit.
 
 Direct npm publication is immutable and is not atomic across six packages. The workflow performs every build, test, browser test, Docker smoke test, image scan, archive, checksum, and local-install gate before the `Production` approval. A retry safely skips an already published package only when its `gitHead`, selected dist-tag, and provenance match the release commit, then continues the remaining dependency levels. A mismatch stops the workflow.
 

@@ -27,7 +27,9 @@ const result = await credits.commitUsage({
 
 Use `runMetered` when provider execution and billing happen in the same process. The method stores an execution claim before the callback, so the same operation key cannot start another provider call through the bundled stores. A matching call on the active `CreditLedger` instance waits for the first call. Another instance receives `MeteredExecutionAlreadyClaimedError` and must reconcile the first execution.
 
-Use the individual commands when a queue or worker separates reservation from execution. Persist the provider result before `commitUsage`. After a commit error, retry `commitUsage` with the saved usage event; do not call the provider again. Pass the operation key to providers that support idempotent requests because the SDK cannot make an external API call and a database transaction atomic.
+Use the individual commands when a queue or worker separates reservation from execution. Persist the provider result before `commitUsage`, or inside the callback before returning from `runMetered`. After a commit error, retry `commitUsage` with the saved usage event and the same commit key only while the reservation remains open and unexpired; a committed event replays its receipt. If the reservation expired or was released, reconcile the saved result and charge explicitly instead of calling the provider again. Pass the operation key to providers that support idempotent requests because the SDK cannot make an external API call and a database transaction atomic.
+
+`runMetered` checks status and expiry atomically when claiming execution. It persists overdue expiry without starting a callback. It does not extend the TTL: choose a TTL that covers the provider's expected execution time and the time needed to save and commit usage.
 
 ## Pricing
 

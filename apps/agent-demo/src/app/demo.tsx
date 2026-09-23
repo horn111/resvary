@@ -167,10 +167,10 @@ export default function Demo() {
         </a>
         <nav aria-label="Demo evidence">
           <a className="proof-link" href="/proofs/2026-09-10.json" target="_blank" rel="noreferrer">
-            Proof
+            Testnet proof
           </a>
           <span className="tag">
-            ARC {status?.arcEnvironment === 'testnet' ? 'TESTNET' : 'MAINNET'}
+            {status ? `ARC ${status.arcEnvironment.toUpperCase()}` : 'CHECKING NETWORK'}
           </span>
         </nav>
       </header>
@@ -186,11 +186,13 @@ export default function Demo() {
         </p>
       </section>
       <div className="notice">
-        {status?.testMode
-          ? 'LOCAL TEST MODE · Deterministic analysis and simulated settlement. No real AI or USDC payment.'
-          : status?.arcEnvironment === 'mainnet'
-            ? 'MAINNET · The agent spends real USDC within a server-enforced per-run limit.'
-            : 'Testnet USDC is supplied by the project. Document analysis uses a paid AI provider.'}
+        {!status
+          ? 'Checking the demo network and payment configuration.'
+          : status.testMode
+            ? 'LOCAL TEST MODE · Deterministic analysis and simulated settlement. No real AI or USDC payment.'
+            : status?.arcEnvironment === 'mainnet'
+              ? 'MAINNET · The agent spends real USDC within a server-enforced per-run limit.'
+              : 'Testnet USDC is supplied by the project. Document analysis uses a paid AI provider.'}
       </div>
       <div className="workspace">
         <section className="document panel">

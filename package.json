@@ -1,6 +1,6 @@
 {
   "name": "resvary",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "private": true,
   "description": "Open-source prepaid credits and usage billing for AI products",
   "repository": {
@@ -20,7 +20,8 @@
     "typecheck": "npm run build:core && npm run build --workspace=create-resvary && tsc --noEmit --project apps/demo/tsconfig.json && tsc --noEmit --project apps/console/tsconfig.json",
     "test": "npm run build:core && npm run test --workspaces --if-present && npm run test:release",
     "test:exports": "node scripts/test-package-exports.mjs",
-    "test:release": "node --test scripts/release/*.test.mjs",
+    "test:release": "node --test scripts/release/*.test.mjs scripts/security/*.test.mjs",
+    "audit:production": "node scripts/security/audit.mjs",
     "test:starters": "npm run build:core && npm run build --workspace=create-resvary && node scripts/test-starters.mjs",
     "generate:admin-load": "npm run build:core && node scripts/generate-admin-load.mjs",
     "benchmark:admin": "npm run build:core && node scripts/benchmark-admin.mjs",
@@ -31,6 +32,13 @@
     "proof:build": "npm run build:core",
     "proof:arc": "npm run proof:build && node examples/arc-testnet-proof.mjs",
     "proof:gateway": "npm run proof:build && node examples/gateway-nanopayment-proof.mjs"
+  },
+  "overrides": {
+    "undici@^7.0.0": "7.29.0",
+    "@workflow/core": {
+      "nanoid": "5.1.16"
+    },
+    "ws@8.18.2": "8.21.0"
   },
   "devDependencies": {
     "@types/node": "^22.20.1",

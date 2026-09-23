@@ -73,6 +73,33 @@ The published evidence is pinned to `v0.4.0-alpha.0` and records an external Arc
 - [x] Ship a read-only synthetic preview and a multi-platform GHCR image pipeline
 - [x] Support preview → RC on npm `next` → GA → post-launch follow-up
 
+## 1.1 stable: Arc Mainnet support
+
+- [x] Explicit Mainnet selection with observed chain identity and canonical network binding
+- [x] Authenticated payer binding and Gateway contract checks for Mainnet funding
+- [x] Durable `runMetered` claims and normalized operator command parameters
+- [x] Bounded PostgreSQL maintenance and admin filtering in SQL
+- [x] Stripe webhook funding guidance
+
+Published Testnet evidence does not establish production Mainnet verification.
+
+## 1.1.1 candidate: expiry and replay correctness
+
+- [x] Check status and expiry atomically with the provider execution claim
+- [x] Persist expired holds without starting the provider callback
+- [x] Preserve an operator sweep's cutoff across HTTP retries
+- [x] Synchronize release copy and document post-expiry recovery limits
+- [x] Gate production dependency advisories and Agent Demo image findings with expiring, version-scoped exceptions
+- [ ] Complete PostgreSQL, browser, and container CI for the release commit
+- [ ] Publish checked 1.1.1 artifacts through the release workflow
+
+## Proposed 1.2: durable operation recovery
+
+- Define separate operation and reservation lifecycles for queued or long-running provider calls.
+- Persist provider results and usage before credit settlement; expose reconciliation for expired holds and unknown provider outcomes.
+- Test restart recovery and concurrent workers without repeating external side effects.
+- Keep the 1.x ledger API compatible and specify migrations before implementation.
+
 ## Later
 
 - hosted control plane, RBAC/OIDC, and multi-project navigation;
