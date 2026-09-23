@@ -185,17 +185,13 @@ export class PostgresAdminStore implements AdminQueryStore {
       values,
     );
     const visible = result.rows.slice(0, page.limit);
-    const items = visible.map(
-      (row): AdminCustomerSummary => ({
-        account: parseReceiptStoreValue<CreditAccount>(row.payload),
-        receiptCount: Number(row.receipt_count),
-        charged30dUnits: row.charged_30d_units,
-        openReservationCount: Number(row.open_reservation_count),
-        lastActivityAt: row.last_activity_at
-          ? Number(row.last_activity_at)
-          : Number(row.updated_at),
-      }),
-    );
+    const items = visible.map((row): AdminCustomerSummary => ({
+      account: parseReceiptStoreValue<CreditAccount>(row.payload),
+      receiptCount: Number(row.receipt_count),
+      charged30dUnits: row.charged_30d_units,
+      openReservationCount: Number(row.open_reservation_count),
+      lastActivityAt: row.last_activity_at ? Number(row.last_activity_at) : Number(row.updated_at),
+    }));
     const last = visible.at(-1);
     return {
       items,
