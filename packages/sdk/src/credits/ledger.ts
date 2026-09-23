@@ -89,8 +89,7 @@ export interface CreatePromotionGrantPolicyInput extends CreateGrantPolicyInputB
 }
 
 export type CreateGrantPolicyInput =
-  | CreateAllowanceGrantPolicyInput
-  | CreatePromotionGrantPolicyInput;
+  CreateAllowanceGrantPolicyInput | CreatePromotionGrantPolicyInput;
 
 export interface ApplyAllowanceInput extends EnsureAccountInput {
   policyId: string;
