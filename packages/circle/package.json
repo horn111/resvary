@@ -63,9 +63,9 @@
   "dependencies": {
     "@circle-fin/x402-batching": "^3.5.0",
     "@resvary/sdk": "1.1.1",
-    "@x402/core": "^2.24.0",
-    "@x402/evm": "^2.24.0",
-    "viem": "^2.56.0"
+    "@x402/core": "^2.26.0",
+    "@x402/evm": "^2.26.0",
+    "viem": "^2.56.8"
   },
   "devDependencies": {
     "typescript": "^5.6.0",
