@@ -93,7 +93,7 @@ test('image exceptions retain exact package version, IDs, reason and expiry', ()
   );
   for (const item of vulnerabilities) {
     assert.deepEqual(item.purls, ['pkg:npm/toml@3.0.0']);
-    assert.equal(item.expired_at, exception.expires);
+    assert.equal(item.expired_at, `${exception.expires}T00:00:00Z`);
     assert.match(item.statement, /maintainer/);
     assert.equal(item.paths, undefined);
   }

@@ -108,7 +108,7 @@ export function trivyExceptions(policy, now = new Date()) {
       [exception.advisory, exception.cve].map((id) => ({
         id,
         purls: [`pkg:npm/${exception.package}@${exception.version}`],
-        expired_at: exception.expires,
+        expired_at: `${exception.expires}T00:00:00Z`,
         statement: `${exception.owner}: ${exception.reason}`,
       })),
     ),
