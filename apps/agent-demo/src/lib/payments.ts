@@ -42,7 +42,7 @@ export function funding(rt: Runtime, id: string) {
     sellerAddress: rt.cfg.seller,
     network,
     facilitator,
-    // Circle CLI 1.1.3 raises batched payment requirements to at least 30 days.
+    // Circle CLI 1.1.4 raises batched payment requirements to at least 30 days.
     // Advertise the same window so strict accepted-requirements validation holds.
     authorizationValiditySeconds: 30 * 24 * 60 * 60,
     resourceUrl: `${rt.cfg.origin}/api/internal/topup/${id}`,
