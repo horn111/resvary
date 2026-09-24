@@ -107,7 +107,7 @@ The application expects these server-side variables. Store secret values as Verc
 
 ## Circle session handling
 
-Run Circle CLI `1.1.3` login on an operator machine, set `AGENT_DEMO_ARC_NETWORK`, then use `scripts/export-circle-session.ts`. The exporter selects only the matching Mainnet or Testnet Agent Wallet slot, encrypts it with AES-256-GCM, and writes two values to the ignored `.env.circle-session.local` file. Each Vercel invocation decrypts the bundle into a new mode-`0700` directory under the platform temporary directory, writes credential files with mode `0600`, gives that directory to the Circle child process, and removes it in `finally`.
+Run Circle CLI `1.1.4` login on an operator machine, set `AGENT_DEMO_ARC_NETWORK`, then use `scripts/export-circle-session.ts`. Existing unexpired `1.1.3` exports remain compatible; Circle now blocks wallet operations through CLI `1.1.3`. The exporter selects only the matching Mainnet or Testnet Agent Wallet slot, encrypts it with AES-256-GCM, and writes two values to the ignored `.env.circle-session.local` file. Each Vercel invocation decrypts the bundle into a new mode-`0700` directory under the platform temporary directory, writes credential files with mode `0600`, gives that directory to the Circle child process, and removes it in `finally`.
 
 The current exported session expires on October 7, 2026. Treat that date as the expiry of this snapshot, not a promised session lifetime. Check the exact stored timestamp and Circle readiness before a production run. The CLI does not refresh the snapshot inside Vercel, so an operator must log in and export a new bundle before expiry.
 
@@ -131,7 +131,7 @@ The service saves provider output before `commitUsage`. A `result_saved` job can
 
 The payment endpoint stores the first authorization's hash, nonce, and validity deadline before contacting the facilitator. It does not store the signature. A later delivery returns an existing settled funding transaction or refuses a second settlement attempt. An operator must reconcile an unknown payment with Circle and the ledger before changing state.
 
-Circle CLI `1.1.3` rewrites the authorization window to 30 days. The demo sets the adapter's `authorizationValiditySeconds` to match; strict requirement comparison and the funding-intent expiry remain unchanged. A successful facilitator response permits the credit grant before Gateway's later onchain batch. A ledger funding status of `settled` does not prove batch finality.
+Circle CLI `1.1.4` rewrites the authorization window to 30 days. The demo sets the adapter's `authorizationValiditySeconds` to match; strict requirement comparison and the funding-intent expiry remain unchanged. A successful facilitator response permits the credit grant before Gateway's later onchain batch. A ledger funding status of `settled` does not prove batch finality.
 
 ## Privacy and security
 

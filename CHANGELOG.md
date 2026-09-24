@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Update Agent Demo to Circle CLI `1.1.4` after Circle blocked wallet operations through `1.1.3`. Continue accepting unexpired session bundles exported with `1.1.3`.
+
 ## [1.2.0] - 2026-09-23
 
 ### Added
