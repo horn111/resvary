@@ -71,7 +71,7 @@ export class DurableMeteredOperations {
         createdAt: now,
         updatedAt: now,
       };
-      await tx.saveMeteredOperation(operation);
+      await this.saveOperation(tx, operation);
       return operation;
     });
   }
@@ -87,6 +87,12 @@ export class DurableMeteredOperations {
     const limit = filter.limit ?? 100;
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 500) {
       throw new Error('Operation list limit must be between 1 and 500');
+    }
+    if (filter.after && (!Number.isSafeInteger(filter.after.createdAt) || !filter.after.id)) {
+      throw new Error('Invalid operation cursor');
+    }
+    if (filter.updatedBefore !== undefined && !Number.isSafeInteger(filter.updatedBefore)) {
+      throw new Error('updatedBefore must be an integer timestamp');
     }
     return this.requireStore().listMeteredOperations!({
       ...filter,
@@ -108,7 +114,7 @@ export class DurableMeteredOperations {
         throw new InvalidCreditStateError(`Operation reservation is missing: ${operation.id}`);
       }
       if (reservation.status !== 'open' || reservation.expiresAt <= this.now()) {
-        await tx.saveMeteredOperation({
+        await this.saveOperation(tx, {
           ...operation,
           status: 'cancelled',
           updatedAt: this.now(),
@@ -124,7 +130,7 @@ export class DurableMeteredOperations {
         claimedAt: this.now(),
         updatedAt: this.now(),
       };
-      await tx.saveMeteredOperation(claimed);
+      await this.saveOperation(tx, claimed);
       return { operation: claimed, release: false };
     });
     if (outcome.release) {
@@ -160,7 +166,7 @@ export class DurableMeteredOperations {
         updatedAt: this.now(),
         lastError: undefined,
       };
-      await tx.saveMeteredOperation(saved);
+      await this.saveOperation(tx, saved);
       return saved;
     });
   }
@@ -182,7 +188,7 @@ export class DurableMeteredOperations {
         lastError: reason,
         updatedAt: this.now(),
       };
-      await tx.saveMeteredOperation(unknown);
+      await this.saveOperation(tx, unknown);
       return unknown;
     });
   }
@@ -207,7 +213,7 @@ export class DurableMeteredOperations {
         evidenceReference,
         lastError: undefined,
       };
-      await tx.saveMeteredOperation(saved);
+      await this.saveOperation(tx, saved);
       return saved;
     });
   }
@@ -234,7 +240,7 @@ export class DurableMeteredOperations {
         evidenceReference,
         updatedAt: this.now(),
       };
-      await tx.saveMeteredOperation(cancelled);
+      await this.saveOperation(tx, cancelled);
       return cancelled;
     });
     const reservation = await this.ledger.getReservation(operation.reservationId);
@@ -295,7 +301,7 @@ export class DurableMeteredOperations {
           lastError: String(error),
           updatedAt: this.now(),
         };
-        await tx.saveMeteredOperation(next);
+        await this.saveOperation(tx, next);
         return next;
       });
       return { operation: unresolved };
@@ -325,7 +331,7 @@ export class DurableMeteredOperations {
         lastError: undefined,
         updatedAt: this.now(),
       };
-      await tx.saveMeteredOperation(next);
+      await this.saveOperation(tx, next);
       return next;
     });
     return { operation: settled, receipt };
@@ -385,7 +391,7 @@ export class DurableMeteredOperations {
           settlementReservationId: undefined,
           updatedAt: this.now(),
         };
-        await tx.saveMeteredOperation(next);
+        await this.saveOperation(tx, next);
         return next;
       });
       if (operation.status === 'settled') return this.settle(operationKey);
@@ -403,7 +409,7 @@ export class DurableMeteredOperations {
             current.reconciliationAttempt !== operation.reconciliationAttempt
           )
             return;
-          await tx.saveMeteredOperation({
+          await this.saveOperation(tx, {
             ...current,
             settlementReservationId: reservation!.id,
             updatedAt: this.now(),
@@ -418,6 +424,40 @@ export class DurableMeteredOperations {
     const operation = await this.get(operationKey);
     if (!operation) throw new CreditNotFoundError('Metered operation', operationKey);
     return operation;
+  }
+
+  private async saveOperation(
+    tx: OperationTransaction,
+    operation: MeteredOperation,
+  ): Promise<void> {
+    const previous = await tx.getMeteredOperation(operation.projectId, operation.operationKey);
+    operation.transitionSequence =
+      (previous?.transitionSequence ?? 0) + (previous?.status === operation.status ? 0 : 1);
+    await tx.saveMeteredOperation(operation);
+    if (previous?.status === operation.status) return;
+    // Keep an immutable transition in the existing transactional outbox. Never include
+    // execution tokens, provider output, metadata, or raw provider errors.
+    await tx.saveOutboxEvent({
+      id: `evt_operation_${randomBytes(16).toString('hex')}`,
+      projectId: operation.projectId,
+      type: 'operation.transitioned',
+      data: {
+        operationId: operation.id,
+        sequence: operation.transitionSequence,
+        operationKey: operation.operationKey,
+        customerId: operation.customerId,
+        fromStatus: previous?.status ?? null,
+        toStatus: operation.status,
+        reservationId: operation.reservationId,
+        settlementReservationId: operation.settlementReservationId,
+        receiptId: operation.receiptId,
+        reconciliationAttempt: operation.reconciliationAttempt ?? 0,
+      },
+      status: 'pending',
+      createdAt: this.now(),
+      nextAttemptAt: this.now(),
+      attemptCount: 0,
+    });
   }
 
   private requireStore() {

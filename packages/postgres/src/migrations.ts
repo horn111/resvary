@@ -9,7 +9,7 @@ import type {
 import { parseReceiptStoreValue, serializeReceiptStoreValue } from '@resvary/sdk/receipts';
 import { createPostgresHandle, table, type PostgresConnectionConfig } from './connection.js';
 
-export const POSTGRES_SCHEMA_VERSION = 5;
+export const POSTGRES_SCHEMA_VERSION = 6;
 const MIGRATION_LOCK_ID = 7_226_519_918;
 
 export interface PostgresMigrationStatus {
@@ -75,6 +75,7 @@ export async function migratePostgres(
     if (currentVersion < 3) await applyV3(client, handle.schema);
     if (currentVersion < 4) await applyV4(client, handle.schema);
     if (currentVersion < 5) await applyV5(client, handle.schema);
+    if (currentVersion < 6) await applyV6(client, handle.schema);
   } finally {
     await client.query('SELECT pg_advisory_unlock($1)', [MIGRATION_LOCK_ID]).catch(() => undefined);
     client.release();
@@ -709,6 +710,28 @@ export async function applyV5(client: PoolClient, schema: string): Promise<void>
     `);
     await client.query(
       `INSERT INTO ${t('resvary_schema_migrations')}(version, applied_at) VALUES (5, $1)`,
+      [Date.now()],
+    );
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  }
+}
+
+/** Operation browsing and transition history indexes; existing records are unchanged. */
+export async function applyV6(client: PoolClient, schema: string): Promise<void> {
+  const t = (name: string) => table({ schema }, name);
+  await client.query('BEGIN');
+  try {
+    await client.query(`
+      CREATE INDEX resvary_operations_timeline ON ${t('resvary_metered_operations')}(project_id, created_at, id);
+      CREATE INDEX resvary_operations_status_timeline ON ${t('resvary_metered_operations')}(project_id, status, created_at, id);
+      CREATE INDEX resvary_operation_history ON ${t('resvary_outbox_events')}(project_id, (payload->'data'->>'operationId'), ((payload->'data'->>'sequence')::bigint)) WHERE type = 'operation.transitioned';
+      CREATE INDEX resvary_operator_target ON ${t('resvary_operator_actions')}(project_id, target_type, target_id, created_at, id);
+    `);
+    await client.query(
+      `INSERT INTO ${t('resvary_schema_migrations')}(version, applied_at) VALUES (6, $1)`,
       [Date.now()],
     );
     await client.query('COMMIT');

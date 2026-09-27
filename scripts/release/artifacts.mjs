@@ -163,6 +163,7 @@ async function smokeArtifacts() {
       manifest.packages.map((entry) => [entry.name, `file:${join(artifactDirectory, entry.file)}`]),
     );
     dependencies.typescript = '5.9.3';
+    dependencies['@types/node'] = '22.20.1';
     await writeFile(
       join(smokeRoot, 'package.json'),
       `${JSON.stringify({ private: true, type: 'module', dependencies }, null, 2)}\n`,
@@ -172,6 +173,7 @@ async function smokeArtifacts() {
     await writeSmokeSources(smokeRoot);
     run(process.execPath, ['check.mjs'], { cwd: smokeRoot });
     run('npm', ['exec', '--', 'tsc', '--noEmit', '--project', 'tsconfig.json'], { cwd: smokeRoot });
+    run(process.execPath, ['operation-recovery.ts'], { cwd: smokeRoot });
     for (const packageInfo of publicPackages.filter(({ cli }) => cli)) {
       const cli = join(smokeRoot, 'node_modules', packageInfo.name, packageInfo.cli);
       run(process.execPath, [cli, '--help'], {
@@ -186,6 +188,11 @@ async function smokeArtifacts() {
 }
 
 async function writeSmokeSources(root) {
+  await writeFile(
+    join(root, 'operation-recovery.ts'),
+    await readFile(new URL('./fixtures/operation-recovery.ts', import.meta.url), 'utf8'),
+    'utf8',
+  );
   await writeFile(
     join(root, 'check.mjs'),
     `const checks = ${JSON.stringify([
@@ -219,7 +226,7 @@ async function writeSmokeSources(root) {
           skipLibCheck: true,
           noEmit: true,
         },
-        include: ['check.ts'],
+        include: ['check.ts', 'operation-recovery.ts'],
       },
       null,
       2,

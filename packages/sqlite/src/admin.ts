@@ -1,5 +1,11 @@
 import { DatabaseSync, type DatabaseSync as DatabaseSyncType } from 'node:sqlite';
 import {
+  summarizeOperation,
+  summarizeTransition,
+  normalizeOperationQuery,
+  operationHealth,
+  type AdminOperationQuery,
+  type AdminOperationStore,
   encodeAdminCursor,
   normalizeAdminPage,
   type AdminAuditQuery,
@@ -15,6 +21,7 @@ import {
   type OperatorAction,
 } from '@resvary/sdk/admin';
 import type {
+  MeteredOperation,
   CreditAccount,
   CreditGrant,
   CreditLot,
@@ -44,7 +51,7 @@ type AuditRow = {
 
 export type SqliteAdminStoreConfig = SqliteCreditStoreConfig;
 
-export class SqliteAdminStore implements AdminQueryStore {
+export class SqliteAdminStore implements AdminQueryStore, AdminOperationStore {
   private readonly db: DatabaseSyncType;
 
   constructor(config: SqliteAdminStoreConfig) {
@@ -52,6 +59,94 @@ export class SqliteAdminStore implements AdminQueryStore {
     migrator.close();
     this.db = new DatabaseSync(config.path, { readOnly: false });
     this.db.exec('PRAGMA busy_timeout = 5000; PRAGMA foreign_keys = ON;');
+  }
+
+  async listOperations(input: AdminOperationQuery) {
+    const page = normalizeOperationQuery(input);
+    const values: unknown[] = [input.projectId];
+    const clauses = ['project_id = ?'];
+    for (const [value, column] of [
+      [input.status, 'status'],
+      [input.customerId, 'customer_id'],
+    ] as const) {
+      if (value) {
+        values.push(value);
+        clauses.push(`${column} = ?`);
+      }
+    }
+    if (input.search) {
+      const search = `%${escapeLike(input.search)}%`;
+      values.push(search, search, search);
+      clauses.push(
+        "(operation_key LIKE ? ESCAPE '\\' OR customer_id LIKE ? ESCAPE '\\' OR id LIKE ? ESCAPE '\\')",
+      );
+    }
+    if (input.updatedBefore !== undefined) {
+      values.push(input.updatedBefore);
+      clauses.push('updated_at <= ?');
+    }
+    if (page.cursor) {
+      values.push(page.cursor.createdAt, page.cursor.createdAt, page.cursor.id);
+      clauses.push('(created_at < ? OR (created_at = ? AND id < ?))');
+    }
+    values.push(page.limit + 1);
+    const rows = this.payloads<MeteredOperation>(
+      `SELECT payload FROM resvary_metered_operations WHERE ${clauses.join(' AND ')} ORDER BY created_at DESC, id DESC LIMIT ?`,
+      ...values,
+    );
+    const visible = rows.slice(0, page.limit);
+    const last = visible.at(-1);
+    return {
+      items: visible.map(summarizeOperation),
+      nextCursor:
+        rows.length > page.limit && last
+          ? encodeAdminCursor({ createdAt: last.createdAt, id: last.id })
+          : undefined,
+    };
+  }
+
+  async getOperation(projectId: string, operationId: string) {
+    const operation = this.payload<MeteredOperation>(
+      'SELECT payload FROM resvary_metered_operations WHERE project_id = ? AND id = ?',
+      projectId,
+      operationId,
+    );
+    return operation ? summarizeOperation(operation) : undefined;
+  }
+
+  async getOperationHealth(projectId: string, now = Date.now()) {
+    const rows = this.db
+      .prepare(
+        'SELECT status, COUNT(*) AS count, MIN(created_at) AS oldest FROM resvary_metered_operations WHERE project_id = ? GROUP BY status',
+      )
+      .all(projectId) as Array<{ status: string; count: number; oldest: number }>;
+    return operationHealth(rows, now);
+  }
+
+  async listOperationHistory(projectId: string, operationId: string, input: AdminPageInput = {}) {
+    const page = normalizeAdminPage(input);
+    const values: unknown[] = [projectId, operationId];
+    let where =
+      "project_id = ? AND type = 'operation.transitioned' AND json_extract(payload, '$.data.operationId') = ?";
+    // This opaque cursor uses the monotonic transition sequence, so equal timestamps stay ordered.
+    if (page.cursor) {
+      values.push(page.cursor.createdAt);
+      where += " AND json_extract(payload, '$.data.sequence') < ?";
+    }
+    values.push(page.limit + 1);
+    const rows = this.payloads<CreditOutboxEvent>(
+      `SELECT payload FROM resvary_outbox_events WHERE ${where} ORDER BY json_extract(payload, '$.data.sequence') DESC LIMIT ?`,
+      ...values,
+    );
+    const visible = rows.slice(0, page.limit);
+    const last = visible.at(-1);
+    return {
+      items: visible.map(summarizeTransition),
+      nextCursor:
+        rows.length > page.limit && last
+          ? encodeAdminCursor({ createdAt: summarizeTransition(last).sequence, id: last.id })
+          : undefined,
+    };
   }
 
   async getOverview(projectId: string, now = Date.now()): Promise<AdminOverview> {
@@ -316,13 +411,25 @@ export class SqliteAdminStore implements AdminQueryStore {
     );
   }
 
-  async listOperatorActions(projectId: string, input: AdminPageInput = {}) {
+  async listOperatorActions(
+    projectId: string,
+    input: AdminPageInput & { targetType?: OperatorAction['targetType']; targetId?: string } = {},
+  ) {
     const page = normalizeAdminPage(input);
     const clauses = ['a.project_id = ?'];
     const values: unknown[] = [projectId];
     if (page.cursor) {
       clauses.push('(a.created_at < ? OR (a.created_at = ? AND a.id < ?))');
       values.push(page.cursor.createdAt, page.cursor.createdAt, page.cursor.id);
+    }
+    for (const [value, column] of [
+      [input.targetType, 'target_type'],
+      [input.targetId, 'target_id'],
+    ] as const) {
+      if (value) {
+        values.push(value);
+        clauses.push(`a.${column} = ?`);
+      }
     }
     values.push(page.limit + 1);
     const rows = this.db
@@ -435,7 +542,10 @@ function toAuditItem(row: AuditRow): AuditItem {
     status: row.status ?? undefined,
     amountUnits: row.amount_units ?? undefined,
     createdAt: row.created_at,
-    payload: parseReceiptStoreValue<unknown>(row.payload),
+    payload:
+      row.kind === 'metered_operation'
+        ? summarizeOperation(parseReceiptStoreValue<MeteredOperation>(row.payload))
+        : parseReceiptStoreValue<unknown>(row.payload),
   };
 }
 
@@ -453,6 +563,13 @@ type AuditBranch = {
 };
 
 const auditBranches: AuditBranch[] = [
+  branch(
+    'metered_operation',
+    'resvary_metered_operations',
+    "'metered.operation'",
+    'status',
+    'NULL',
+  ),
   branch('grant', 'resvary_credit_grants', 'source', 'NULL', 'amount_units'),
   branch(
     'reservation',

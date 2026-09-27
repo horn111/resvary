@@ -1,4 +1,6 @@
 import { expect, test } from '@playwright/test';
+import { mkdir } from 'node:fs/promises';
+import { resolve } from 'node:path';
 
 const secret = 'e2e-admin-secret-with-at-least-32-characters';
 
@@ -129,6 +131,127 @@ test('shows evidence drill-down and rejects a cross-origin mutation', async ({ p
     },
   });
   expect(response.status()).toBe(403);
+});
+
+test('filters a recovery backlog and retries a lost settlement response with the same command ID', async ({
+  page,
+}) => {
+  await authenticate(page);
+  await page.goto('/operations');
+  await expect(page.getByRole('heading', { name: 'Metered operations' })).toBeVisible();
+  const health = await page
+    .context()
+    .request.get('/api/health', { headers: { authorization: `Bearer ${secret}` } });
+  expect(health.status()).toBe(200);
+  expect(await health.json()).toMatchObject({
+    meteredOperations: {
+      unresolvedCount: 3,
+      byStatus: {
+        running: { count: 1 },
+        outcome_unknown: { count: 1 },
+        result_saved: { count: 1 },
+        needs_reconciliation: { count: 1 },
+      },
+    },
+  });
+  await page.getByLabel('Operation status').selectOption('result_saved');
+  await page.getByLabel('Last update').selectOption('1');
+  await page.getByRole('button', { name: 'Filter operations' }).click();
+  await expect(page.getByRole('link', { name: 'e2e-saved-job', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'e2e-unknown-job', exact: true })).toHaveCount(0);
+  const capture = process.env.RESVARY_CAPTURE_REVIEW === '1';
+  const screenshots = resolve(process.cwd(), '../../.impeccable/review');
+  if (capture) await mkdir(screenshots, { recursive: true });
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 1000 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    if (capture)
+      await page.screenshot({
+        path: resolve(screenshots, `operations-${width === 1440 ? 'desktop' : 'mobile'}.png`),
+        fullPage: true,
+      });
+  }
+  await page.getByRole('link', { name: 'e2e-saved-job', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Operation recovery' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Charge evidence' })).toBeVisible();
+  expect(await page.content()).not.toContain('e2e-private-provider-output');
+  expect(await page.content()).not.toContain('e2e-private-worker');
+  expect(await page.content()).not.toContain('claimToken');
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 1000 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    if (capture)
+      await page.screenshot({
+        path: resolve(screenshots, `${width === 1440 ? 'desktop' : 'mobile'}.png`),
+        fullPage: true,
+      });
+  }
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const form = page.locator('form.operation-recovery');
+  await form.getByLabel('Reason').fill('E2E saved result reviewed after worker restart');
+  await form.getByRole('button', { name: 'Review recovery action' }).click();
+  const requests: string[] = [];
+  await page.route('**/api/operator', async (route) => {
+    requests.push(route.request().postData()!);
+    if (requests.length === 1) {
+      const response = await route.fetch();
+      expect(response.status()).toBe(200);
+      await route.abort('failed');
+    } else await route.continue();
+  });
+  await form.getByRole('button', { name: 'Confirm: settle saved usage' }).click();
+  await expect(form.getByRole('alert')).toBeVisible();
+  await form.getByRole('button', { name: 'Retry same command' }).click();
+  await expect(page.getByRole('heading', { name: 'Settled', exact: true })).toBeVisible();
+  expect(requests).toHaveLength(2);
+  expect(requests[1]).toBe(requests[0]);
+  await expect(
+    page.getByRole('cell', { name: 'E2E saved result reviewed after worker restart', exact: true }),
+  ).toHaveCount(1);
+  await expect(
+    page.locator('dl').filter({ hasText: 'Receipt' }).getByRole('link').last(),
+  ).toHaveAttribute('href', /kind=usage_receipt/);
+});
+
+test('reconciles saved usage and resolves an unknown outcome only with external evidence', async ({
+  page,
+}) => {
+  await authenticate(page);
+  for (const [key, label, reason] of [
+    [
+      'e2e-reconcile-job',
+      'reconcile saved usage',
+      'E2E measured usage and available credits verified',
+    ],
+    [
+      'e2e-unknown-job',
+      'confirm no execution',
+      'E2E provider confirmed the request was not executed',
+    ],
+  ]) {
+    await page.goto(`/operations?search=${key}`);
+    await page.getByRole('link', { name: key, exact: true }).click();
+    const form = page.locator('form.operation-recovery');
+    await form.getByLabel('Reason').fill(reason);
+    if (key === 'e2e-unknown-job') {
+      await form.getByRole('button', { name: 'Review recovery action' }).click();
+      await expect(form.getByRole('button', { name: `Confirm: ${label}` })).toHaveCount(0);
+      await form.getByLabel('External evidence reference').fill('provider-log:e2e-no-execution');
+    }
+    await form.getByRole('button', { name: 'Review recovery action' }).click();
+    await form.getByRole('button', { name: `Confirm: ${label}` }).click();
+    await expect(
+      page.getByRole('heading', {
+        name: key === 'e2e-unknown-job' ? 'Cancelled' : 'Settled',
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(page.getByRole('cell', { name: reason, exact: true })).toBeVisible();
+  }
 });
 
 async function authenticate(page: import('@playwright/test').Page) {

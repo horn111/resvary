@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 import type { CreditLedger } from '../credits/ledger.js';
 import type { CreditStore, OutboxDeliveryStore } from '../credits/store.js';
 import { toCreditUnits } from '../credits/amount.js';
+import { DurableMeteredOperations } from '../credits/operations.js';
+import { summarizeOperation } from './operations.js';
 import type {
   AdminQueryStore,
   OperatorAction,
@@ -40,6 +42,19 @@ export interface OperatorRequeueInput extends OperatorCommandBase {
   eventId: string;
 }
 
+export interface OperatorOperationInput extends OperatorCommandBase {
+  operationKey: string;
+}
+
+export interface OperatorSettlementInput extends OperatorOperationInput {
+  /** Bind approval to the immutable result the operator reviewed. */
+  resultHash: string;
+}
+
+export interface OperatorNonExecutionInput extends OperatorOperationInput {
+  evidenceReference: string;
+}
+
 export class OperatorService {
   private readonly now: () => number;
 
@@ -49,6 +64,81 @@ export class OperatorService {
       throw new Error('Operator service and ledger must use the same projectId');
     }
     this.now = config.now ?? Date.now;
+  }
+
+  settleOperation(input: OperatorSettlementInput) {
+    return this.operationCommand(input, 'operation.settle');
+  }
+
+  reconcileOperation(input: OperatorSettlementInput) {
+    return this.operationCommand(input, 'operation.reconcile');
+  }
+
+  markOperationUnknown(input: OperatorOperationInput) {
+    return this.operationCommand(input, 'operation.mark_unknown');
+  }
+
+  confirmOperationNotExecuted(input: OperatorNonExecutionInput) {
+    return this.operationCommand(input, 'operation.confirm_not_executed');
+  }
+
+  private async operationCommand(
+    input: OperatorOperationInput & { resultHash?: string; evidenceReference?: string },
+    type:
+      | 'operation.settle'
+      | 'operation.reconcile'
+      | 'operation.mark_unknown'
+      | 'operation.confirm_not_executed',
+  ) {
+    const operationKey = requireText(input.operationKey, 'operationKey');
+    const charging = type === 'operation.settle' || type === 'operation.reconcile';
+    const resultHash = charging ? requireText(input.resultHash ?? '', 'resultHash') : undefined;
+    if (charging && !/^[a-f0-9]{64}$/.test(resultHash!))
+      throw new Error('Invalid operation result hash');
+    const evidenceReference =
+      type === 'operation.confirm_not_executed'
+        ? requireText(input.evidenceReference ?? '', 'evidenceReference')
+        : undefined;
+    if (evidenceReference && evidenceReference.length > 500)
+      throw new Error('Evidence reference is limited to 500 characters');
+    const operations = new DurableMeteredOperations(this.config.ledger, { now: this.now });
+    const reviewed = await operations.get(operationKey);
+    return this.execute(
+      input,
+      type,
+      'metered_operation',
+      operationKey,
+      {
+        resultHash: resultHash ?? null,
+        evidenceReference: evidenceReference ?? null,
+      },
+      async (_pending, existing) => {
+        const before = await operations.get(operationKey);
+        if (!before) throw new Error('Metered operation not found');
+        if (charging && before.resultHash !== resultHash)
+          throw new Error('Saved result does not match the reviewed operation');
+        let after;
+        if (type === 'operation.settle') after = (await operations.settle(operationKey)).operation;
+        else if (type === 'operation.reconcile')
+          after = (await operations.reconcile(operationKey)).operation;
+        else if (type === 'operation.mark_unknown')
+          after = await operations.markOutcomeUnknown({
+            operationKey,
+            reason: input.reason.trim(),
+          });
+        else
+          after = await operations.confirmNotExecuted({
+            operationKey,
+            evidenceReference: evidenceReference!,
+          });
+        return {
+          fromStatus: existing?.command?.fromStatus ?? reviewed?.status ?? before.status,
+          operation: summarizeOperation(after),
+          resolved: after.status === 'settled' || after.status === 'cancelled',
+        };
+      },
+      { fromStatus: reviewed?.status ?? null },
+    );
   }
 
   grantCredits(input: OperatorGrantInput) {
