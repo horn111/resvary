@@ -141,7 +141,7 @@ describe('SqliteCreditStore', () => {
     const version = db
       .prepare('SELECT MAX(version) AS version FROM resvary_schema_migrations')
       .get() as { version: number };
-    expect(version.version).toBe(7);
+    expect(version.version).toBe(8);
     db.close();
   });
 
@@ -154,7 +154,7 @@ describe('SqliteCreditStore', () => {
 
     const old = new DatabaseSync(path);
     old.exec(
-      'DROP TABLE resvary_metered_operations; DELETE FROM resvary_schema_migrations WHERE version = 7;',
+      'DROP TABLE resvary_metered_operations; DELETE FROM resvary_schema_migrations WHERE version >= 7;',
     );
     old.close();
 
@@ -291,7 +291,7 @@ describe('SqliteCreditStore', () => {
           version: number;
         }
       ).version,
-    ).toBe(7);
+    ).toBe(8);
     database.close();
   });
 
@@ -430,7 +430,7 @@ describe('SqliteCreditStore', () => {
           version: number;
         }
       ).version,
-    ).toBe(7);
+    ).toBe(8);
     migrated.close();
   });
 

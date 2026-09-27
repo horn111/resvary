@@ -912,10 +912,20 @@ function reader(
         ['customer_id', filter.customerId],
         ['status', filter.status],
       ]);
+      const extra: string[] = [];
+      if (filter.after) {
+        query.values.push(filter.after.createdAt, filter.after.id);
+        extra.push(`(created_at, id) > ($${query.values.length - 1}, $${query.values.length})`);
+      }
+      if (filter.updatedBefore !== undefined) {
+        query.values.push(filter.updatedBefore);
+        extra.push(`updated_at <= $${query.values.length}`);
+      }
+      const where = query.where + extra.map((clause) => ` AND ${clause}`).join('');
       const limit = sqlLimit(filter.limit ?? 100, query.values);
       return all(
         db,
-        `SELECT payload::text AS payload FROM ${t('resvary_metered_operations')} ${query.where} ORDER BY created_at, id ${limit.sql}`,
+        `SELECT payload::text AS payload FROM ${t('resvary_metered_operations')} ${where} ORDER BY created_at, id ${limit.sql}`,
         limit.values,
       );
     },

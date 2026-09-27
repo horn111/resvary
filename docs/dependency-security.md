@@ -2,6 +2,8 @@
 
 Reviewed on September 21, 2026 for the 1.1.1 candidate. Run `npm run audit:production` from the repository root after `npm ci`. It checks every workspace's production dependency graph, saves the raw report to `.resvary/npm-audit.json`, and rejects unapproved high or critical advisories. Registry failures and expired exceptions fail the gate too.
 
+Rechecked on September 27, 2026 for the 1.3.0 candidate with Circle CLI 1.1.4. The all-workspace audit still reports 7 low, 5 moderate, and 3 high affected-package entries, with the same two scoped `toml` exceptions. The separate release audit of the six public packages and Operator Console reports no vulnerabilities. npm verified registry signatures for 741 installed packages and attestations for 155. These checks do not replace the container scans.
+
 The Agent Demo CI job also scans its runtime image with Trivy, blocks high/critical findings (including unfixed ones), and uploads a CycloneDX SBOM with the npm report. The runtime image prunes development dependencies and uses the maintained [Debian 13 distroless Node.js 24 runtime](https://github.com/GoogleContainerTools/distroless#what-images-are-available) without a shell or npm. CI starts the built image and checks its homepage before scanning. The scan covers operating-system packages as well as npm dependencies; a passing npm audit alone does not establish that the image passes.
 
 ## Changes in 1.1.1
@@ -27,7 +29,7 @@ These findings receive no high/critical exception. A future severity increase bl
 
 ## Temporary toml exceptions
 
-The chain is `@circle-fin/cli@1.1.3` → `@coral-xyz/anchor@0.31.1` → `toml@3.0.0`.
+The current chain is `@circle-fin/cli@1.1.4` → `@coral-xyz/anchor@0.31.1` → `toml@3.0.0`.
 
 - [GHSA-82x6-q7mm-w9cf / CVE-2026-77465](https://github.com/advisories/GHSA-82x6-q7mm-w9cf): uncontrolled recursion in TOML parsing.
 - [GHSA-v5mp-jgw5-2x6j / CVE-2026-63376](https://github.com/advisories/GHSA-v5mp-jgw5-2x6j): prototype pollution in TOML parsing.

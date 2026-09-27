@@ -1,4 +1,10 @@
 import {
+  summarizeOperation,
+  summarizeTransition,
+  normalizeOperationQuery,
+  operationHealth,
+  type AdminOperationQuery,
+  type AdminOperationStore,
   encodeAdminCursor,
   normalizeAdminPage,
   type AdminAuditQuery,
@@ -14,6 +20,7 @@ import {
   type OperatorAction,
 } from '@resvary/sdk/admin';
 import type {
+  MeteredOperation,
   CreditAccount,
   CreditGrant,
   CreditLot,
@@ -49,11 +56,96 @@ type AuditRow = {
 
 export interface PostgresAdminStoreConfig extends PostgresConnectionConfig {}
 
-export class PostgresAdminStore implements AdminQueryStore {
+export class PostgresAdminStore implements AdminQueryStore, AdminOperationStore {
   private readonly handle: PostgresHandle;
 
   constructor(config: PostgresAdminStoreConfig) {
     this.handle = createPostgresHandle(config);
+  }
+
+  async listOperations(input: AdminOperationQuery) {
+    const page = normalizeOperationQuery(input);
+    const values: unknown[] = [input.projectId];
+    const clauses = ['project_id = $1'];
+    for (const [value, column] of [
+      [input.status, 'status'],
+      [input.customerId, 'customer_id'],
+    ] as const) {
+      if (value) {
+        values.push(value);
+        clauses.push(`${column} = $${values.length}`);
+      }
+    }
+    if (input.search) {
+      values.push(`%${escapeLike(input.search)}%`);
+      clauses.push(
+        `(operation_key LIKE $${values.length} OR customer_id LIKE $${values.length} OR id LIKE $${values.length})`,
+      );
+    }
+    if (input.updatedBefore !== undefined) {
+      values.push(input.updatedBefore);
+      clauses.push(`updated_at <= $${values.length}`);
+    }
+    if (page.cursor) {
+      values.push(page.cursor.createdAt, page.cursor.id);
+      clauses.push(`(created_at, id) < ($${values.length - 1}, $${values.length})`);
+    }
+    values.push(page.limit + 1);
+    const rows = await this.payloads<MeteredOperation>(
+      `SELECT payload::text AS payload FROM ${table(this.handle, 'resvary_metered_operations')} WHERE ${clauses.join(' AND ')} ORDER BY created_at DESC, id DESC LIMIT $${values.length}`,
+      values,
+    );
+    const visible = rows.slice(0, page.limit);
+    const last = visible.at(-1);
+    return {
+      items: visible.map(summarizeOperation),
+      nextCursor:
+        rows.length > page.limit && last
+          ? encodeAdminCursor({ createdAt: last.createdAt, id: last.id })
+          : undefined,
+    };
+  }
+
+  async getOperation(projectId: string, operationId: string) {
+    const operation = await this.payload<MeteredOperation>(
+      `SELECT payload::text AS payload FROM ${table(this.handle, 'resvary_metered_operations')} WHERE project_id = $1 AND id = $2`,
+      [projectId, operationId],
+    );
+    return operation ? summarizeOperation(operation) : undefined;
+  }
+
+  async getOperationHealth(projectId: string, now = Date.now()) {
+    const result = await this.handle.pool.query<{ status: string; count: string; oldest: string }>(
+      `SELECT status, COUNT(*)::text AS count, MIN(created_at)::text AS oldest FROM ${table(this.handle, 'resvary_metered_operations')} WHERE project_id = $1 GROUP BY status`,
+      [projectId],
+    );
+    return operationHealth(result.rows, now);
+  }
+
+  async listOperationHistory(projectId: string, operationId: string, input: AdminPageInput = {}) {
+    const page = normalizeAdminPage(input);
+    const values: unknown[] = [projectId, operationId];
+    let where =
+      "project_id = $1 AND type = 'operation.transitioned' AND payload->'data'->>'operationId' = $2";
+    // This opaque cursor uses the monotonic transition sequence, so equal timestamps stay ordered.
+    if (page.cursor) {
+      values.push(page.cursor.createdAt);
+      where += " AND (payload->'data'->>'sequence')::bigint < $3";
+    }
+    values.push(page.limit + 1);
+    const rows = await this.payloads<CreditOutboxEvent>(
+      `SELECT payload::text AS payload FROM ${table(this.handle, 'resvary_outbox_events')} WHERE ${where} ORDER BY (payload->'data'->>'sequence')::bigint DESC LIMIT $${values.length}`,
+      values,
+    );
+    const visible = rows.slice(0, page.limit);
+    const last = visible.at(-1);
+    return {
+      items: visible.map(summarizeTransition),
+      nextCursor:
+        rows.length > page.limit && last
+          ? encodeAdminCursor({ createdAt: summarizeTransition(last).sequence, id: last.id })
+          : undefined,
+    };
   }
 
   async getOverview(projectId: string, now = Date.now()): Promise<AdminOverview> {
@@ -378,7 +470,10 @@ export class PostgresAdminStore implements AdminQueryStore {
     );
   }
 
-  async listOperatorActions(projectId: string, input: AdminPageInput = {}) {
+  async listOperatorActions(
+    projectId: string,
+    input: AdminPageInput & { targetType?: OperatorAction['targetType']; targetId?: string } = {},
+  ) {
     const page = normalizeAdminPage(input);
     const actions = table(this.handle, 'resvary_operator_actions');
     const values: unknown[] = [projectId];
@@ -386,6 +481,15 @@ export class PostgresAdminStore implements AdminQueryStore {
     if (page.cursor) {
       values.push(page.cursor.createdAt, page.cursor.id);
       clauses.push(`(action.created_at < $2 OR (action.created_at = $2 AND action.id < $3))`);
+    }
+    for (const [value, column] of [
+      [input.targetType, 'target_type'],
+      [input.targetId, 'target_id'],
+    ] as const) {
+      if (value) {
+        values.push(value);
+        clauses.push(`action.${column} = $${values.length}`);
+      }
     }
     values.push(page.limit + 1);
     const result = await this.handle.pool.query<{
@@ -495,13 +599,18 @@ function toAuditItem(row: AuditRow): AuditItem {
     status: row.status ?? undefined,
     amountUnits: row.amount_units ?? undefined,
     createdAt: Number(row.created_at),
-    payload: parseReceiptStoreValue<unknown>(row.payload),
+    payload:
+      row.kind === 'metered_operation'
+        ? summarizeOperation(parseReceiptStoreValue<MeteredOperation>(row.payload))
+        : parseReceiptStoreValue<unknown>(row.payload),
   };
 }
 
 function auditUnionSql(handle: PostgresHandle): string {
   const t = (name: string) => table(handle, name);
   return `
+    SELECT id, project_id, customer_id, 'metered_operation'::text AS kind, 'metered.operation'::text AS type, status, NULL::text AS amount_units, created_at, payload FROM ${t('resvary_metered_operations')}
+    UNION ALL
     SELECT id, project_id, customer_id, 'grant'::text AS kind, source AS type,
       NULL::text AS status, amount_units::text, created_at, payload FROM ${t('resvary_credit_grants')}
     UNION ALL

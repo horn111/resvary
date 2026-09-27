@@ -34,6 +34,9 @@ export interface MeteredOperationFilter {
   customerId?: string;
   status?: MeteredOperationStatus;
   limit?: number;
+  /** Exclusive, ascending keyset position. Use the last returned operation. */
+  after?: { createdAt: number; id: string };
+  updatedBefore?: number;
 }
 
 export interface CreditStoreReader {
@@ -687,7 +690,11 @@ function reader(
             (item) =>
               item.projectId === filter.projectId &&
               (!filter.customerId || item.customerId === filter.customerId) &&
-              (!filter.status || item.status === filter.status),
+              (!filter.status || item.status === filter.status) &&
+              (filter.updatedBefore === undefined || item.updatedAt <= filter.updatedBefore) &&
+              (!filter.after ||
+                item.createdAt > filter.after.createdAt ||
+                (item.createdAt === filter.after.createdAt && item.id > filter.after.id)),
           )
           .sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id))
           .slice(0, filter.limit ?? 100),

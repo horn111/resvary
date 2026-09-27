@@ -2,8 +2,17 @@ import { PageHeader } from '@/components/page-header';
 import { RequeueForm, SweepForm } from '@/components/operator-forms';
 import { getRuntime } from '@/lib/runtime';
 import { formatTimestamp } from '@/lib/format';
+import { MeteredOperations } from '@/components/metered-operations';
 
-export default async function OperationsPage() {
+export default async function OperationsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const raw = await searchParams;
+  const query = Object.fromEntries(
+    Object.entries(raw).map(([key, value]) => [key, typeof value === 'string' ? value : undefined]),
+  );
   const runtime = await getRuntime();
   const [overview, overdue, deadLetters, actions] = await Promise.all([
     runtime.admin.getOverview(runtime.config.projectId),
@@ -15,8 +24,9 @@ export default async function OperationsPage() {
     <main className="section-page">
       <PageHeader
         title="Operations"
-        description="Only bounded recovery work: expired reservations, dead-letter events, and migration health."
+        description="Inspect unfinished AI work, recover saved charges, and resolve delivery failures."
       />
+      <MeteredOperations admin={runtime.admin} projectId={runtime.config.projectId} query={query} />
       <section className="health-strip">
         <div>
           <span>Database</span>
@@ -31,7 +41,7 @@ export default async function OperationsPage() {
           <strong>{overview.pendingOutboxCount}</strong>
         </div>
         <div>
-          <span>Reconciliation</span>
+          <span>Funding reconciliation</span>
           <strong>{overview.reconciliationRequiredCount}</strong>
         </div>
       </section>

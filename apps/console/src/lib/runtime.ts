@@ -1,7 +1,11 @@
 import 'server-only';
 import { existsSync } from 'node:fs';
 import { CreditLedger } from '@resvary/sdk/credits';
-import { OperatorService, type AdminQueryStore } from '@resvary/sdk/admin';
+import {
+  OperatorService,
+  type AdminQueryStore,
+  type AdminOperationStore,
+} from '@resvary/sdk/admin';
 import {
   createPostgresAdminStore,
   createPostgresCreditStore,
@@ -18,7 +22,7 @@ import { getConsoleConfig } from './config';
 
 type Runtime = {
   config: ReturnType<typeof getConsoleConfig>;
-  admin: AdminQueryStore;
+  admin: AdminQueryStore & AdminOperationStore;
   operator: OperatorService;
   store: CreditStore & OutboxDeliveryStore;
   database: 'SQLite' | 'Postgres';

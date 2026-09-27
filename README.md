@@ -21,7 +21,7 @@ grant or top up credits
 → issue an auditable usage receipt
 ```
 
-Resvary keeps credit accounting separate from settlement. Arc is the reference network for external USDC funding: direct Arc transfers and Circle Gateway Nanopayments fund the same ledger. Resvary 1.0 adds an Operator Console for explaining balances and safely recovering operational failures without manual SQL.
+Resvary keeps credit accounting separate from settlement. Arc is the reference network for external USDC funding: direct Arc transfers and Circle Gateway Nanopayments fund the same ledger. The Operator Console explains balances and supports guarded recovery without manual SQL. The unreleased 1.3 update adds [durable-operation recovery](docs/migration-1.3.md) with saved usage evidence, transition history, and replayable commands.
 
 The [agent demo](https://agent.resvary.xyz) shows an OpenAI Agents SDK buyer funding credits through Circle Agent Wallet and Gateway on Arc before it buys document analysis. Its archived public proof was recorded on Testnet; the current source supports an explicit Mainnet configuration.
 

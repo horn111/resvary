@@ -24,5 +24,9 @@ export {
   type OperatorExpireOverdueInput,
   type OperatorGrantInput,
   type OperatorRequeueInput,
+  type OperatorOperationInput,
+  type OperatorSettlementInput,
+  type OperatorNonExecutionInput,
   type OperatorServiceConfig,
 } from './service.js';
+export * from './operations.js';
