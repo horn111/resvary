@@ -1,6 +1,6 @@
-# Preparing for Resvary 1.3
+# Upgrading to Resvary 1.3
 
-The 1.3 update adds operator recovery for the durable metered operations introduced in 1.2. It does not convert existing `runMetered` calls into durable operations. Manifests and starter dependencies are prepared at 1.3.0; publication still requires the release gates in [Release Publication](releasing.md).
+Resvary 1.3 adds operator recovery for the durable metered operations introduced in 1.2. It does not convert existing `runMetered` calls into durable operations. Packages and generated starters use version 1.3.0.
 
 ## Deployment
 

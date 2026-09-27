@@ -69,7 +69,7 @@ Creating the reservation and inserting the operation use two transactions becaus
 
 The existing `resvary-postgres import-sqlite` command intentionally accepts only an offline SQLite schema v5 snapshot from Resvary 0.8. It rejects schemas v7 and v8; it does not drop operation records silently. Do not use that command to move a live 1.2 operation database. Settle or reconcile outstanding operations and use a separately verified migration plan for a newer SQLite database.
 
-## Operator recovery in 1.3 (unreleased)
+## Operator recovery in 1.3
 
 The console's **Operations** page lists durable operations by project, status, last-update age, and operation/customer search. Cursor pagination continues beyond 500 rows. Open a row to inspect the original and settlement holds, measured usage, price breakdown, receipt, state transitions, and recovery command log.
 

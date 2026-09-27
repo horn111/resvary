@@ -18,7 +18,7 @@ export RESVARY_CONSOLE_ADMIN_SECRET='replace-with-at-least-32-random-characters'
 docker compose -f docker-compose.console.yml up -d
 ```
 
-The Compose stack runs the PostgreSQL migration as a separate one-shot service before starting the console. The console itself never runs PostgreSQL DDL. It exits when the database schema does not match its bundled store version: PostgreSQL v6 for the unreleased 1.3 build.
+The Compose stack runs the PostgreSQL migration as a separate one-shot service before starting the console. The console itself never runs PostgreSQL DDL. It exits when the database schema does not match its bundled store version: PostgreSQL v6 for version 1.3.
 
 The image is published as `ghcr.io/horn111/resvary-console`. Release tags are multi-platform (`linux/amd64` and `linux/arm64`) and are accompanied by an SBOM, vulnerability scan, build provenance, and an immutable digest.
 

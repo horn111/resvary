@@ -4,7 +4,7 @@
 
 1. Announce a short writer outage and stop application and outbox-worker writes.
 2. Back up the database and restore that backup into a disposable environment.
-3. For the unreleased 1.3 build, apply PostgreSQL schema v6 with the migration CLI. SQLite migrates to v8 when the store first opens. See [migration notes](migration-1.3.md) for transition-event compatibility and retention.
+3. For version 1.3, apply PostgreSQL schema v6 with the migration CLI. SQLite migrates to v8 when the store first opens. See [migration notes](migration-1.3.md) for transition-event compatibility and retention.
 4. Deploy the application and workers.
 5. Deploy one console instance with one `RESVARY_PROJECT_ID`.
 6. Verify `/api/health`, project isolation, a known charge drill-down, and one idempotent staging action.
