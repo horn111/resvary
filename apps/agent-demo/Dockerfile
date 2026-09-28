@@ -16,6 +16,10 @@ RUN npm ci --ignore-scripts
 COPY . .
 RUN npm run build:core && npm run build --workspace @resvary/agent-demo
 RUN npm prune --omit=dev --ignore-scripts
+# npm retains TypeScript through production peers (Solana types and Workflow's
+# editor plugin). The built app and tsx worker use no compiler at runtime.
+RUN rm -rf node_modules/typescript node_modules/@typescript \
+    && rm -f node_modules/.bin/tsc node_modules/.bin/tsserver
 RUN mkdir -p /home/nonroot/.circle-cli \
     && chown -R 65532:65532 /home/nonroot \
     && chmod 700 /home/nonroot/.circle-cli

@@ -4,16 +4,27 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 2
+    open-pull-requests-limit: 5
+    # Node type majors follow our supported runtimes, not the newest Node release.
+    ignore:
+      - dependency-name: '@types/node'
+        update-types:
+          - version-update:semver-major
     groups:
       production-dependencies:
         patterns:
           - '*'
         dependency-type: production
+        update-types:
+          - minor
+          - patch
       development-dependencies:
         patterns:
           - '*'
         dependency-type: development
+        update-types:
+          - minor
+          - patch
 
   - package-ecosystem: github-actions
     directory: /
