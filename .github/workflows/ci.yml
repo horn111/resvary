@@ -132,7 +132,7 @@ jobs:
       - name: Check Agent Demo runtime dependencies
         run: |
           docker run --rm \
-            --volume "$PWD/scripts/security/check-agent-runtime.mjs:/checks/check-agent-runtime.mjs:ro" \
+            --volume "$PWD/scripts/security:/checks:ro" \
             resvary-agent-demo:ci /checks/check-agent-runtime.mjs
       - name: Smoke test Agent Demo runtime image
         run: |
