@@ -4,8 +4,10 @@ import type { GatewayFundingRequest } from '@resvary/circle';
 import type { UsageReceipt } from '@resvary/sdk/credits';
 import { BUDGET_CEILING_UNITS, RUN_BUDGET_UNITS, estimate } from './config';
 import type { AiConfig } from './ai-providers';
+import { FREE_RUNS_PER_IP, PAID_ESTIMATED_USAGE, walletCustomer } from './billing';
 
 export type Phase =
+  | 'awaiting_credits'
   | 'queued'
   | 'running'
   | 'payment_pending'
@@ -19,6 +21,8 @@ export type Phase =
 export interface Job {
   id: string;
   customer: string;
+  billing_mode: 'free' | 'paid';
+  billing_customer: string | null;
   request_key: string;
   input_hash: string;
   document: string | null;
@@ -76,12 +80,29 @@ ALTER TABLE agent_demo.jobs ADD COLUMN IF NOT EXISTS dispatch_token uuid;
 ALTER TABLE agent_demo.jobs ADD COLUMN IF NOT EXISTS dispatch_started_at timestamptz;
 ALTER TABLE agent_demo.jobs ADD COLUMN IF NOT EXISTS execution_token uuid;
 ALTER TABLE agent_demo.jobs ADD COLUMN IF NOT EXISTS execution_started_at timestamptz;
+ALTER TABLE agent_demo.jobs ADD COLUMN IF NOT EXISTS billing_mode text NOT NULL DEFAULT 'free' CHECK(billing_mode IN ('free','paid'));
+ALTER TABLE agent_demo.jobs ADD COLUMN IF NOT EXISTS billing_customer text;
 CREATE TABLE IF NOT EXISTS agent_demo.authorizations (
  job_id uuid PRIMARY KEY REFERENCES agent_demo.jobs(id), hash text NOT NULL);
 ALTER TABLE agent_demo.authorizations ADD COLUMN IF NOT EXISTS nonce text;
 ALTER TABLE agent_demo.authorizations ADD COLUMN IF NOT EXISTS valid_before text;
 CREATE TABLE IF NOT EXISTS agent_demo.quotas (
  key text PRIMARY KEY, used integer NOT NULL CHECK(used>=0));
+CREATE TABLE IF NOT EXISTS agent_demo.free_trials (
+ ip_hash text PRIMARY KEY, used integer NOT NULL CHECK(used BETWEEN 0 AND 3));
+-- Retain historical sponsored usage across days; rerunning migrations never resets a quota.
+INSERT INTO agent_demo.free_trials(ip_hash,used)
+ SELECT split_part(key,':',3),LEAST(SUM(used),3)::integer FROM agent_demo.quotas
+ WHERE key ~ '^ip:[0-9]{4}-[0-9]{2}-[0-9]{2}:[0-9a-f]{64}$'
+ GROUP BY split_part(key,':',3) ON CONFLICT DO NOTHING;
+CREATE TABLE IF NOT EXISTS agent_demo.wallet_sessions (
+ customer text PRIMARY KEY, address text NOT NULL, expires_at timestamptz NOT NULL);
+CREATE TABLE IF NOT EXISTS agent_demo.wallet_challenges (
+ customer text PRIMARY KEY, address text NOT NULL, message text NOT NULL,
+ expires_at timestamptz NOT NULL);
+CREATE TABLE IF NOT EXISTS agent_demo.wallet_funding (
+ id text PRIMARY KEY, customer text NOT NULL, request jsonb NOT NULL,
+ tx_hash text, created_at timestamptz NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS agent_demo.events (
  seq bigserial PRIMARY KEY, job_id uuid NOT NULL REFERENCES agent_demo.jobs(id),
  kind text NOT NULL, detail jsonb NOT NULL, created_at timestamptz NOT NULL DEFAULT now());
@@ -121,6 +142,7 @@ export class JobStore {
     document: string,
     ipHash: string,
     accepting: boolean,
+    wallet?: string,
   ) {
     if (!/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(key))
       throw new DemoError(400, 'A UUID request key is required');
@@ -152,27 +174,79 @@ export class JobStore {
         throw new DemoError(503, 'New runs are paused. Completed examples remain available.');
       if (!budget || Number(budget.allocated) + RUN_BUDGET_UNITS > Number(budget.ceiling))
         throw new DemoError(429, 'The demo AI budget is exhausted');
-      const day = new Date().toISOString().slice(0, 10);
-      for (const [quota, limit] of [
-        [`session:${customer}`, 3],
-        [`ip:${day}:${ipHash}`, 10],
-      ] as const) {
-        const count = (
-          await client.query(
-            'INSERT INTO agent_demo.quotas(key,used) VALUES($1,1) ON CONFLICT(key) DO UPDATE SET used=agent_demo.quotas.used+1 RETURNING used',
-            [quota],
-          )
-        ).rows[0].used;
-        if (count > limit) throw new DemoError(429, 'Demo request quota reached');
+      const used = Number(
+        (await client.query('SELECT used FROM agent_demo.free_trials WHERE ip_hash=$1', [ipHash]))
+          .rows[0]?.used ?? 0,
+      );
+      const paid = used >= FREE_RUNS_PER_IP;
+      if (paid && !wallet)
+        throw new DemoError(
+          402,
+          'Your IP has used its three free runs. Connect a wallet and add credits to continue.',
+        );
+      // An unfunded paid job cannot enter the execution queue or consume the AI budget.
+      if (paid) {
+        const pending = await client.query(
+          "SELECT id FROM agent_demo.jobs WHERE customer=$1 AND phase='awaiting_credits' AND expires_at>now() LIMIT 1",
+          [customer],
+        );
+        if (pending.rowCount)
+          throw new DemoError(409, 'Finish funding the pending request before creating another.');
+      } else {
+        await client.query(
+          'INSERT INTO agent_demo.free_trials(ip_hash,used) VALUES($1,1) ON CONFLICT(ip_hash) DO UPDATE SET used=agent_demo.free_trials.used+1',
+          [ipHash],
+        );
+        await client.query('UPDATE agent_demo.budget SET allocated=allocated+$1 WHERE id=1', [
+          RUN_BUDGET_UNITS,
+        ]);
       }
+      return (
+        await client.query<Job>(
+          `INSERT INTO agent_demo.jobs(id,customer,request_key,input_hash,document,phase,estimated,billing_mode,billing_customer)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+          [
+            randomUUID(),
+            customer,
+            key,
+            hash,
+            document,
+            paid ? 'awaiting_credits' : 'queued',
+            JSON.stringify(paid ? PAID_ESTIMATED_USAGE : estimated),
+            paid ? 'paid' : 'free',
+            paid ? walletCustomer(wallet!) : customer,
+          ],
+        )
+      ).rows[0];
+    });
+  }
+  async freeRunsRemaining(ipHash: string) {
+    const result = await this.pool.query(
+      'SELECT used FROM agent_demo.free_trials WHERE ip_hash=$1',
+      [ipHash],
+    );
+    return Math.max(0, FREE_RUNS_PER_IP - Number(result.rows[0]?.used ?? 0));
+  }
+  async activatePaid(id: string, reservationId: string, accepting: boolean) {
+    return this.transaction(async (client) => {
+      const budget = (await client.query('SELECT * FROM agent_demo.budget WHERE id=1 FOR UPDATE'))
+        .rows[0];
+      const job = (
+        await client.query<Job>('SELECT * FROM agent_demo.jobs WHERE id=$1 FOR UPDATE', [id])
+      ).rows[0];
+      if (!job || job.billing_mode !== 'paid') throw new DemoError(409, 'Invalid paid request');
+      if (job.phase !== 'awaiting_credits') return job;
+      if (!accepting || job.expires_at.getTime() <= Date.now())
+        throw new DemoError(503, 'New runs are paused or this request has expired');
+      if (!budget || Number(budget.allocated) + RUN_BUDGET_UNITS > Number(budget.ceiling))
+        throw new DemoError(429, 'The demo AI budget is exhausted');
       await client.query('UPDATE agent_demo.budget SET allocated=allocated+$1 WHERE id=1', [
         RUN_BUDGET_UNITS,
       ]);
       return (
         await client.query<Job>(
-          `INSERT INTO agent_demo.jobs(id,customer,request_key,input_hash,document,phase,estimated)
-        VALUES($1,$2,$3,$4,$5,'queued',$6) RETURNING *`,
-          [randomUUID(), customer, key, hash, document, JSON.stringify(estimated)],
+          "UPDATE agent_demo.jobs SET reservation_id=$2,phase='queued' WHERE id=$1 RETURNING *",
+          [id, reservationId],
         )
       ).rows[0];
     });

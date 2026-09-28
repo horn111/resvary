@@ -1,10 +1,16 @@
 # Resvary agent demo architecture
 
-Resvary runs a Next.js production deployment in the dedicated Vercel project `resvary-agent-demo`. Vercel Workflow `4.8.8` coordinates durable execution, and a managed Neon PostgreSQL database in `fra1` holds job state, the credit ledger, idempotency records, quotas, and budget allocation. Two live analyses verified the payment, credit, usage, and replay path; [sanitized evidence](../apps/agent-demo/public/proofs/2026-09-10.json) records their identifiers and amounts.
+Resvary runs a Next.js production deployment in the dedicated Vercel project `resvary-agent-demo`. Vercel Workflow `4.8.8` coordinates durable execution, and a managed Neon PostgreSQL database in `fra1` holds job state, the credit ledger, idempotency records, quotas, and budget allocation. Two live analyses verified the payment, credit, usage, and replay path; [sanitized evidence](archive/agent-demo/2026-09-10-testnet.json) records their identifiers and amounts.
 
 The OpenAI Agents SDK remains the agent runtime. The production provider profile sends the agent loop to Nous `qwen/qwen3.8-flash` and sends the paid document-analysis request to Nous `openai/gpt-4.1-mini` through a bounded OpenAI-compatible transport.
 
-## Paid request sequence
+## Visitor-funded credits
+
+Three lifetime runs per IP use the sponsored path below. Later runs use the visitor's verified wallet account in Resvary Core. A five-minute SIWE challenge establishes wallet ownership; a verified Arc Mainnet memo deposit grants credits. The API reserves up to `$0.347392` before queuing a paid job. After execution, it commits measured agent plus analysis usage and releases the unused reserve. The paid tool set excludes `top_up`, and both the engine and internal payment endpoint reject sponsor-wallet spending for paid jobs.
+
+`agent_demo.free_trials` retains lifetime IP counts, including migrated historical usage. Wallet bindings expire after 24 hours; balances belong to wallet addresses and persist across sessions. See the [current credit policy and recovery rules](../apps/agent-demo/README.md#visitor-credits). The September 10 evidence remains an archived Testnet record.
+
+## Sponsored request sequence
 
 ```mermaid
 sequenceDiagram

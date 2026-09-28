@@ -1,6 +1,15 @@
 # Resvary agent demo
 
-Resvary shows an AI agent buying a paid document-analysis service with product credits. If the visitor account lacks credits, the server uses a Circle Agent Wallet to fund the shortfall through Circle Gateway on the configured Arc network. The Vercel production configuration explicitly selects Mainnet; an omitted network remains on Testnet. Resvary reserves the quoted product credits, saves the provider result, charges measured usage, and returns the saved result with its receipt.
+Resvary shows an AI agent buying document analysis with product credits. Each IP receives three sponsored runs for all time. After that, the visitor signs in with an EOA browser wallet and tops up Resvary Core credits with USDC through Arc Mainnet. The server verifies the onchain memo payment before crediting the wallet's ledger account. It reserves the maximum charge, saves measured agent and analysis usage, then commits the actual charge and releases the unused reserve. Paid runs cannot call the project's Circle wallet.
+
+## Visitor credits
+
+- Wallet sign-in uses a server-generated SIWE message, a five-minute nonce, and a 24-hour signed visitor session. It does not authorize a payment. The balance belongs to the verified wallet address and survives browser sessions.
+- Top-ups offer `0.50`, `1.00`, or `5.00` USDC on Arc Mainnet, chain `5042`. Each deposit has a separate Core funding intent and memo invoice. Chain, successful receipt, sender, recipient, token, amount, and memo must match before credits are granted. Replaying a confirmation cannot grant credits again.
+- The browser sends the memo transaction from the visitor's wallet. No private key or token approval reaches the server. Smart-contract wallets are currently rejected because the Arc memo payment path requires an EOA.
+- The maximum paid reservation is `$0.347392`. Billing combines agent and analysis tokens at `$2` per million input tokens and `$8` per million output tokens. Network fees are separate. Unspent prepaid credits remain in Core; there is no automated withdrawal feature.
+- A pending transaction stays in browser storage. After a lost wallet response, enter its transaction hash and retry verification; do not submit a second payment. Confirmations remain available while new runs are paused.
+- Paid jobs wait in `awaiting_credits` until Core reserves credits. They do not allocate the provider budget or enter the execution queue beforehand. A pending job can resume through `POST /api/jobs/:id`. Reservations expire with the job and maintenance releases expired holds. Operator review is required if agent usage disappears after analysis; the app does not repeat the model call or invent a charge.
 
 The Vercel deployment keeps the OpenAI Agents SDK for the agent loop. The selected Nous configuration uses `qwen/qwen3.8-flash` for the buying agent and `openai/gpt-4.1-mini` for the document-analysis service.
 
@@ -20,23 +29,23 @@ The Vercel deployment keeps the OpenAI Agents SDK for the agent loop. The select
 | Vercel build            | Linux production build passed. Runtime CLI resolution and `@vercel/nft` tracing package Circle CLI dependencies.                                 |
 | Public readiness        | Two real analyses completed. Saved-result replay and a second analysis from remaining credits passed; a separate live isolation test passed.     |
 
-This is a working prototype with a verified live payment-and-analysis path, not a production-maturity claim. See the [sanitized evidence](public/proofs/2026-09-10.json) and [verification qualifications](../../docs/ethonline-continuity.md#evidence-status). No user documents, model results, signatures, session cookies, or credentials appear in the evidence.
+This is a working prototype with a verified live payment-and-analysis path, not a production-maturity claim. See the [sanitized evidence](../../docs/archive/agent-demo/2026-09-10-testnet.json) and [verification qualifications](../../docs/ethonline-continuity.md#evidence-status). No user documents, model results, signatures, session cookies, or credentials appear in the evidence.
 
 ## Request lifecycle
 
 1. The browser creates a signed 24-hour session and submits plain text with a UUID request key.
-2. PostgreSQL deduplicates the request, applies quotas, and allocates a non-returnable `$0.40` demo-budget hold.
+2. PostgreSQL deduplicates the request and checks the lifetime IP allowance. Paid admission requires a verified wallet and a Core reservation before the job enters the queue. Each queued job holds `$0.40` of provider budget.
 3. Vercel Workflow starts a durable run with the job ID. PostgreSQL grants one global execution claim, so the deployment performs one paid agent run at a time.
-4. The OpenAI Agents SDK agent checks the visitor's product-credit balance and quote.
-5. If the balance cannot cover the quote, the server constrains a Circle CLI payment to the stored service URL, configured Arc network, wallet, seller, and maximum amount.
-6. Resvary reserves product credits. The service calls the selected analysis model, saves the result and measured usage, then commits the charge with stable idempotency keys.
+4. The OpenAI Agents SDK agent checks the job's product-credit balance and quote. Paid jobs already hold the visitor's maximum reservation and have no top-up tool.
+5. For a free run, the server may fund the sponsored account through a constrained Circle CLI payment. A paid run uses only the visitor's prepaid balance.
+6. The service saves analysis output and measured usage before the Core commit. For a paid run, it also saves agent usage before charging the combined amount with stable idempotency keys.
 7. The browser polls the job and can replay the saved result without another provider call.
 8. A supervisor reconciles recoverable database state and clears document text and result text after 24 hours.
 
 The demo uses two separate accounting controls:
 
-- The PostgreSQL demo budget allocates `$0.40` for each accepted job and does not return unused allocation.
-- The Resvary product-credit reservation charges measured service usage and releases unused reserved credits when the commit succeeds.
+- The PostgreSQL demo budget holds `$0.40` for each queued job. Completed jobs settle that hold to saved provider costs; uncertain jobs retain the conservative hold.
+- The Resvary reservation charges measured product usage and releases unused credits when the commit succeeds. Paid runs include both the agent and the analysis service.
 
 ## Identity boundary
 
@@ -114,12 +123,12 @@ The current exported session expires on October 7, 2026. Treat that date as the 
 ## Limits and cost controls
 
 - The API accepts plain text from 1 through 12,288 UTF-8 bytes. The service output cap is 1,024 tokens. The agent gets at most eight turns, 512 output tokens per turn, serialized tool calls, and a 16,000-byte provider request cap.
-- Each signed session can create three jobs. Each IP hash can create ten jobs per UTC day. Replaying a known request key does not consume another allowance.
+- Each IP hash receives three free jobs for all time, across sessions and dates. PostgreSQL serializes admission; migration carries forward historical daily counters. Failed accepted runs still consume the free allowance. Paid runs and idempotent replays do not consume it. Shared networks share the allowance; changing IPs can bypass any IP-only policy. Preserve the HMAC secret and lifetime quota table across deployments.
 - The demo budget ceiling is `$10.00`, represented as `10,000,000` micro-USD. Provider probes created `19,390` micro-USD (`$0.019390`) of conservative pre-call holds. The provider reported `$0.00083109` in total probe spend. Record the holds, not the reported bill, in `AGENT_DEMO_INITIAL_SPEND_UNITS` before the first migration of a fresh database.
-- Each accepted job allocates `400,000` micro-USD (`$0.40`) and the application never returns that allocation. With the recorded probe holds, a fresh budget can admit at most 24 jobs. This limit controls exposure; it does not report a provider invoice total.
+- Each queued job holds `400,000` micro-USD (`$0.40`). Completed jobs replace that hold with saved provider costs; uncertain or failed runs keep a conservative hold. This separate demo-wide `$10` ceiling still controls admission for free and paid runs. Top-ups pause when the provider budget cannot admit another job.
 - Product credits use `$2` per million input tokens and `$8` per million output tokens. The receipt reports this product charge, not the Nous invoice.
 - The Circle payment policy rejects a request above `50,000` Gateway units and passes the stored funding amount again as the CLI `--max-amount` value.
-- Readiness requires a valid session for the configured network, the Agent Wallet SCA, the expected backing EOA, and at least `0.05` Gateway USDC.
+- Sponsored readiness requires a valid Circle session, the expected Agent Wallet SCA and backing EOA, and at least `0.05` Gateway USDC. Paid Workflow runs require AI readiness and provider budget, and do not depend on sponsor-wallet funds or its Circle session.
 
 ## Recovery rules
 
@@ -138,7 +147,7 @@ Circle CLI `1.1.4` rewrites the authorization window to 30 days. The demo sets t
 - Workflow receives opaque job IDs and timing/state values. PostgreSQL stores the submitted document and result.
 - The application clears document and result columns after the 24-hour expiry. It retains ledger identifiers, events, quota counters, usage, and receipts. Database backups may retain older content until their own retention window ends.
 - The app sets `store:false` for model calls and disables Agents SDK tracing. Provider-side retention remains subject to the provider's terms.
-- The agent receives four fixed tools and no shell. The server fixes addresses, network, service URL, payment amount, provider profiles, and request limits.
+- The agent receives fixed tools and no shell: four for sponsored jobs, three for paid jobs. Only sponsored jobs expose `top_up`. The server fixes addresses, network, service URL, payment amount, provider profiles, and request limits.
 - The public API derives the visitor account from an HMAC-signed, HttpOnly, `SameSite=Strict` cookie and checks the request origin for mutations.
 
 ## Known limitations

@@ -1,5 +1,19 @@
 import { randomUUID } from 'node:crypto';
-import { beforeAll, beforeEach, afterAll, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, afterEach, afterAll, describe, expect, it, vi } from 'vitest';
+import { privateKeyToAccount } from 'viem/accounts';
+import { encodeAbiParameters, encodeEventTopics, parseAbiItem } from 'viem';
+import { ARC_MAINNET, ARC_TESTNET_CONTRACTS } from '@resvary/sdk';
+import { ARC_MEMO_ABI } from '@resvary/sdk/receipts';
+import {
+  arcClient,
+  walletChallenge,
+  verifyWallet,
+  connectedWallet,
+  createWalletFunding,
+  confirmWalletFunding,
+  reservePaidJob,
+} from './wallet';
+import { PAID_MAX_UNITS, walletCustomer } from './billing';
 import { migratePostgres } from '@resvary/postgres';
 import { createRuntime, price, type Runtime } from './runtime';
 import { JobEngine, ProviderRejected, analyzeFixture } from './engine';
@@ -8,6 +22,7 @@ import { JobStore } from './store';
 import { handle } from './http';
 import { paymentToken } from './auth';
 import { executeWorkflowJob, recoverWorkflowJob } from './workflow-execution';
+import { closeQueuedJobStep } from './workflow-steps';
 
 const database = process.env.TEST_DATABASE_URL;
 describe.skipIf(!database)('durable document jobs on PostgreSQL', () => {
@@ -38,13 +53,14 @@ describe.skipIf(!database)('durable document jobs on PostgreSQL', () => {
   });
   beforeEach(async () => {
     await rt.pool.query(
-      'TRUNCATE agent_demo.events,agent_demo.authorizations,agent_demo.jobs,agent_demo.quotas',
+      'TRUNCATE agent_demo.events,agent_demo.authorizations,agent_demo.jobs,agent_demo.quotas,agent_demo.free_trials,agent_demo.wallet_sessions,agent_demo.wallet_challenges,agent_demo.wallet_funding',
     );
     await rt.pool.query('UPDATE agent_demo.budget SET allocated=0 WHERE id=1');
     await rt.pool.query(
       'UPDATE agent_demo.executor SET job_id=NULL,token=NULL,started_at=NULL WHERE id=1',
     );
   });
+  afterEach(() => vi.restoreAllMocks());
   afterAll(async () => {
     await rt?.pool.end();
   });
@@ -85,9 +101,14 @@ describe.skipIf(!database)('durable document jobs on PostgreSQL', () => {
     expect(claimed.filter(Boolean)).toHaveLength(1);
     expect((await rt.jobs.status()).remainingUnits).toBe(10_000_000 - RUN_BUDGET_UNITS);
   });
-  it('serializes concurrent session quotas and does not consume quota on replay', async () => {
+  it('serializes concurrent lifetime IP quotas and does not consume quota on replay', async () => {
     const owner = randomUUID();
-    const outcomes = await Promise.allSettled(Array.from({ length: 6 }, () => make(owner)));
+    const ip = randomUUID();
+    const outcomes = await Promise.allSettled(
+      Array.from({ length: 6 }, () =>
+        rt.jobs.create(owner, randomUUID(), 'A short test document.', ip, true),
+      ),
+    );
     expect(outcomes.filter((x) => x.status === 'fulfilled')).toHaveLength(3);
     const job = (
       outcomes.find((x) => x.status === 'fulfilled') as PromiseFulfilledResult<
@@ -103,7 +124,203 @@ describe.skipIf(!database)('durable document jobs on PostgreSQL', () => {
         rt.jobs.create(randomUUID(), randomUUID(), 'test', ip, true),
       ),
     );
-    expect(results.filter((x) => x.status === 'fulfilled')).toHaveLength(10);
+    expect(results.filter((x) => x.status === 'fulfilled')).toHaveLength(3);
+  });
+  it('migrates historical IP usage across dates once without resetting the lifetime allowance', async () => {
+    const ip = 'a'.repeat(64);
+    await rt.pool.query('INSERT INTO agent_demo.quotas(key,used) VALUES($1,2),($2,2)', [
+      `ip:2026-09-01:${ip}`,
+      `ip:2026-09-02:${ip}`,
+    ]);
+    await rt.jobs.migrate();
+    expect(await rt.jobs.freeRunsRemaining(ip)).toBe(0);
+    await rt.pool.query('DELETE FROM agent_demo.quotas');
+    await rt.jobs.migrate();
+    expect(await rt.jobs.freeRunsRemaining(ip)).toBe(0);
+    await expect(
+      rt.jobs.create(randomUUID(), randomUUID(), 'New session', ip, true),
+    ).rejects.toMatchObject({ status: 402 });
+    expect((await rt.jobs.status()).remainingUnits).toBe(10_000_000);
+  });
+
+  async function paidJob(wallet: `0x${string}`, ip = randomUUID()) {
+    await rt.pool.query(
+      'INSERT INTO agent_demo.free_trials(ip_hash,used) VALUES($1,3) ON CONFLICT DO NOTHING',
+      [ip],
+    );
+    return rt.jobs.create(randomUUID(), randomUUID(), 'A short paid document.', ip, true, wallet);
+  }
+  it('reserves a paid retry only once and releases a timed-out queue hold after a database retry', async () => {
+    const wallet = privateKeyToAccount(`0x${randomUUID().replaceAll('-', '').repeat(2)}`).address;
+    const job = await paidJob(wallet);
+    await rt.ledger.grantCredits({
+      customerId: walletCustomer(wallet),
+      amount: '1',
+      idempotencyKey: randomUUID(),
+    });
+    const [first, second] = await Promise.all([
+      reservePaidJob(rt, job, wallet, true),
+      reservePaidJob(rt, job, wallet, true),
+    ]);
+    expect(first.reservation_id).toBe(second.reservation_id);
+    expect((await rt.jobs.status()).remainingUnits).toBe(10_000_000 - RUN_BUDGET_UNITS);
+    const release = vi
+      .spyOn(rt.ledger, 'releaseReservation')
+      .mockRejectedValueOnce(new Error('database interrupted'));
+    await expect(closeQueuedJobStep(job.id)).rejects.toThrow();
+    await closeQueuedJobStep(job.id);
+    expect(release).toHaveBeenCalledTimes(2);
+    expect((await rt.ledger.getBalance(walletCustomer(wallet))).availableUnits).toBe('1000000');
+    await closeQueuedJobStep(job.id);
+    expect((await rt.ledger.getBalance(walletCustomer(wallet))).availableUnits).toBe('1000000');
+  });
+  it('requires visitor credits, rejects another wallet, and never calls sponsored funding', async () => {
+    const wallet = privateKeyToAccount(`0x${randomUUID().replaceAll('-', '').repeat(2)}`).address;
+    const job = await paidJob(wallet);
+    expect(job.phase).toBe('awaiting_credits');
+    expect((await rt.jobs.status()).remainingUnits).toBe(10_000_000);
+    await expect(reservePaidJob(rt, job, null, true)).rejects.toMatchObject({ status: 401 });
+    await expect(reservePaidJob(rt, job, rt.cfg.payer, true)).rejects.toMatchObject({
+      status: 401,
+    });
+    await expect(reservePaidJob(rt, job, wallet, true)).rejects.toMatchObject({ status: 402 });
+    await rt.ledger.grantCredits({
+      customerId: walletCustomer(wallet),
+      amount: '0.50',
+      idempotencyKey: randomUUID(),
+    });
+    const queued = await reservePaidJob(rt, job, wallet, true);
+    expect(queued.phase).toBe('queued');
+    expect((await rt.ledger.getBalance(walletCustomer(wallet))).reservedUnits).toBe(
+      PAID_MAX_UNITS.toString(),
+    );
+    const second = await paidJob(wallet);
+    await expect(reservePaidJob(rt, second, wallet, true)).rejects.toMatchObject({ status: 402 });
+    const engine = new JobEngine(rt);
+    await expect(engine.topup(job.id)).rejects.toThrow('cannot spend the sponsor wallet');
+    await engine.run(job.id);
+    const done = await rt.jobs.get(job.id);
+    expect(done.phase).toBe('completed');
+    expect(done.challenge).toBeNull();
+    expect(done.receipt?.customerId).toBe(walletCustomer(wallet));
+    expect((await rt.ledger.getBalance(walletCustomer(wallet))).reservedUnits).toBe('0');
+    const balance = await rt.ledger.getBalance(walletCustomer(wallet));
+    await engine.execute(job.id);
+    expect(await rt.ledger.getBalance(walletCustomer(wallet))).toEqual(balance);
+  });
+  it('charges agent plus analysis usage only after both usage records are saved', async () => {
+    const wallet = privateKeyToAccount(`0x${randomUUID().replaceAll('-', '').repeat(2)}`).address;
+    let job = await paidJob(wallet);
+    await rt.ledger.grantCredits({
+      customerId: walletCustomer(wallet),
+      amount: '1',
+      idempotencyKey: randomUUID(),
+    });
+    job = await reservePaidJob(rt, job, wallet, true);
+    const engine = new JobEngine(rt, vi.fn(analyzeFixture));
+    await engine.execute(job.id);
+    job = await rt.jobs.get(job.id);
+    expect(job.phase).toBe('result_saved');
+    expect(job.receipt).toBeNull();
+    await expect(engine.commit(job)).rejects.toThrow('Agent usage must be persisted');
+    await rt.jobs.patch(job.id, {
+      agent_usage: { inputTokens: 2000, outputTokens: 100, requests: 2 },
+    });
+    job = await rt.jobs.get(job.id);
+    await engine.commit(job);
+    const done = await rt.jobs.get(job.id);
+    expect(done.receipt?.amountUnits).toBe(
+      String(
+        (BigInt(job.usage!.input_tokens) + 2000n) * 2n +
+          (BigInt(job.usage!.output_tokens) + 100n) * 8n,
+      ),
+    );
+    expect(Number(done.receipt?.releasedAmount)).toBeGreaterThan(0);
+  });
+  it('requires an expiring one-time wallet signature before binding a balance', async () => {
+    const mainnet = { ...rt, cfg: { ...rt.cfg, arcEnvironment: 'mainnet' as const } };
+    const account = privateKeyToAccount(`0x${randomUUID().replaceAll('-', '').repeat(2)}`);
+    const owner = randomUUID();
+    vi.spyOn(arcClient, 'getChainId').mockResolvedValue(5042);
+    vi.spyOn(arcClient, 'getCode').mockResolvedValue(undefined);
+    const first = await walletChallenge(mainnet, owner, account.address);
+    const oldSignature = await account.signMessage({ message: first.message });
+    const next = await walletChallenge(mainnet, owner, account.address);
+    await expect(verifyWallet(mainnet, owner, oldSignature)).rejects.toMatchObject({ status: 401 });
+    const signature = await account.signMessage({ message: next.message });
+    await verifyWallet(mainnet, owner, signature);
+    expect(await connectedWallet(mainnet, owner)).toBe(account.address.toLowerCase());
+    await expect(verifyWallet(mainnet, owner, signature)).rejects.toMatchObject({ status: 401 });
+    await walletChallenge(mainnet, owner, account.address);
+    await rt.pool.query(
+      "UPDATE agent_demo.wallet_challenges SET expires_at=now()-interval '1 second'",
+    );
+    await expect(verifyWallet(mainnet, owner, signature)).rejects.toMatchObject({ status: 401 });
+  });
+  it('credits a verified Mainnet memo payment once and rejects wrong chain, payer and invoice', async () => {
+    const mainnet = { ...rt, cfg: { ...rt.cfg, arcEnvironment: 'mainnet' as const } };
+    const wallet = privateKeyToAccount(`0x${randomUUID().replaceAll('-', '').repeat(2)}`).address;
+    const key = randomUUID();
+    const request = await createWalletFunding(mainnet, wallet, '0.50', key);
+    expect((await createWalletFunding(mainnet, wallet, '0.50', key)).fundingIntent.id).toBe(
+      request.fundingIntent.id,
+    );
+    await expect(createWalletFunding(mainnet, wallet, '1.00', key)).rejects.toThrow();
+    const hash = `0x${randomUUID().replaceAll('-', '').repeat(2)}` as const;
+    const transfer = parseAbiItem(
+      'event Transfer(address indexed from,address indexed to,uint256 value)',
+    );
+    const memo = ARC_MEMO_ABI.find((entry) => entry.type === 'event' && entry.name === 'Memo')!;
+    const payment = request.paymentRequest;
+    const logs = [
+      {
+        address: ARC_MAINNET.usdcAddress,
+        topics: encodeEventTopics({
+          abi: [transfer],
+          eventName: 'Transfer',
+          args: { from: wallet, to: rt.cfg.seller },
+        }),
+        data: encodeAbiParameters([{ type: 'uint256' }], [500_000n]),
+      },
+      {
+        address: ARC_TESTNET_CONTRACTS.memo,
+        topics: encodeEventTopics({
+          abi: [memo],
+          eventName: 'Memo',
+          args: { sender: wallet, target: payment.target, memoId: payment.memoId },
+        }),
+        data: encodeAbiParameters(
+          [{ type: 'bytes32' }, { type: 'bytes' }, { type: 'uint256' }],
+          [payment.callDataHash, payment.memoData, 42n],
+        ),
+      },
+    ];
+    const chain = vi.spyOn(arcClient, 'getChainId').mockResolvedValue(5042);
+    const receipt = vi
+      .spyOn(arcClient, 'getTransactionReceipt')
+      .mockResolvedValue({ status: 'success', blockNumber: 10n, logs } as never);
+    chain.mockResolvedValueOnce(5042002);
+    await expect(
+      confirmWalletFunding(mainnet, wallet, request.fundingIntent.id, hash),
+    ).rejects.toThrow();
+    receipt.mockRejectedValueOnce(new Error('pending'));
+    await expect(
+      confirmWalletFunding(mainnet, wallet, request.fundingIntent.id, hash),
+    ).rejects.toThrow();
+    const wrongInvoice = await createWalletFunding(mainnet, wallet, '0.50', randomUUID());
+    await expect(
+      confirmWalletFunding(mainnet, wallet, wrongInvoice.fundingIntent.id, hash),
+    ).rejects.toThrow();
+    await expect(
+      confirmWalletFunding(mainnet, rt.cfg.payer, request.fundingIntent.id, hash),
+    ).rejects.toMatchObject({ status: 404 });
+    const funded = await confirmWalletFunding(mainnet, wallet, request.fundingIntent.id, hash);
+    expect(funded.confirmed).toBe(true);
+    expect(await confirmWalletFunding(mainnet, wallet, request.fundingIntent.id, hash)).toEqual(
+      funded,
+    );
+    expect((await rt.ledger.getBalance(walletCustomer(wallet))).availableUnits).toBe('500000');
+    expect(await rt.ledger.listFundingTransactions(request.fundingIntent.id)).toHaveLength(1);
   });
   it('reserves the shared budget before external calls and persists it', async () => {
     await rt.pool.query('UPDATE agent_demo.budget SET allocated=ceiling-$1 WHERE id=1', [

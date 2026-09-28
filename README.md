@@ -152,7 +152,7 @@ The Continuity implementation adds an OpenAI Agents SDK buyer that purchases doc
 - [Agent demo source and setup](apps/agent-demo/README.md)
 - [Architecture and trust boundaries](docs/agent-demo-architecture.md)
 - [Continuity disclosure](docs/ethonline-continuity.md)
-- [Sanitized live proof](https://agent.resvary.xyz/proofs/2026-09-10.json)
+- [Archived Testnet proof](docs/archive/agent-demo/2026-09-10-testnet.json)
 
 The archived proof verifies the former Circle Testnet payment-and-analysis path. Circle later reported the recorded Gateway transfer as completed, and the Testnet explorer reports its batch transaction as successful. It does not prove the new Mainnet path; Mainnet activation requires a separate wallet session, funded Gateway balance, deployment check, and low-value live verification.
 

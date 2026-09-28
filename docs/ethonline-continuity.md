@@ -56,7 +56,7 @@ This budget allocation differs from the visitor-facing product-credit charge. Re
 
 Source validation passed 43 agent-demo tests, 17 nanopayment and credit-gate tests, and the compiled Workflow browser E2E. These source tests use deterministic-provider and simulated-facilitator paths.
 
-Separate production verification used real Circle Testnet and Nous calls. Managed Neon migrations, the Linux deployment, and operator and deployed-cloud readiness passed. The [sanitized evidence record](../apps/agent-demo/public/proofs/2026-09-10.json) contains:
+Separate production verification used real Circle Testnet and Nous calls. Managed Neon migrations, the Linux deployment, and operator and deployed-cloud readiness passed. The [sanitized evidence record](archive/agent-demo/2026-09-10-testnet.json) contains:
 
 - job `8729f212-e29b-4e5e-8d9c-948423e67781`: one accepted 0.02 Testnet USDC Gateway payment, one funding grant, 0.010276 reserved, 0.001268 charged, and 0.009008 released;
 - replay of that job with the same result, receipt, events, and balance, without another paid call;

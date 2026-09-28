@@ -37,6 +37,10 @@ export async function expireContentStep() {
   'use step';
   try {
     await runtime().jobs.cleanup();
+    await runtime().ledger.releaseExpiredReservations({
+      idempotencyKey: `expired:${Date.now()}`,
+      limit: 100,
+    });
   } catch {
     throw new RetryableError('Content expiration is temporarily unavailable', { retryAfter: '1m' });
   }
@@ -47,10 +51,20 @@ export async function closeQueuedJobStep(id: string) {
   'use step';
   try {
     // A full queue never starts a paid operation after its waiting window.
-    if (await runtime().jobs.transition(id, ['queued'], 'failed')) {
-      await runtime().jobs.patch(id, {
-        failure: 'The demo queue is busy. No analysis was started.',
-      });
+    const rt = runtime();
+    const failure = 'The demo queue is busy. No analysis was started.';
+    await rt.pool.query(
+      "UPDATE agent_demo.jobs SET phase='failed',failure=$2 WHERE id=$1 AND phase='queued'",
+      [id, failure],
+    );
+    const job = await rt.jobs.get(id);
+    if (job.phase === 'failed' && job.failure === failure) {
+      if (job.billing_mode === 'paid' && job.reservation_id)
+        await runtime().ledger.releaseReservation({
+          reservationId: job.reservation_id,
+          idempotencyKey: `queue-timeout:${id}`,
+          reason: 'queue_timeout',
+        });
     }
   } catch {
     throw new RetryableError('Queue state is temporarily unavailable', { retryAfter: '10s' });

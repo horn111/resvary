@@ -19,6 +19,15 @@ export async function recoverWorkflowJob(rt: Runtime, id: string, engine = new J
   const state = await rt.jobs.executionStatus(id);
   if (!state || state.expires_at.getTime() <= Date.now()) return 'expired';
   if (state.phase === 'result_saved') {
+    const saved = await rt.jobs.get(id);
+    if (saved.billing_mode === 'paid' && !saved.agent_usage) {
+      if (state.execution_started_at && state.execution_started_at.getTime() < Date.now() - 600_000)
+        await rt.jobs.patch(id, {
+          phase: 'review_required',
+          failure: 'Agent usage was interrupted. Credits remain reserved for operator review.',
+        });
+      return (await rt.jobs.executionStatus(id))?.phase ?? 'expired';
+    }
     // Only the persisted provider output is used. commitUsage has a stable key.
     await engine.execute(id);
     return (await rt.jobs.executionStatus(id))?.phase ?? 'expired';

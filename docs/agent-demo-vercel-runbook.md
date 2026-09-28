@@ -188,7 +188,7 @@ npm run proof --workspace @resvary/agent-demo -- JOB_UUID
 
 The exporter rejects fixture runs and outputs an allowlisted record without the document, result, signature, session, or credentials. Keep the first output outside the Git worktree until an operator checks the transaction and authorizes publication.
 
-The [September 10 evidence](../apps/agent-demo/public/proofs/2026-09-10.json) is historical Testnet evidence. It must not be presented as Mainnet verification. Publish a separate sanitized Mainnet proof only after checking the transfer, network, amount, payer, seller, replay behavior, and final job receipt.
+The [September 10 evidence](archive/agent-demo/2026-09-10-testnet.json) is historical Testnet evidence. It must not be presented as Mainnet verification. Publish a separate sanitized Mainnet proof only after checking the transfer, network, amount, payer, seller, replay behavior, and final job receipt.
 
 The live browser suite requires explicit opt-in because a full run creates two paid jobs:
 

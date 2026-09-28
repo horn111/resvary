@@ -48,6 +48,8 @@ export function circle(args: string[]): Promise<unknown> {
 }
 
 export async function pay(rt: Runtime, job: Job) {
+  if (job.billing_mode === 'paid')
+    throw new Error('Visitor-funded jobs cannot spend the sponsor wallet');
   if (!job.challenge) throw new Error('Missing persisted challenge');
   const requirements = job.challenge.paymentRequired.accepts[0];
   const network = arcGatewayNetwork(rt.cfg.arcEnvironment);
