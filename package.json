@@ -44,7 +44,7 @@
   "devDependencies": {
     "@types/node": "^22.20.1",
     "prettier": "^3.9.8",
-    "typescript": "^5.9.3"
+    "typescript": "^7.0.2"
   },
   "engines": {
     "node": ">=20.0.0"
