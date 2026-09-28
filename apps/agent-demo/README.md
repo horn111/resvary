@@ -34,18 +34,18 @@ This is a working prototype with a verified live payment-and-analysis path, not 
 ## Request lifecycle
 
 1. The browser creates a signed 24-hour session and submits plain text with a UUID request key.
-2. PostgreSQL deduplicates the request, applies quotas, and allocates a non-returnable `$0.40` demo-budget hold.
+2. PostgreSQL deduplicates the request and checks the lifetime IP allowance. Paid admission requires a verified wallet and a Core reservation before the job enters the queue. Each queued job holds `$0.40` of provider budget.
 3. Vercel Workflow starts a durable run with the job ID. PostgreSQL grants one global execution claim, so the deployment performs one paid agent run at a time.
-4. The OpenAI Agents SDK agent checks the visitor's product-credit balance and quote.
-5. If the balance cannot cover the quote, the server constrains a Circle CLI payment to the stored service URL, configured Arc network, wallet, seller, and maximum amount.
-6. Resvary reserves product credits. The service calls the selected analysis model, saves the result and measured usage, then commits the charge with stable idempotency keys.
+4. The OpenAI Agents SDK agent checks the job's product-credit balance and quote. Paid jobs already hold the visitor's maximum reservation and have no top-up tool.
+5. For a free run, the server may fund the sponsored account through a constrained Circle CLI payment. A paid run uses only the visitor's prepaid balance.
+6. The service saves analysis output and measured usage before the Core commit. For a paid run, it also saves agent usage before charging the combined amount with stable idempotency keys.
 7. The browser polls the job and can replay the saved result without another provider call.
 8. A supervisor reconciles recoverable database state and clears document text and result text after 24 hours.
 
 The demo uses two separate accounting controls:
 
-- The PostgreSQL demo budget allocates `$0.40` for each accepted job and does not return unused allocation.
-- The Resvary product-credit reservation charges measured service usage and releases unused reserved credits when the commit succeeds.
+- The PostgreSQL demo budget holds `$0.40` for each queued job. Completed jobs settle that hold to saved provider costs; uncertain jobs retain the conservative hold.
+- The Resvary reservation charges measured product usage and releases unused credits when the commit succeeds. Paid runs include both the agent and the analysis service.
 
 ## Identity boundary
 
@@ -147,7 +147,7 @@ Circle CLI `1.1.4` rewrites the authorization window to 30 days. The demo sets t
 - Workflow receives opaque job IDs and timing/state values. PostgreSQL stores the submitted document and result.
 - The application clears document and result columns after the 24-hour expiry. It retains ledger identifiers, events, quota counters, usage, and receipts. Database backups may retain older content until their own retention window ends.
 - The app sets `store:false` for model calls and disables Agents SDK tracing. Provider-side retention remains subject to the provider's terms.
-- The agent receives four fixed tools and no shell. The server fixes addresses, network, service URL, payment amount, provider profiles, and request limits.
+- The agent receives fixed tools and no shell: four for sponsored jobs, three for paid jobs. Only sponsored jobs expose `top_up`. The server fixes addresses, network, service URL, payment amount, provider profiles, and request limits.
 - The public API derives the visitor account from an HMAC-signed, HttpOnly, `SameSite=Strict` cookie and checks the request origin for mutations.
 
 ## Known limitations
