@@ -51,6 +51,6 @@ Trivy's YAML ignore format, package URL matching, and expiration rules are descr
 
 ### Agent Demo compiler exclusion
 
-`npm prune --omit=dev` retains TypeScript because Solana packages and Workflow's editor plugin declare it as a production peer. The Docker build uses the compiler, then removes `typescript`, its `@typescript` native compiler packages, and its executable links before copying the runtime tree. This preserves other production peers, Circle CLI, and `tsx`/esbuild for Compose migrations and the worker.
+`npm prune --omit=dev` retains TypeScript because Solana packages and Workflow's editor plugin declare it as a production peer. Next.js also retains Playwright through an optional test peer. The Docker build uses the compiler, then removes `typescript`, its `@typescript` native compiler packages, the Playwright test packages, and their executable links before copying the runtime tree. This preserves other production peers, Circle CLI, and `tsx`/esbuild for Compose migrations and the worker.
 
 CI checks the built image for compiler packages, including nested installations, imports the persistence adapters and worker modules, and starts Circle CLI with `--version`. It then starts the web server and runs the existing Trivy gate. A future dependency that needs the TypeScript compiler at runtime requires a packaging review; do not suppress the image findings or remove another runtime peer to pass the scan.

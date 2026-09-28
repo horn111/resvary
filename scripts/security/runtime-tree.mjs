@@ -8,7 +8,15 @@ export async function checkRuntimeTree(directory) {
     const path = join(directory, entry.name);
     if (
       basename(directory) === 'node_modules' &&
-      ['typescript', '@typescript', 'prettier', 'vitest', '@playwright'].includes(entry.name)
+      [
+        'typescript',
+        '@typescript',
+        'prettier',
+        'vitest',
+        '@playwright',
+        'playwright',
+        'playwright-core',
+      ].includes(entry.name)
     ) {
       // npm prune can leave an empty scope directory after removing its packages.
       const contents = await readdir(path);

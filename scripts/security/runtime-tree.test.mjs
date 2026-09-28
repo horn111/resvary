@@ -17,6 +17,8 @@ for (const packagePath of [
   'node_modules/typescript',
   'node_modules/@typescript/typescript-linux-x64',
   'node_modules/@playwright/test',
+  'node_modules/playwright',
+  'node_modules/playwright-core',
   'apps/agent-demo/node_modules/typescript',
   'node_modules/workflow/node_modules/typescript',
 ]) {
