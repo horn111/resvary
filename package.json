@@ -34,6 +34,9 @@
     "proof:gateway": "npm run proof:build && node examples/gateway-nanopayment-proof.mjs"
   },
   "overrides": {
+    "@coral-xyz/anchor@0.31.1": {
+      "toml": "4.3.0"
+    },
     "undici@^7.0.0": "7.29.0",
     "undici@7.28.0": "7.29.0",
     "@workflow/core": {
