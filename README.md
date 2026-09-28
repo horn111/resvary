@@ -7,7 +7,7 @@
 <p align="center"><strong>Open-source prepaid credits and usage billing for AI products.</strong></p>
 
 <p align="center">
-  <a href="https://ethglobal.com/events/ethonline2026"><img src="https://img.shields.io/badge/ETHOnline%202026-Continuity%20participant-6c5ce7?style=flat-square&logo=ethereum&logoColor=white" alt="ETHOnline 2026 Continuity participant" /></a>
+  <a href="https://ethglobal.com/showcase/resvary-ojfqx"><img src="https://img.shields.io/badge/ETHOnline%202026-Continuity%20participant-6c5ce7?style=flat-square&logo=ethereum&logoColor=white" alt="ETHOnline 2026 Continuity participant" /></a>
 </p>
 
 Resvary gives AI applications a durable balance ledger and a safe request lifecycle:
@@ -273,3 +273,13 @@ npm run build
 ```
 
 The project is Apache-2.0 licensed. See [SECURITY.md](SECURITY.md) before reporting a vulnerability.
+
+---
+
+<p align="center">
+  <a href="https://resvary.xyz">Website</a> &middot;
+  <a href="#documentation">Documentation</a> &middot;
+  <a href="https://x.com/resvaryAI">X / @resvaryAI</a> &middot;
+  <a href="https://www.producthunt.com/products/resvary">Product Hunt</a> &middot;
+  <a href="https://ethglobal.com/showcase/resvary-ojfqx">ETHOnline showcase</a>
+</p>
