@@ -5,9 +5,6 @@ import { checkRuntimeTree } from './runtime-tree.mjs';
 
 await checkRuntimeTree('/workspace');
 const require = createRequire('/workspace/apps/agent-demo/package.json');
-for (const name of ['@resvary/sdk', '@resvary/postgres', '@resvary/circle', 'pg']) {
-  await import(require.resolve(name));
-}
 const cli = require.resolve('@circle-fin/cli');
 const version = execFileSync(process.execPath, [cli, '--version'], {
   encoding: 'utf8',
@@ -23,7 +20,7 @@ execFileSync(
     require.resolve('tsx'),
     '--input-type=module',
     '--eval',
-    "await import('./src/lib/runtime.ts'); await import('./src/lib/engine.ts');",
+    "await import('@resvary/sdk'); await import('@resvary/postgres'); await import('@resvary/circle'); await import('pg'); await import('./src/lib/runtime.ts'); await import('./src/lib/engine.ts');",
   ],
   { cwd: '/workspace/apps/agent-demo', stdio: 'inherit', timeout: 30_000 },
 );
