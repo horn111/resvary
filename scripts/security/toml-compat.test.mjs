@@ -87,7 +87,8 @@ test('Circle CLI loads wallet, Gateway and payment commands without credentials'
         cwd: root,
         env,
         encoding: 'utf8',
-        timeout: 30_000,
+        // Match the application's CLI timeout, including a cold module load.
+        timeout: 90_000,
         maxBuffer: 256_000,
         windowsHide: true,
       });
