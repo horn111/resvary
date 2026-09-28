@@ -129,6 +129,11 @@ jobs:
       - run: npm run test:e2e --workspace @resvary/agent-demo
       - name: Build deployment image
         run: docker build --tag resvary-agent-demo:ci --file apps/agent-demo/Dockerfile .
+      - name: Check Agent Demo runtime dependencies
+        run: |
+          docker run --rm \
+            --volume "$PWD/scripts/security:/checks:ro" \
+            resvary-agent-demo:ci /checks/check-agent-runtime.mjs
       - name: Smoke test Agent Demo runtime image
         run: |
           docker run --detach --name resvary-agent-demo-ci --publish 3111:3100 resvary-agent-demo:ci

@@ -43,7 +43,7 @@ services:
     <<: *app
     restart: 'no'
     environment: *env
-    command: [node, ../../node_modules/tsx/dist/cli.mjs, scripts/migrate.ts]
+    command: [../../node_modules/tsx/dist/cli.mjs, scripts/migrate.ts]
     profiles: [tools]
   web:
     <<: *app
@@ -54,8 +54,8 @@ services:
     environment:
       <<: *env
       OPENAI_API_KEY: ${OPENAI_API_KEY:?Set API key}
-    volumes: [circle-session:/home/node/.circle-cli]
-    command: [node, ../../node_modules/tsx/dist/cli.mjs, src/worker.ts]
+    volumes: [circle-session:/home/nonroot/.circle-cli]
+    command: [../../node_modules/tsx/dist/cli.mjs, src/worker.ts]
 volumes:
   postgres-data:
   circle-session:

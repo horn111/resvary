@@ -42,9 +42,15 @@ Re-review before enabling Solana workspace features, processing uploaded configu
 
 ## Maintenance
 
-1. Let the weekly npm Dependabot check propose updates, then review the lockfile and run workspace tests, Agent Demo build, and PostgreSQL/browser CI.
+1. Let the weekly npm Dependabot check propose updates, then review the lockfile and run workspace tests, Agent Demo build, and PostgreSQL/browser CI. Group production and development minor/patch updates separately; review each major dependency update in its own PR. Keep Node type majors aligned with supported runtimes through a deliberate migration rather than an automatic upgrade to the latest Node release.
 2. Remove each override once all callers resolve to a fixed compatible version without it. Keep overrides version-scoped.
 3. Inspect both the raw audit report and image findings. Never add a blanket package, severity, or `ignore-unfixed` exemption to make the Agent Demo scan pass.
 4. For a necessary exception, document the affected input path, exact version, owner, expiry, and removal plan in the policy and this document. The image exceptions derive from the same policy; do not maintain a second independent allowlist.
 
 Trivy's YAML ignore format, package URL matching, and expiration rules are described in its [filtering documentation](https://trivy.dev/docs/latest/configuration/filtering/).
+
+### Agent Demo compiler exclusion
+
+`npm prune --omit=dev` retains TypeScript because Solana packages and Workflow's editor plugin declare it as a production peer. Next.js also retains Playwright through an optional test peer. The Docker build uses the compiler, then removes `typescript`, its `@typescript` native compiler packages, the Playwright test packages, and their executable links before copying the runtime tree. This preserves other production peers, Circle CLI, and `tsx`/esbuild for Compose migrations and the worker.
+
+CI checks the built image for compiler packages, including nested installations, imports the persistence adapters and worker modules, and starts Circle CLI with `--version`. It then starts the web server and runs the existing Trivy gate. A future dependency that needs the TypeScript compiler at runtime requires a packaging review; do not suppress the image findings or remove another runtime peer to pass the scan.

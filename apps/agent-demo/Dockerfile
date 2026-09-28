@@ -16,6 +16,12 @@ RUN npm ci --ignore-scripts
 COPY . .
 RUN npm run build:core && npm run build --workspace @resvary/agent-demo
 RUN npm prune --omit=dev --ignore-scripts
+# npm retains TypeScript through Solana/Workflow peers and Playwright through
+# Next's optional test peer. The server and tsx worker need neither toolchain.
+RUN rm -rf node_modules/typescript node_modules/@typescript \
+      node_modules/@playwright node_modules/playwright node_modules/playwright-core \
+    && rm -f node_modules/.bin/tsc node_modules/.bin/tsserver \
+      node_modules/.bin/playwright node_modules/.bin/playwright-core
 RUN mkdir -p /home/nonroot/.circle-cli \
     && chown -R 65532:65532 /home/nonroot \
     && chmod 700 /home/nonroot/.circle-cli
