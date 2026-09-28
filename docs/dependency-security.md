@@ -4,6 +4,8 @@ Reviewed on September 21, 2026 for the 1.1.1 candidate. Run `npm run audit:produ
 
 Rechecked on September 27, 2026 for version 1.3.0 with Circle CLI 1.1.4. The all-workspace audit still reports 7 low, 5 moderate, and 3 high affected-package entries, with the same two scoped `toml` exceptions. The separate release audit of the six public packages and Operator Console reports no vulnerabilities. npm verified registry signatures for 741 installed packages and attestations for 155. These checks do not replace the container scans.
 
+Rechecked on September 28, 2026 after overriding Anchor's TOML parser to `4.3.0`. The all-workspace production audit reports **7 low, 7 moderate, 0 high, and 0 critical** affected-package entries, with **no temporary exceptions**. Circle CLI and Anchor still inherit moderate findings from their other dependencies; removing their inherited TOML findings moves these two entries from high to moderate. The lower-severity advisory sources remain unchanged.
+
 The Agent Demo CI job also scans its runtime image with Trivy, blocks high/critical findings (including unfixed ones), and uploads a CycloneDX SBOM with the npm report. The runtime image prunes development dependencies and uses the maintained [Debian 13 distroless Node.js 24 runtime](https://github.com/GoogleContainerTools/distroless#what-images-are-available) without a shell or npm. CI starts the built image and checks its homepage before scanning. The scan covers operating-system packages as well as npm dependencies; a passing npm audit alone does not establish that the image passes.
 
 ## Changes in 1.1.1
@@ -27,18 +29,18 @@ The remaining lower-severity sources also ship through Circle CLI's production g
 
 These findings receive no high/critical exception. A future severity increase blocks the gate until addressed or explicitly reviewed.
 
-## Temporary toml exceptions
+## Patched TOML parser
 
-The current chain is `@circle-fin/cli@1.1.4` → `@coral-xyz/anchor@0.31.1` → `toml@3.0.0`.
+The installed chain is `@circle-fin/cli@1.1.4` → `@coral-xyz/anchor@0.31.1` → `toml@4.3.0`. A root override applies only to `@coral-xyz/anchor@0.31.1`. At the September 28 review, Circle CLI's latest release was still `1.1.4`, and both its pinned Anchor `0.31.1` and the latest Anchor `0.32.1` requested TOML `^3.0.0`.
 
-- [GHSA-82x6-q7mm-w9cf / CVE-2026-77465](https://github.com/advisories/GHSA-82x6-q7mm-w9cf): uncontrolled recursion in TOML parsing.
-- [GHSA-v5mp-jgw5-2x6j / CVE-2026-63376](https://github.com/advisories/GHSA-v5mp-jgw5-2x6j): prototype pollution in TOML parsing.
+- [GHSA-82x6-q7mm-w9cf / CVE-2026-77465](https://github.com/advisories/GHSA-82x6-q7mm-w9cf): uncontrolled recursion in TOML parsing, fixed in `4.2.0`.
+- [GHSA-v5mp-jgw5-2x6j / CVE-2026-63376](https://github.com/advisories/GHSA-v5mp-jgw5-2x6j): prototype pollution in TOML parsing, fixed in `4.1.2`.
 
-The maintainer owns both exceptions. They expire at **2026-10-21 00:00 UTC**. Their machine-readable source is [`security/dependency-exceptions.json`](../security/dependency-exceptions.json). The npm gate matches advisory, installed path, package, and exact version. It follows inherited advisory references rather than exempting Circle CLI or Anchor wholesale. The generated Trivy ignore file uses the corresponding GHSA/CVE IDs and the exact `pkg:npm/toml@3.0.0` package URL. A new advisory or another version remains blocking.
+TOML `4.3.0` fixes both advisories and retains the CommonJS entry point and Buffer input support used by Anchor. [`scripts/security/toml-compat.test.mjs`](../scripts/security/toml-compat.test.mjs), included in `npm run test:release`, resolves the parser through the installed Circle CLI and Anchor packages. It checks Anchor's actual workspace loader with a temporary `Anchor.toml` and IDL, rejects deeply nested arrays and inline tables without a stack overflow, and rejects scalar-to-prototype traversal without modifying `Object.prototype`. It also starts Circle CLI's version command and help for the wallet, Gateway, and payment commands used by the application, with a temporary home directory and telemetry disabled.
 
-The reviewed Anchor implementation imports `toml` in `dist/cjs/workspace.js`; parsing occurs when its Solana workspace proxy reads a local `Anchor.toml`. Circle CLI imports Anchor, but Resvary's [`circle-cli.ts`](../apps/agent-demo/src/lib/circle-cli.ts) runs fixed Arc wallet and Gateway commands through `execFile`. The application does not accept TOML, arbitrary CLI commands, or user-supplied workspace files. No path from the reviewed request inputs to the affected parser was found. This narrows exposure in these specific call sites; it does not fix the parser or establish safety for every Circle CLI command.
+The previous two exceptions, which had an October 21 deadline, have been removed from [`security/dependency-exceptions.json`](../security/dependency-exceptions.json). The policy is empty, so the npm gate and generated Trivy ignore file no longer exempt either advisory. The generic exception mechanism remains available for future reviewed cases and retains its expiry and exact-version checks.
 
-Re-review before enabling Solana workspace features, processing uploaded configuration, changing CLI dispatch, or changing the upstream dependency chain. Do not apply an untested major-version override to Anchor's TOML parser. Remove these exceptions when an upstream CLI/Anchor update removes the affected parser, or replace the limited CLI integration with maintained APIs and test wallet/session/Gateway behavior. If neither is completed by the deadline, CI blocks until the maintainer records a new evidence-based decision.
+The application still runs fixed Arc wallet and Gateway commands through [`circle-cli.ts`](../apps/agent-demo/src/lib/circle-cli.ts). The compatibility checks do not perform live payments or establish compatibility with every Solana workspace feature. Re-review the override when changing CLI dispatch, enabling Solana workspace features, or updating Anchor. Remove it once the upstream caller selects a fixed parser without an override. Replacing the CLI with maintained APIs remains an option for the remaining transitive findings, but is no longer required to meet the former TOML exception deadline.
 
 ## Maintenance
 
