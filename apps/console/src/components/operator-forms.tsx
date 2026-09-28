@@ -210,6 +210,7 @@ export function SweepForm({ overdueCount, disabled }: { overdueCount: number; di
       target={`${overdueCount} overdue reservation${overdueCount === 1 ? '' : 's'}`}
       button="Expire overdue reservations"
       disabled={disabled}
+      disabledLabel={overdueCount === 0 ? 'Nothing to expire' : 'Read-only demo'}
     />
   );
 }
@@ -234,6 +235,7 @@ function SimpleActionForm({
   button,
   eventId,
   disabled,
+  disabledLabel = 'Read-only demo',
 }: {
   action: 'expire_overdue' | 'requeue';
   title: string;
@@ -241,6 +243,7 @@ function SimpleActionForm({
   button: string;
   eventId?: string;
   disabled: boolean;
+  disabledLabel?: string;
 }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -303,7 +306,7 @@ function SimpleActionForm({
         </p>
       ) : null}
       <button disabled={disabled || pending}>
-        {disabled ? 'Read-only demo' : pending ? 'Recording…' : button}
+        {disabled ? disabledLabel : pending ? 'Recording…' : button}
       </button>
     </form>
   );

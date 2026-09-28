@@ -5,6 +5,7 @@ import { formatTimestamp, formatUnits } from '@/lib/format';
 import type { AuditItemKind } from '@resvary/sdk/admin';
 
 const kinds: AuditItemKind[] = [
+  'metered_operation',
   'grant',
   'reservation',
   'usage_receipt',

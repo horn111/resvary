@@ -4,11 +4,22 @@ import { getRuntime } from '@/lib/runtime';
 
 type OperatorRequest = {
   actionId?: string;
-  action?: 'grant' | 'adjust' | 'expire_overdue' | 'requeue';
+  action?:
+    | 'grant'
+    | 'adjust'
+    | 'expire_overdue'
+    | 'requeue'
+    | 'settle_operation'
+    | 'reconcile_operation'
+    | 'mark_operation_unknown'
+    | 'confirm_not_executed';
   customerId?: string;
   eventId?: string;
   amount?: string;
   reason?: string;
+  operationKey?: string;
+  resultHash?: string;
+  evidenceReference?: string;
 };
 
 export async function POST(request: Request) {
@@ -25,6 +36,37 @@ export async function POST(request: Request) {
     const actionId = requireUuid(body.actionId);
     const reason = requireReason(body.reason);
     switch (body.action) {
+      case 'settle_operation':
+      case 'reconcile_operation': {
+        const input = {
+          actionId,
+          reason,
+          operationKey: requireText(body.operationKey, 'operationKey'),
+          resultHash: requireText(body.resultHash, 'resultHash'),
+        };
+        return NextResponse.json(
+          await (body.action === 'settle_operation'
+            ? runtime.operator.settleOperation(input)
+            : runtime.operator.reconcileOperation(input)),
+        );
+      }
+      case 'mark_operation_unknown':
+        return NextResponse.json(
+          await runtime.operator.markOperationUnknown({
+            actionId,
+            reason,
+            operationKey: requireText(body.operationKey, 'operationKey'),
+          }),
+        );
+      case 'confirm_not_executed':
+        return NextResponse.json(
+          await runtime.operator.confirmOperationNotExecuted({
+            actionId,
+            reason,
+            operationKey: requireText(body.operationKey, 'operationKey'),
+            evidenceReference: requireText(body.evidenceReference, 'evidenceReference'),
+          }),
+        );
       case 'grant':
         return NextResponse.json(
           await runtime.operator.grantCredits({
@@ -71,7 +113,7 @@ export async function POST(request: Request) {
 }
 
 function requireText(value: string | undefined, name: string): string {
-  const normalized = value?.trim();
+  const normalized = typeof value === 'string' ? value.trim() : '';
   if (!normalized) throw new Error(`${name} is required`);
   return normalized;
 }

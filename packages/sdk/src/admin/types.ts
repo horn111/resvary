@@ -59,6 +59,7 @@ export type AuditItemKind =
   | 'funding_intent'
   | 'funding_transaction'
   | 'outbox_event'
+  | 'metered_operation'
   | 'operator_action';
 
 export interface AuditItem {
@@ -103,7 +104,14 @@ export interface AdminUsageEvidence {
 }
 
 export type OperatorActionType =
-  'credit.grant' | 'credit.adjust' | 'reservation.expire_overdue' | 'outbox.requeue';
+  | 'credit.grant'
+  | 'credit.adjust'
+  | 'reservation.expire_overdue'
+  | 'outbox.requeue'
+  | 'operation.settle'
+  | 'operation.reconcile'
+  | 'operation.mark_unknown'
+  | 'operation.confirm_not_executed';
 
 export type OperatorActionStatus = 'pending' | 'succeeded' | 'failed';
 
@@ -112,7 +120,7 @@ export interface OperatorAction {
   sequence: number;
   projectId: string;
   type: OperatorActionType;
-  targetType: 'customer' | 'project' | 'outbox_event';
+  targetType: 'customer' | 'project' | 'outbox_event' | 'metered_operation';
   targetId: string;
   reason: string;
   command?: Record<string, unknown>;
@@ -135,7 +143,7 @@ export interface AdminQueryStore {
   getOperatorAction(projectId: string, id: string): Promise<OperatorAction | undefined>;
   listOperatorActions(
     projectId: string,
-    input?: AdminPageInput,
+    input?: AdminPageInput & { targetType?: OperatorAction['targetType']; targetId?: string },
   ): Promise<AdminPage<OperatorAction>>;
   appendOperatorAction(action: OperatorAction): Promise<void>;
 }

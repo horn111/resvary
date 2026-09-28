@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { CreditLedger } from './ledger.js';
 import { DurableMeteredOperations } from './operations.js';
 import { InMemoryCreditStore } from './store.js';
@@ -42,6 +42,43 @@ async function fixture() {
 }
 
 describe('DurableMeteredOperations', () => {
+  it('atomically records ordered transitions and rolls back a claim when its outbox write fails', async () => {
+    const { store, operations, input } = await fixture();
+    await operations.create(input);
+    const transaction = store.transaction.bind(store);
+    const spy = vi.spyOn(store, 'transaction').mockImplementation((handler) =>
+      transaction((tx) => {
+        const save = tx.saveOutboxEvent.bind(tx);
+        tx.saveOutboxEvent = async (event) => {
+          if (event.type === 'operation.transitioned') throw new Error('outbox unavailable');
+          return save(event);
+        };
+        return handler(tx);
+      }),
+    );
+    await expect(
+      operations.claim({ operationKey: input.idempotencyKey, workerId: 'worker' }),
+    ).rejects.toThrow('outbox unavailable');
+    spy.mockRestore();
+    expect((await operations.get(input.idempotencyKey))?.status).toBe('queued');
+    expect(await store.listOutboxEvents({ type: 'operation.transitioned' })).toHaveLength(1);
+    const claim = await operations.claim({
+      operationKey: input.idempotencyKey,
+      workerId: 'worker',
+    });
+    await operations.saveResult({
+      operationKey: input.idempotencyKey,
+      claimToken: claim!.claimToken!,
+      result: { value: 'secret-response', actualUsage: { jobs: '1' }, usageEventId: 'recorded' },
+    });
+    await operations.settle(input.idempotencyKey);
+    await operations.settle(input.idempotencyKey);
+    const events = await store.listOutboxEvents({ type: 'operation.transitioned' });
+    expect(events.map((event) => event.data.sequence).sort()).toEqual([1, 2, 3, 4]);
+    expect(JSON.stringify(events)).not.toContain('claimToken');
+    expect(JSON.stringify(events)).not.toContain('secret-response');
+  });
+
   it('claims once across workers, then settles a saved result after coordinator restart', async () => {
     const { ledger, store, operations, input } = await fixture();
     const created = await operations.create(input);

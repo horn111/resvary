@@ -1,3 +1,4 @@
+import { operationHealth, type OperationHealth } from '@resvary/sdk/admin';
 import { createPostgresHandle, table, type PostgresConnectionConfig } from './connection.js';
 import { POSTGRES_SCHEMA_VERSION } from './migrations.js';
 
@@ -12,6 +13,7 @@ export interface PostgresHealth {
   oldestPendingOutboxAgeMs: number;
   overdueReservations: number;
   reconciliationRequiredFunding: number;
+  meteredOperations: OperationHealth;
   error?: string;
 }
 
@@ -44,12 +46,16 @@ export async function checkPostgresHealth(
           WHERE settlement_status = 'reconciliation_required') AS reconciliation_required`,
       [now],
     );
+    const operations = await handle.pool.query<{ status: string; count: string; oldest: string }>(
+      `SELECT status, COUNT(*)::text AS count, MIN(created_at)::text AS oldest FROM ${table(handle, 'resvary_metered_operations')} GROUP BY status`,
+    );
     const appliedVersions = version.rows.map((row) => row.version);
     const schemaVersion = appliedVersions.at(-1) ?? 0;
     const migrationHistoryValid = appliedVersions.every(
       (appliedVersion, index) => appliedVersion === index + 1,
     );
     return {
+      meteredOperations: operationHealth(operations.rows, now),
       ok: migrationHistoryValid && schemaVersion === POSTGRES_SCHEMA_VERSION,
       latencyMs: Date.now() - startedAt,
       schema: handle.schema,
@@ -63,6 +69,7 @@ export async function checkPostgresHealth(
     };
   } catch (error) {
     return {
+      meteredOperations: operationHealth([], Date.now()),
       ok: false,
       latencyMs: Date.now() - startedAt,
       schema: handle.schema,

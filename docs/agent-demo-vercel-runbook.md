@@ -66,7 +66,7 @@ Confirm these pinned runtime dependencies in `apps/agent-demo/package.json`:
 - `workflow` `4.8.8`
 - `@openai/agents` `0.17.1`
 - `openai` `7.10.0`
-- `@circle-fin/cli` `1.1.3`
+- `@circle-fin/cli` `1.1.4`
 
 ## 2. Check the Vercel and Neon boundary
 
@@ -137,7 +137,7 @@ The SCA and backing EOA serve different protocol roles. Do not copy one address 
 
 ## 4. Export and rotate the Circle Mainnet session
 
-Use Circle CLI `1.1.3` on the operator machine:
+Use Circle CLI `1.1.4` on the operator machine. Circle blocks wallet operations through `1.1.3`; existing unexpired exports from that version remain compatible with `1.1.4`.
 
 1. Complete `circle wallet login EMAIL --type agent` without `--testnet`, and accept terms in the CLI.
 2. Confirm that the chosen wallet address is the Agent Wallet SCA.
@@ -232,7 +232,7 @@ Do not clear an execution token, authorization fingerprint, reservation ID, or f
 
 The maintenance endpoint accepts `GET /api/internal/maintenance` with `Authorization: Bearer <CRON_SECRET>`. It performs database-only cleanup, stale-claim reconciliation, saved-result commits, and dispatch draining. Never call it without an approved operator context because it mutates production state.
 
-Circle CLI `1.1.3` rewrites `maxTimeoutSeconds` to 30 days. The demo configures `authorizationValiditySeconds` accordingly; strict requirements matching and the funding-intent expiry stay unchanged. Never generalize a known pre-verification Testnet failure to an unknown Mainnet payment outcome.
+Circle CLI `1.1.4` rewrites `maxTimeoutSeconds` to 30 days. The demo configures `authorizationValiditySeconds` accordingly; strict requirements matching and the funding-intent expiry stay unchanged. Never generalize a known pre-verification Testnet failure to an unknown Mainnet payment outcome.
 
 For a Mainnet payment, query `https://gateway-api.circle.com/v1/x402/transfers/TRANSFER_UUID`. Verify `eip155:5042`, amount, payer, and seller. A successful facilitator response can precede the onchain batch, so retain both the Gateway status and transaction hash separately from Resvary's funding status. The archived Testnet transfer remains available through the Testnet Gateway API and explorer.
 

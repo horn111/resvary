@@ -18,7 +18,7 @@ import {
 import { createPostgresCreditStore } from './credit.js';
 import { createPostgresAdminStore } from './admin.js';
 import { checkPostgresHealth } from './health.js';
-import { applyV1, applyV2, applyV3, migratePostgres } from './migrations.js';
+import { applyV1, applyV2, applyV3, applyV4, applyV5, migratePostgres } from './migrations.js';
 import { createPostgresReceiptStore } from './receipt.js';
 import { importSqliteDatabase, verifySqliteImport } from './import-sqlite.js';
 
@@ -55,7 +55,7 @@ suite('Postgres stores', () => {
 
   it('applies schema migrations idempotently', async () => {
     const status = await migratePostgres({ pool: pool!, schema });
-    expect(status).toMatchObject({ currentVersion: 5, latestVersion: 5, pendingVersions: [] });
+    expect(status).toMatchObject({ currentVersion: 6, latestVersion: 6, pendingVersions: [] });
   });
 
   it('claims a metered operation once across PostgreSQL workers and settles after restart', async () => {
@@ -107,6 +107,154 @@ suite('Postgres stores', () => {
     );
     expect((await afterRestart.settle('job')).receipt?.usageEventId).toBe('provider-1');
     expect(await second.listUsageReceipts('customer')).toHaveLength(1);
+  });
+
+  it('recovers saved usage concurrently and pages a tenant-scoped backlog beyond 500 operations', async () => {
+    const projectId = `recovery_${randomUUID().replaceAll('-', '')}`;
+    let now = 1_000;
+    const stores = [
+      createPostgresCreditStore({ pool: pool!, schema }),
+      createPostgresCreditStore({ pool: pool!, schema }),
+    ];
+    const ledgers = stores.map(
+      (store) => new CreditLedger({ projectId, store, now: () => now, reservationTtlMs: 100 }),
+    );
+    const admin = createPostgresAdminStore({ pool: pool!, schema });
+    const operators = ledgers.map(
+      (ledger, index) =>
+        new OperatorService({
+          projectId,
+          ledger,
+          adminStore: admin,
+          deliveryStore: stores[index],
+          now: () => now,
+        }),
+    );
+    await ledgers[0].registerMeter({ key: 'jobs', dimensions: ['jobs'], idempotencyKey: 'meter' });
+    const price = await ledgers[0].createPriceVersion({
+      meterKey: 'jobs',
+      rates: [{ dimension: 'jobs', unitSize: '1', amount: '1' }],
+      idempotencyKey: 'price',
+    });
+    await ledgers[0].grantCredits({
+      customerId: 'customer',
+      amount: '10',
+      idempotencyKey: 'grant',
+    });
+    const operations = new DurableMeteredOperations(ledgers[0], { now: () => now });
+    const created = await operations.create({
+      customerId: 'customer',
+      priceId: price.id,
+      estimatedUsage: { jobs: '1' },
+      idempotencyKey: 'job',
+    });
+    const claim = await operations.claim({ operationKey: 'job', workerId: 'private-worker' });
+    const saved = await operations.saveResult({
+      operationKey: 'job',
+      claimToken: claim!.claimToken!,
+      result: {
+        value: 'private-result',
+        actualUsage: { jobs: '2' },
+        usageEventId: `usage-${projectId}`,
+      },
+    });
+    now = 1_200;
+    const input = {
+      actionId: randomUUID(),
+      operationKey: 'job',
+      resultHash: saved.resultHash!,
+      reason: 'Reviewed the saved usage after restart',
+    };
+    expect((await operators[0].settleOperation(input)).result.resolved).toBe(false);
+    expect(await admin.getOperationHealth(projectId, now)).toMatchObject({
+      unresolvedCount: 1,
+      oldestUnresolvedAgeMs: 200,
+    });
+    const results = await Promise.all(
+      operators.map((operator) =>
+        operator.reconcileOperation({ ...input, actionId: randomUUID() }),
+      ),
+    );
+    expect(results.every((result) => result.result.resolved)).toBe(true);
+    expect(await ledgers[0].listUsageReceipts('customer')).toHaveLength(1);
+    expect((await ledgers[0].getBalance('customer')).postedAmount).toBe('8');
+    const history = await admin.listOperationHistory(projectId, created.id, { limit: 2 });
+    expect(history.items.map((event) => event.sequence)).toEqual([5, 4]);
+    expect(history.items.map((event) => event.toStatus)).toEqual([
+      'settled',
+      'needs_reconciliation',
+    ]);
+    const previous = await admin.listOperationHistory(projectId, created.id, {
+      cursor: history.nextCursor,
+    });
+    expect(previous.items.map((event) => event.sequence)).toEqual([3, 2, 1]);
+    expect((await admin.listOperationHistory('foreign', created.id)).items).toHaveLength(0);
+    const actionLog = await admin.listOperatorActions(projectId, {
+      targetType: 'metered_operation',
+      targetId: 'job',
+    });
+    expect(actionLog.items).toHaveLength(3);
+    expect(
+      (
+        await admin.listOperatorActions(projectId, {
+          targetType: 'metered_operation',
+          targetId: 'other',
+        })
+      ).items,
+    ).toHaveLength(0);
+    const safeViews = JSON.stringify([
+      results,
+      history,
+      await admin.getOperation(projectId, created.id),
+      await admin.listAuditItems({ projectId, kind: 'metered_operation' }),
+    ]);
+    for (const secret of ['claimToken', 'private-result', 'private-worker', 'savedResult'])
+      expect(safeViews).not.toContain(secret);
+    await stores[0].transaction(async (tx) => {
+      for (let index = 0; index < 605; index++) {
+        const id = `${projectId}_bulk_${String(index).padStart(4, '0')}`;
+        await tx.saveMeteredOperation!({
+          ...created,
+          id,
+          operationKey: id,
+          requestHash: id,
+          status: 'outcome_unknown',
+          createdAt: 2_000,
+          updatedAt: 3_000,
+        });
+      }
+    });
+    const ids: string[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = await admin.listOperations({
+        projectId,
+        status: 'outcome_unknown',
+        limit: 100,
+        cursor,
+      });
+      ids.push(...page.items.map((item) => item.id));
+      cursor = page.nextCursor;
+    } while (cursor);
+    expect(new Set(ids).size).toBe(605);
+    const sdkFirst = await operations.list({ status: 'outcome_unknown', limit: 500 });
+    const sdkSecond = await operations.list({
+      status: 'outcome_unknown',
+      after: sdkFirst.at(-1),
+      limit: 500,
+    });
+    expect(new Set([...sdkFirst, ...sdkSecond].map((item) => item.id)).size).toBe(605);
+    expect(
+      (await admin.listOperations({ projectId, status: 'outcome_unknown', updatedBefore: 2_999 }))
+        .items,
+    ).toHaveLength(0);
+    expect((await admin.listOperations({ projectId, search: '%' })).items).toHaveLength(0);
+    expect(
+      (await admin.listOperations({ projectId: 'foreign', search: projectId })).items,
+    ).toHaveLength(0);
+    expect(
+      (await checkPostgresHealth({ pool: pool!, schema })).meteredOperations.unresolvedCount,
+    ).toBeGreaterThanOrEqual(605);
   });
 
   it('matches the admin query and operator-action contract', async () => {
@@ -226,7 +374,7 @@ suite('Postgres stores', () => {
     const health = await checkPostgresHealth({ pool: pool!, schema });
     expect(health).toMatchObject({
       ok: true,
-      schemaVersion: 5,
+      schemaVersion: 6,
       reconciliationRequiredFunding: 0,
     });
     expect(health.deadLetterEvents).toBeGreaterThanOrEqual(1);
@@ -270,6 +418,165 @@ suite('Postgres stores', () => {
     await store.close();
   });
 
+  it('preserves a 1.2 saved operation through the v5 to v6 migration and settles it once', async () => {
+    const upgradeSchema = `resvary_upgrade_v5_${randomUUID().replaceAll('-', '')}`;
+    const client = await pool!.connect();
+    try {
+      await client.query(`CREATE SCHEMA "${upgradeSchema}"`);
+      await client.query(
+        `CREATE TABLE "${upgradeSchema}".resvary_schema_migrations (version INTEGER PRIMARY KEY, applied_at BIGINT NOT NULL)`,
+      );
+      for (const migrate of [applyV1, applyV2, applyV3, applyV4, applyV5])
+        await migrate(client, upgradeSchema);
+      const projectId = 'upgrade_saved_result';
+      const store = createPostgresCreditStore({ pool: pool!, schema: upgradeSchema });
+      const ledger = new CreditLedger({ projectId, store, now: () => 1_000 });
+      await ledger.registerMeter({ key: 'jobs', dimensions: ['jobs'], idempotencyKey: 'meter' });
+      const price = await ledger.createPriceVersion({
+        meterKey: 'jobs',
+        rates: [{ dimension: 'jobs', unitSize: '1', amount: '1' }],
+        idempotencyKey: 'price',
+      });
+      await ledger.grantCredits({ customerId: 'customer', amount: '5', idempotencyKey: 'grant' });
+      const operations = new DurableMeteredOperations(ledger, { now: () => 1_000 });
+      await operations.create({
+        customerId: 'customer',
+        priceId: price.id,
+        estimatedUsage: { jobs: '1' },
+        idempotencyKey: 'legacy-job',
+      });
+      const claim = await operations.claim({
+        operationKey: 'legacy-job',
+        workerId: 'legacy-worker',
+      });
+      const legacy = await operations.saveResult({
+        operationKey: 'legacy-job',
+        claimToken: claim!.claimToken!,
+        result: { value: 'saved-by-1.2', actualUsage: { jobs: '1' }, usageEventId: 'legacy-usage' },
+      });
+      // Version 1.2 stored the operation but no transition sequence or events.
+      delete legacy.transitionSequence;
+      await store.transaction((tx) => tx.saveMeteredOperation!(legacy));
+      await client.query(
+        `DELETE FROM "${upgradeSchema}".resvary_outbox_events WHERE type = 'operation.transitioned'`,
+      );
+      const balanceBefore = await ledger.getBalance('customer');
+      const holdBefore = await ledger.getReservation(legacy.reservationId);
+      expect((await migratePostgres({ pool: pool!, schema: upgradeSchema })).currentVersion).toBe(
+        6,
+      );
+      expect(await operations.get('legacy-job')).toEqual(legacy);
+      expect(await ledger.getBalance('customer')).toEqual(balanceBefore);
+      expect(await ledger.getReservation(legacy.reservationId)).toEqual(holdBefore);
+      const indexes = await client.query<{ indexname: string }>(
+        'SELECT indexname FROM pg_indexes WHERE schemaname = $1',
+        [upgradeSchema],
+      );
+      expect(indexes.rows.map((row) => row.indexname)).toEqual(
+        expect.arrayContaining([
+          'resvary_operations_timeline',
+          'resvary_operations_status_timeline',
+          'resvary_operation_history',
+          'resvary_operator_target',
+        ]),
+      );
+      const admin = createPostgresAdminStore({ pool: pool!, schema: upgradeSchema });
+      expect((await admin.listOperationHistory(projectId, legacy.id)).items).toHaveLength(0);
+      expect(
+        (await admin.listOperations({ projectId, status: 'result_saved' })).items,
+      ).toHaveLength(1);
+      const operator = new OperatorService({
+        projectId,
+        ledger,
+        adminStore: admin,
+        deliveryStore: store,
+        now: () => 1_000,
+      });
+      const command = {
+        actionId: randomUUID(),
+        operationKey: 'legacy-job',
+        resultHash: legacy.resultHash!,
+        reason: 'Reviewed the saved result after schema migration',
+      };
+      const first = await operator.settleOperation(command);
+      expect(await operator.settleOperation(command)).toEqual(first);
+      expect(await ledger.listUsageReceipts('customer')).toHaveLength(1);
+      expect((await ledger.getBalance('customer')).postedAmount).toBe('4');
+      expect((await admin.listOperationHistory(projectId, legacy.id)).items).toMatchObject([
+        { sequence: 1, fromStatus: 'result_saved', toStatus: 'settled' },
+      ]);
+    } finally {
+      client.release();
+      await pool!.query(`DROP SCHEMA IF EXISTS "${upgradeSchema}" CASCADE`);
+    }
+  });
+
+  it('replays concurrent copies of one recovery command without a second charge or journal mutation', async () => {
+    const projectId = `same_command_${randomUUID().replaceAll('-', '')}`;
+    const store = createPostgresCreditStore({ pool: pool!, schema });
+    const ledger = new CreditLedger({ projectId, store });
+    await ledger.registerMeter({ key: 'jobs', dimensions: ['jobs'], idempotencyKey: 'meter' });
+    const price = await ledger.createPriceVersion({
+      meterKey: 'jobs',
+      rates: [{ dimension: 'jobs', unitSize: '1', amount: '1' }],
+      idempotencyKey: 'price',
+    });
+    await ledger.grantCredits({ customerId: 'customer', amount: '5', idempotencyKey: 'grant' });
+    const operations = new DurableMeteredOperations(ledger);
+    await operations.create({
+      customerId: 'customer',
+      priceId: price.id,
+      estimatedUsage: { jobs: '1' },
+      idempotencyKey: 'job',
+    });
+    const claim = await operations.claim({ operationKey: 'job', workerId: 'worker' });
+    const saved = await operations.saveResult({
+      operationKey: 'job',
+      claimToken: claim!.claimToken!,
+      result: {
+        value: 'saved-result',
+        actualUsage: { jobs: '1' },
+        usageEventId: `usage-${projectId}`,
+      },
+    });
+    const admins = [
+      createPostgresAdminStore({ pool: pool!, schema }),
+      createPostgresAdminStore({ pool: pool!, schema }),
+    ];
+    const operators = admins.map(
+      (adminStore) => new OperatorService({ projectId, ledger, adminStore, deliveryStore: store }),
+    );
+    const command = {
+      actionId: randomUUID(),
+      operationKey: 'job',
+      resultHash: saved.resultHash!,
+      reason: 'Same reviewed command submitted concurrently',
+    };
+    // A journal insertion collision may reject a concurrent request. Retrying that
+    // same UUID must recover the canonical result, never create another charge.
+    const concurrent = await Promise.allSettled(
+      operators.map((operator) => operator.settleOperation(command)),
+    );
+    expect(concurrent.some((result) => result.status === 'fulfilled')).toBe(true);
+    const replays = await Promise.all(
+      operators.map((operator) => operator.settleOperation(command)),
+    );
+    expect(replays[0]).toEqual(replays[1]);
+    expect(await ledger.listUsageReceipts('customer')).toHaveLength(1);
+    expect((await ledger.getBalance('customer')).postedAmount).toBe('4');
+    const journal = await pool!.query<{ sequence: number; status: string }>(
+      `SELECT sequence, status FROM "${schema}".resvary_operator_actions WHERE id = $1 ORDER BY sequence`,
+      [command.actionId],
+    );
+    expect(journal.rows).toEqual([
+      { sequence: 0, status: 'pending' },
+      { sequence: 1, status: 'succeeded' },
+    ]);
+    await expect(
+      operators[1].settleOperation({ ...command, resultHash: '0'.repeat(64) }),
+    ).rejects.toThrow('another command');
+  });
+
   it('upgrades a version 1 schema sequentially', async () => {
     const upgradeSchema = `resvary_upgrade_${randomUUID().replaceAll('-', '')}`;
     const client = await pool!.connect();
@@ -283,7 +590,7 @@ suite('Postgres stores', () => {
       `);
       await applyV1(client, upgradeSchema);
       const status = await migratePostgres({ pool: pool!, schema: upgradeSchema });
-      expect(status).toMatchObject({ currentVersion: 5, latestVersion: 5, pendingVersions: [] });
+      expect(status).toMatchObject({ currentVersion: 6, latestVersion: 6, pendingVersions: [] });
       const constraint = await pool!.query<{ exists: boolean }>(
         `SELECT EXISTS (
            SELECT 1 FROM pg_constraint
@@ -459,7 +766,7 @@ suite('Postgres stores', () => {
         );
       }
       const status = await migratePostgres({ pool: pool!, schema: upgradeSchema });
-      expect(status).toMatchObject({ currentVersion: 5, latestVersion: 5 });
+      expect(status).toMatchObject({ currentVersion: 6, latestVersion: 6 });
       const store = createPostgresCreditStore({ pool: pool!, schema: upgradeSchema });
       await expect(store.listCreditLots({ customerId: account.customerId })).resolves.toMatchObject(
         [{ kind: 'legacy', originalAmount: '10', availableAmount: '5', reservedAmount: '5' }],

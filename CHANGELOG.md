@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-09-27
+
+### Added
+
+- Add operator recovery for durable metered operations: project-scoped cursor lists, status and age filters, redacted charge evidence, state history, and reasoned recovery commands bound to a reviewed result hash and stable action UUID.
+- Record `operation.transitioned` events atomically with state changes. Expose per-state operation backlog and oldest ages separately from funding reconciliation in console and PostgreSQL health.
+- Add a SQLite process-crash recovery example and SDK, store, HTTP, and browser regression coverage for recovery, pagination, redaction, and command replay.
+- Verify PostgreSQL v5-to-v6 migration with an existing saved result and concurrent replay of the same recovery command, including one charge and one canonical command outcome.
+- Exercise saved-operation recovery, redacted evidence, history, and command replay from independently installed release archives, including their TypeScript declarations.
+
+### Changed
+
+- Add SQLite schema v8 and PostgreSQL schema v6 indexes for operation queries and targeted audit history. Document migration, event-consumer compatibility, and transition retention in `docs/migration-1.3.md`.
+
+### Fixed
+
+- Update Agent Demo to Circle CLI `1.1.4` after Circle blocked wallet operations through `1.1.3`. Continue accepting unexpired session bundles exported with `1.1.3`.
+
 ## [1.2.0] - 2026-09-23
 
 ### Added
@@ -333,7 +351,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI/CD pipeline with GitHub Actions
 - Security policy and contribution guidelines
 
-[unreleased]: https://github.com/horn111/resvary/compare/v1.1.1...HEAD
+[unreleased]: https://github.com/horn111/resvary/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/horn111/resvary/compare/v1.2.0...v1.3.0
+[1.2.0]: https://github.com/horn111/resvary/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/horn111/resvary/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/horn111/resvary/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/horn111/resvary/compare/v0.8.0...v1.0.0

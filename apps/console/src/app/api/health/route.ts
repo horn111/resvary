@@ -13,12 +13,14 @@ export async function GET(request: Request) {
   try {
     const runtime = await getRuntime();
     await runtime.admin.getOverview(runtime.config.projectId);
+    const meteredOperations = await runtime.admin.getOperationHealth(runtime.config.projectId);
     return NextResponse.json({
       ok: true,
       database: runtime.database,
       schemaVersion: runtime.schemaVersion,
       projectId: runtime.config.projectId,
       demoMode: runtime.config.demoMode,
+      meteredOperations,
     });
   } catch {
     return NextResponse.json({ ok: false }, { status: 503 });

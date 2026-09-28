@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { access, readFile, stat } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
@@ -37,9 +38,64 @@ function configuredEnv() {
     CIRCLE_SESSION_ENCRYPTION_KEY: encryptionKey,
   };
 }
+
+// Recreate an older export's authenticated version marker without relying on the exporter.
+function withBundleCliVersion(encrypted: string, cliVersion: string) {
+  const [, nonce, ciphertext, tag] = encrypted.split('.');
+  const key = Buffer.from(encryptionKey, 'hex');
+  const aad = Buffer.from('resvary-circle-session-v2');
+  const decipher = createDecipheriv('aes-256-gcm', key, Buffer.from(nonce, 'base64url'));
+  decipher.setAAD(aad);
+  decipher.setAuthTag(Buffer.from(tag, 'base64url'));
+  const bundle = JSON.parse(
+    Buffer.concat([
+      decipher.update(Buffer.from(ciphertext, 'base64url')),
+      decipher.final(),
+    ]).toString('utf8'),
+  );
+  bundle.cliVersion = cliVersion;
+  const newNonce = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', key, newNonce);
+  cipher.setAAD(aad);
+  const updated = Buffer.concat([cipher.update(JSON.stringify(bundle)), cipher.final()]);
+  return [
+    'v1',
+    newNonce.toString('base64url'),
+    updated.toString('base64url'),
+    cipher.getAuthTag().toString('base64url'),
+  ].join('.');
+}
 afterEach(() => vi.restoreAllMocks());
 
 describe('portable Circle network session', () => {
+  it('accepts existing 1.1.3 exports but rejects unreviewed CLI session formats', async () => {
+    const env = configuredEnv();
+    await withCircleSession(
+      async (childEnv) => {
+        const hydrated = JSON.parse(
+          await readFile(
+            join(childEnv.CIRCLE_CLI_HOME!, 'profiles', 'agent', 'session.json'),
+            'utf8',
+          ),
+        );
+        expect(hydrated.mainnet.userToken).toBe('fixture-user-token');
+        expect(hydrated.testnet).toBeUndefined();
+      },
+      {
+        ...env,
+        CIRCLE_AGENT_SESSION_BUNDLE: withBundleCliVersion(env.CIRCLE_AGENT_SESSION_BUNDLE, '1.1.3'),
+      },
+    );
+    const operation = vi.fn();
+    await expect(
+      withCircleSession(operation, {
+        ...env,
+        CIRCLE_AGENT_SESSION_BUNDLE: withBundleCliVersion(env.CIRCLE_AGENT_SESSION_BUNDLE, '9.0.0'),
+      }),
+    ).rejects.toThrow('Invalid Circle session bundle');
+    expect(operation).not.toHaveBeenCalled();
+  });
+
   it('hydrates only Mainnet secrets, keeps homes isolated under concurrency, and cleans them', async () => {
     const environments = configuredEnv();
     const homes: string[] = [];

@@ -1,4 +1,4 @@
-# Durable metered operations (1.2)
+# Durable metered operations
 
 Use `DurableMeteredOperations` when a queue or worker separates the provider call from credit settlement. The existing `runMetered`, reservation, and `commitUsage` APIs remain available. An operation is identified by a project-scoped key and has its own state, independent of its reservation.
 
@@ -67,4 +67,21 @@ SQLite schema v7 adds `resvary_metered_operations` with an operation ID primary 
 
 Creating the reservation and inserting the operation use two transactions because `reserveCredits` is a public ledger command. If a process dies between them, the reservation remains recoverable by its idempotency key and expires normally. Creating the operation again with the same input and key resumes from that reservation. Do not enqueue the job until `create` returns an operation record.
 
-The existing `resvary-postgres import-sqlite` command intentionally accepts only an offline SQLite schema v5 snapshot from Resvary 0.8. It rejects schema v7; it does not drop operation records silently. Do not use that command to move a live 1.2 operation database. Settle or reconcile outstanding operations and use a separately verified migration plan for a newer SQLite database.
+The existing `resvary-postgres import-sqlite` command intentionally accepts only an offline SQLite schema v5 snapshot from Resvary 0.8. It rejects schemas v7 and v8; it does not drop operation records silently. Do not use that command to move a live 1.2 operation database. Settle or reconcile outstanding operations and use a separately verified migration plan for a newer SQLite database.
+
+## Operator recovery in 1.3
+
+The console's **Operations** page lists durable operations by project, status, last-update age, and operation/customer search. Cursor pagination continues beyond 500 rows. Open a row to inspect the original and settlement holds, measured usage, price breakdown, receipt, state transitions, and recovery command log.
+
+| Current state          | Operator action       | Required evidence                                              |
+| ---------------------- | --------------------- | -------------------------------------------------------------- |
+| `running`              | Mark outcome unknown  | Incident reason; this does not stop the worker.                |
+| `result_saved`         | Settle saved usage    | Review the measured usage and original hold.                   |
+| `needs_reconciliation` | Reconcile saved usage | Review the measured amount and available credits.              |
+| `outcome_unknown`      | Confirm no execution  | External negative evidence, with the worker stopped or fenced. |
+
+Every action has a preview, reason, UUID, and explicit confirmation. Settlement approval binds to the saved result hash. Keep the same UUID and request body when a response is lost; a deliberate retry after a recorded failure requires a new UUID. Neither path calls the provider.
+
+Admin operation queries and responses exclude the claim token, worker identity, provider output, provider metadata, and raw provider errors. History is retained as transactional outbox transition events, ordered by a monotonic sequence. Retaining delivered transition events is necessary to keep that history available. Records created before 1.3 have no reconstructed historical transitions.
+
+Read the [1.3 migration notes](migration-1.3.md) before deployment. Run `node examples/durable-operation-recovery.mjs` after `npm run build:core` to reproduce a worker exit after saving a result and before settlement. The example verifies one simulated provider call and one receipt across process restart and command replay.

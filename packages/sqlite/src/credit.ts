@@ -36,7 +36,7 @@ import type {
 import { parseReceiptStoreValue, serializeReceiptStoreValue } from '@resvary/sdk/receipts';
 import { hardenSqliteDatabaseFiles, prepareSqliteDatabasePath } from './filesystem.js';
 
-export const SQLITE_SCHEMA_VERSION = 7;
+export const SQLITE_SCHEMA_VERSION = 8;
 
 export interface SqliteCreditStoreConfig {
   path: string;
@@ -409,6 +409,30 @@ export class SqliteCreditStore implements CreditPolicyStore, OutboxDeliveryStore
     this.migrateCreditLotsV5();
     this.migrateAdminV6();
     this.migrateMeteredOperationsV7();
+    this.migrateOperationIndexesV8();
+  }
+
+  private migrateOperationIndexesV8(): void {
+    const row = this.db
+      .prepare('SELECT MAX(version) AS version FROM resvary_schema_migrations')
+      .get() as { version: number };
+    if (row.version >= 8) return;
+    this.db.exec('BEGIN IMMEDIATE;');
+    try {
+      this.db.exec(`
+        CREATE INDEX IF NOT EXISTS resvary_operations_timeline ON resvary_metered_operations(project_id, created_at, id);
+        CREATE INDEX IF NOT EXISTS resvary_operations_status_timeline ON resvary_metered_operations(project_id, status, created_at, id);
+        CREATE INDEX IF NOT EXISTS resvary_operation_history ON resvary_outbox_events(project_id, json_extract(payload, '$.data.operationId'), json_extract(payload, '$.data.sequence')) WHERE type = 'operation.transitioned';
+        CREATE INDEX IF NOT EXISTS resvary_operator_target ON resvary_operator_actions(project_id, target_type, target_id, created_at, id);
+      `);
+      this.db
+        .prepare('INSERT INTO resvary_schema_migrations(version, applied_at) VALUES (8, ?)')
+        .run(Date.now());
+      this.db.exec('COMMIT;');
+    } catch (error) {
+      this.db.exec('ROLLBACK;');
+      throw error;
+    }
   }
 
   private migrateMeteredOperationsV7(): void {
@@ -1708,6 +1732,14 @@ function reader(
       if (filter.status) {
         where.push('status = ?');
         values.push(filter.status);
+      }
+      if (filter.after) {
+        where.push('(created_at > ? OR (created_at = ? AND id > ?))');
+        values.push(filter.after.createdAt, filter.after.createdAt, filter.after.id);
+      }
+      if (filter.updatedBefore !== undefined) {
+        where.push('updated_at <= ?');
+        values.push(filter.updatedBefore);
       }
       values.push(filter.limit ?? 100);
       return all<MeteredOperation>(

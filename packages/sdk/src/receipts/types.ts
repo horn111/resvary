@@ -122,6 +122,7 @@ export interface ReceiptOnchainProof {
 }
 
 export type WebhookEventType =
+  | 'operation.transitioned'
   | 'invoice.created'
   | 'invoice.observed'
   | 'invoice.paid'

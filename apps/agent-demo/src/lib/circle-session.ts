@@ -37,7 +37,8 @@ const termsSchema = z
 const bundleSchema = z
   .object({
     version: z.literal(VERSION),
-    cliVersion: z.literal('1.1.3'),
+    // 1.1.4 retains the 1.1.3 session format, including existing encrypted exports.
+    cliVersion: z.enum(['1.1.3', '1.1.4']),
     environment: environmentSchema,
     session: sessionSchema,
     terms: termsSchema,
@@ -92,7 +93,7 @@ export function exportCircleSession(
   };
   const bundle = validateBundle({
     version: VERSION,
-    cliVersion: '1.1.3',
+    cliVersion: '1.1.4',
     environment,
     session: selectedSession,
     terms,
@@ -209,7 +210,7 @@ export async function withCircleSession<T>(
       JSON.stringify({ telemetry: { enabled: false } }),
       { mode: 0o600, flag: 'wx' },
     );
-    // Pinned CLI 1.1.3 reads this session during payment. It never refreshes or
+    // Pinned CLI 1.1.4 reads this session during payment. It never refreshes or
     // rewrites it; a new operator login/export is needed when its token expires.
     return await operation({ ...env, CIRCLE_CLI_HOME: directory });
   } finally {

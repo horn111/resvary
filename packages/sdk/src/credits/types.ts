@@ -25,6 +25,7 @@ export type MeteredOperationStatus =
 export type LedgerEntryType = 'grant' | 'adjustment' | 'reserve' | 'release' | 'charge' | 'expire';
 export type LedgerBucket = 'posted' | 'reserved';
 export type CreditEventType =
+  | 'operation.transitioned'
   | 'credit.granted'
   | 'credit.adjusted'
   | 'credit.reserved'
@@ -322,6 +323,7 @@ export interface MeteredOperation {
   receiptId?: string;
   evidenceReference?: string;
   lastError?: string;
+  transitionSequence?: number;
 }
 
 export interface UsageEvent {

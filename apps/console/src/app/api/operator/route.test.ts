@@ -8,6 +8,7 @@ import { OperatorService } from '@resvary/sdk/admin';
 import { createSqliteCreditStore } from '@resvary/sqlite';
 import { createSqliteAdminStore } from '@resvary/sqlite/admin';
 import { POST } from './route';
+import { AuthError } from '@/lib/auth';
 
 const { getRuntime, requireApiSession } = vi.hoisted(() => ({
   getRuntime: vi.fn(),
@@ -25,6 +26,77 @@ afterEach(() => {
 });
 
 describe('operator HTTP commands', () => {
+  it('guards every recovery command with authentication and read-only mode', async () => {
+    const operator = {
+      settleOperation: vi.fn(),
+      reconcileOperation: vi.fn(),
+      markOperationUnknown: vi.fn(),
+      confirmOperationNotExecuted: vi.fn(),
+    };
+    const request = (action: string) =>
+      new Request('https://console.example/api/operator', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          action,
+          actionId: randomUUID(),
+          operationKey: 'job',
+          reason: 'Reviewed the provider evidence',
+          resultHash: 'a'.repeat(64),
+          evidenceReference: 'incident-123',
+        }),
+      });
+    for (const action of [
+      'settle_operation',
+      'reconcile_operation',
+      'mark_operation_unknown',
+      'confirm_not_executed',
+    ]) {
+      requireApiSession.mockRejectedValueOnce(new AuthError(401, 'Unauthorized'));
+      expect((await POST(request(action))).status).toBe(401);
+      getRuntime.mockResolvedValue({ config: { demoMode: true }, operator });
+      expect((await POST(request(action))).status).toBe(403);
+    }
+    for (const method of Object.values(operator)) expect(method).not.toHaveBeenCalled();
+  });
+
+  it('dispatches validated recovery evidence and rejects incomplete or malformed input', async () => {
+    const operator = {
+      settleOperation: vi.fn().mockResolvedValue({ result: { resolved: true } }),
+      confirmOperationNotExecuted: vi.fn(),
+    };
+    getRuntime.mockResolvedValue({ config: { demoMode: false }, operator });
+    const body = {
+      action: 'settle_operation',
+      actionId: randomUUID(),
+      operationKey: 'job',
+      reason: 'Reviewed saved usage evidence',
+      resultHash: 'b'.repeat(64),
+    };
+    const request = (payload: unknown) =>
+      new Request('https://console.example/api/operator', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+    expect((await POST(request(body))).status).toBe(200);
+    expect(operator.settleOperation).toHaveBeenCalledWith({
+      actionId: body.actionId,
+      operationKey: 'job',
+      reason: body.reason,
+      resultHash: body.resultHash,
+    });
+    for (const invalid of [
+      { ...body, resultHash: undefined },
+      { ...body, operationKey: {} },
+      { ...body, reason: 'short' },
+      { ...body, actionId: 'invalid' },
+      { ...body, action: 'confirm_not_executed' },
+    ])
+      expect((await POST(request(invalid))).status).toBe(400);
+    expect(operator.confirmOperationNotExecuted).not.toHaveBeenCalled();
+  });
+
   it('replays an expiry sweep after a lost response without moving its cutoff', async () => {
     let now = 1_000;
     vi.spyOn(Date, 'now').mockImplementation(() => now);

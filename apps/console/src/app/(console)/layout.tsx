@@ -1,5 +1,6 @@
 import { requireSession } from '@/lib/auth';
 import { getRuntime } from '@/lib/runtime';
+import { version } from '../../../package.json';
 import { Navigation } from '@/components/navigation';
 
 export const dynamic = 'force-dynamic';
@@ -13,12 +14,12 @@ export default async function ConsoleLayout({ children }: { children: React.Reac
         <div className="brand-block r-brand">
           <strong>RESVARY</strong>
           <span>OPERATOR CONSOLE</span>
-          <span>v1.0.0</span>
+          <span>v{version}</span>
         </div>
         <Navigation />
         <div className="sidebar-status">
           <div>
-            <span className="status-square" /> All systems normal
+            <span className="status-square" /> Operator session active
           </div>
           <time dateTime={new Date().toISOString()}>
             {new Date().toISOString().slice(0, 19).replace('T', ' ')}
