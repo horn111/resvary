@@ -38,6 +38,18 @@ export async function connectedWallet(rt: Runtime, owner: string): Promise<Addre
   return row?.address ?? null;
 }
 
+export async function releaseExpiredWalletHolds(rt: Runtime) {
+  // Pending jobs may never start a Workflow. Let an authenticated balance read
+  // expire their holds too, even if no operator maintenance job has run.
+  // One stable request per minute bounds the idempotency records across wallets.
+  const minute = Math.floor(Date.now() / 60_000) * 60_000;
+  await rt.ledger.releaseExpiredReservations({
+    idempotencyKey: `wallet-expiry:${minute}`,
+    now: minute,
+    limit: 100,
+  });
+}
+
 export async function walletActionLimit(rt: Runtime, ipHash: string) {
   const key = `wallet:${new Date().toISOString().slice(0, 13)}:${ipHash}`;
   const count = (

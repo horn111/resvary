@@ -10,6 +10,7 @@ import { dispatchJob, drainDispatches } from './workflow-dispatch';
 import { recoverWorkflowJob } from './workflow-execution';
 import {
   connectedWallet,
+  releaseExpiredWalletHolds,
   walletActionLimit,
   walletChallenge,
   verifyWallet,
@@ -187,11 +188,13 @@ export async function handle(request: Request) {
         rt.jobs.freeRunsRemaining(ip),
         connectedWallet(rt, owner),
       ]);
-      if (wallet)
+      if (wallet) {
         await rt.ledger.ensureAccount({
           customerId: walletCustomer(wallet),
           idempotencyKey: `account:${walletCustomer(wallet)}`,
         });
+        await releaseExpiredWalletHolds(rt);
+      }
       const [status, balance, jobs] = await Promise.all([
         demoReadiness(rt, freeRunsRemaining === 0),
         rt.ledger.getBalance(wallet ? walletCustomer(wallet) : owner),

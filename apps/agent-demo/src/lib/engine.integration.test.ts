@@ -12,6 +12,7 @@ import {
   createWalletFunding,
   confirmWalletFunding,
   reservePaidJob,
+  releaseExpiredWalletHolds,
 } from './wallet';
 import { PAID_MAX_UNITS, walletCustomer } from './billing';
 import { migratePostgres } from '@resvary/postgres';
@@ -150,6 +151,46 @@ describe.skipIf(!database)('durable document jobs on PostgreSQL', () => {
     );
     return rt.jobs.create(randomUUID(), randomUUID(), 'A short paid document.', ip, true, wallet);
   }
+  it('releases expired holds for a job that never entered Workflow without clearing a live reservation', async () => {
+    const wallet = privateKeyToAccount(`0x${randomUUID().replaceAll('-', '').repeat(2)}`).address;
+    const job = await paidJob(wallet);
+    const start = Date.now();
+    await rt.ledger.grantCredits({
+      customerId: walletCustomer(wallet),
+      amount: '1',
+      idempotencyKey: randomUUID(),
+    });
+    await rt.jobs.patch(job.id, { reservation_id: null });
+    // Core may persist a reserve just before admission loses its available budget.
+    const pricing = await price(rt.ledger);
+    await rt.ledger.reserveCredits({
+      customerId: walletCustomer(wallet),
+      priceId: pricing.id,
+      estimatedUsage: job.estimated,
+      idempotencyKey: `pending-expiry:${job.id}`,
+      expiresAt: start + 120_000,
+    });
+    const live = await rt.ledger.reserveCredits({
+      customerId: walletCustomer(wallet),
+      priceId: pricing.id,
+      estimatedUsage: job.estimated,
+      idempotencyKey: `live-expiry:${job.id}`,
+      expiresAt: start + 600_000,
+    });
+    await releaseExpiredWalletHolds(rt);
+    expect((await rt.ledger.getBalance(walletCustomer(wallet))).reservedUnits).toBe(
+      String(PAID_MAX_UNITS * 2n),
+    );
+    vi.spyOn(Date, 'now').mockReturnValue(start + 180_000);
+    await releaseExpiredWalletHolds(rt);
+    await releaseExpiredWalletHolds(rt);
+    expect((await rt.ledger.getBalance(walletCustomer(wallet))).reservedUnits).toBe(
+      String(PAID_MAX_UNITS),
+    );
+    expect((await rt.ledger.getReservation(live.id))?.status).toBe('open');
+    expect((await rt.jobs.get(job.id)).phase).toBe('awaiting_credits');
+    expect((await rt.jobs.status()).remainingUnits).toBe(10_000_000);
+  });
   it('reserves a paid retry only once and releases a timed-out queue hold after a database retry', async () => {
     const wallet = privateKeyToAccount(`0x${randomUUID().replaceAll('-', '').repeat(2)}`).address;
     const job = await paidJob(wallet);
