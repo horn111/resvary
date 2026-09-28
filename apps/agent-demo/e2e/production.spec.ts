@@ -131,10 +131,10 @@ test('live funding, paid analysis, idempotent replay, remaining credits, and ses
     page.getByRole('heading', { name: 'An agent pays for document analysis.' }),
   ).toBeVisible();
   await expect(
-    page.getByText('MAINNET · The agent spends real USDC', { exact: false }),
+    page.getByText('MAINNET · Three sponsored runs per IP', { exact: false }),
   ).toBeVisible();
   await expect(page.getByText('LOCAL TEST MODE', { exact: false })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Run paid analysis' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Run free analysis' })).toBeEnabled();
 
   const initialStatus = await getJson<Status>(page.request, '/api/status');
   expect(initialStatus).toMatchObject({
@@ -162,7 +162,7 @@ test('live funding, paid analysis, idempotent replay, remaining credits, and ses
       response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/jobs',
   );
   await page.getByLabel('Choose an example or paste plain text').fill(firstDocument);
-  await page.getByRole('button', { name: 'Run paid analysis' }).click();
+  await page.getByRole('button', { name: 'Run free analysis' }).click();
   const firstResponse = await firstResponsePromise;
   expect(firstResponse.status()).toBe(202);
   const firstCreated = (await firstResponse.json()) as { id: string; phase: string };
@@ -218,7 +218,7 @@ test('live funding, paid analysis, idempotent replay, remaining credits, and ses
       response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/jobs',
   );
   await page.getByLabel('Choose an example or paste plain text').fill(secondDocument);
-  await page.getByRole('button', { name: 'Run paid analysis' }).click();
+  await page.getByRole('button', { name: 'Run free analysis' }).click();
   const secondResponse = await secondResponsePromise;
   expect(secondResponse.status()).toBe(202);
   const secondCreated = (await secondResponse.json()) as { id: string; phase: string };
@@ -257,7 +257,7 @@ test('live funding, paid analysis, idempotent replay, remaining credits, and ses
     const other = await isolated.newPage();
     const isolatedErrors = captureBrowserErrors(other);
     await other.goto('/');
-    await expect(other.getByRole('button', { name: 'Run paid analysis' })).toBeEnabled({
+    await expect(other.getByRole('button', { name: 'Run free analysis' })).toBeEnabled({
       timeout: 45_000,
     });
     await expect(other.getByTestId('balance')).toHaveText('$0.000000');

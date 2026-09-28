@@ -4,11 +4,12 @@ import type { Runtime } from './runtime';
 
 const pending = new WeakMap<Runtime, Promise<{ ready: boolean; message: string }>>();
 
-export async function demoReadiness(rt: Runtime) {
+export async function demoReadiness(rt: Runtime, paid = false) {
   const budget = await rt.jobs.status();
   if (rt.cfg.executionMode !== 'workflow') return budget;
   const ai = rt.cfg.testMode ? { ready: true as const } : aiReadiness();
   if (!ai.ready) return { ...budget, workerReady: false, message: ai.reason };
+  if (paid) return { ...budget, workerReady: true, message: 'Visitor credits fund paid runs' };
   const cached = await rt.jobs.cachedReadiness();
   let readiness = cached;
   if (!readiness) {

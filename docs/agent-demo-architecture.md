@@ -1,6 +1,6 @@
 # Resvary agent demo architecture
 
-Resvary runs a Next.js production deployment in the dedicated Vercel project `resvary-agent-demo`. Vercel Workflow `4.8.8` coordinates durable execution, and a managed Neon PostgreSQL database in `fra1` holds job state, the credit ledger, idempotency records, quotas, and budget allocation. Two live analyses verified the payment, credit, usage, and replay path; [sanitized evidence](../apps/agent-demo/public/proofs/2026-09-10.json) records their identifiers and amounts.
+Resvary runs a Next.js production deployment in the dedicated Vercel project `resvary-agent-demo`. Vercel Workflow `4.8.8` coordinates durable execution, and a managed Neon PostgreSQL database in `fra1` holds job state, the credit ledger, idempotency records, quotas, and budget allocation. Two live analyses verified the payment, credit, usage, and replay path; [sanitized evidence](archive/agent-demo/2026-09-10-testnet.json) records their identifiers and amounts.
 
 The OpenAI Agents SDK remains the agent runtime. The production provider profile sends the agent loop to Nous `qwen/qwen3.8-flash` and sends the paid document-analysis request to Nous `openai/gpt-4.1-mini` through a bounded OpenAI-compatible transport.
 

@@ -1,5 +1,6 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import WalletPanel from './wallet-panel';
 
 const examples = [
   {
@@ -20,6 +21,7 @@ type Receipt = {
   balanceAfterUnits: string;
 };
 type Job = {
+  document?: string | null;
   id: string;
   phase: string;
   result: string | null;
@@ -28,6 +30,10 @@ type Job = {
   events: { seq: string; kind: string; detail: Record<string, unknown> }[];
 };
 type Status = {
+  wallet: string | null;
+  freeRunsRemaining: number;
+  maxPaidAmount: string;
+  topUpAmounts: string[];
   accepting: boolean;
   balance: string;
   testMode: boolean;
@@ -35,7 +41,7 @@ type Status = {
   message: string;
   jobs: { id: string; phase: string }[];
 };
-const terminal = new Set(['completed', 'failed', 'review_required']);
+const terminal = new Set(['completed', 'failed', 'review_required', 'awaiting_credits']);
 const labels: Record<string, string> = {
   topup_required: 'Balance below quote. Top-up required.',
   payment_started: 'Circle Agent Wallet payment started',
@@ -70,6 +76,16 @@ export default function Demo() {
   const request = useRef<{ key: string; document: string } | null>(null);
   const bytes = new TextEncoder().encode(document).length;
   const active = submitting || Boolean(job && !terminal.has(job.phase));
+  const paid = status?.freeRunsRemaining === 0;
+  const canPay =
+    !paid ||
+    Boolean(
+      status?.wallet &&
+      (Number(status.balance) >= Number(status.maxPaidAmount) || job?.phase === 'awaiting_credits'),
+    );
+  const refresh = useCallback(async () => {
+    setStatus(await api<Status>('status'));
+  }, []);
 
   function replaceDocument(nextDocument: string) {
     setDocument(nextDocument);
@@ -86,8 +102,12 @@ export default function Demo() {
         await api('session', { method: 'POST', signal: abort.signal });
         const current = await api<Status>('status', { signal: abort.signal });
         setStatus(current);
-        if (current.jobs[0])
-          setJob(await api<Job>(`jobs/${current.jobs[0].id}`, { signal: abort.signal }));
+        if (current.jobs[0]) {
+          const restored = await api<Job>(`jobs/${current.jobs[0].id}`, { signal: abort.signal });
+          setJob(restored);
+          if (restored.phase === 'awaiting_credits' && restored.document)
+            setDocument(restored.document);
+        }
       } catch (e) {
         if (!abort.signal.aborted) setError((e as Error).message);
       }
@@ -128,13 +148,24 @@ export default function Demo() {
     if (!request.current || request.current.document !== document)
       request.current = { key: crypto.randomUUID(), document };
     try {
-      const created = await api<{ id: string }>('jobs', {
-        method: 'POST',
-        body: JSON.stringify(request.current),
-      });
+      if (paid && status?.wallet)
+        await (await import('../lib/wallet-client')).walletClient(status.wallet);
+      const created = await api<{ id: string }>(
+        job?.phase === 'awaiting_credits' ? `jobs/${job.id}` : 'jobs',
+        {
+          method: 'POST',
+          body: JSON.stringify(request.current),
+        },
+      );
       setJob(await api<Job>(`jobs/${created.id}`));
     } catch (e) {
       setError((e as Error).message);
+      const latest = await api<Status>('status').catch(() => null);
+      if (latest) {
+        setStatus(latest);
+        if (latest.jobs[0]?.phase === 'awaiting_credits')
+          setJob(await api<Job>(`jobs/${latest.jobs[0].id}`));
+      }
     } finally {
       setSubmitting(false);
     }
@@ -165,10 +196,7 @@ export default function Demo() {
         >
           resvary<span> / agent demo</span>
         </a>
-        <nav aria-label="Demo evidence">
-          <a className="proof-link" href="/proofs/2026-09-10.json" target="_blank" rel="noreferrer">
-            Testnet proof
-          </a>
+        <nav aria-label="Demo network">
           <span className="tag">
             {status ? `ARC ${status.arcEnvironment.toUpperCase()}` : 'CHECKING NETWORK'}
           </span>
@@ -181,8 +209,8 @@ export default function Demo() {
           document analysis.
         </h1>
         <p>
-          The agent checks its credits, funds a shortfall through Circle Gateway, and pays for a
-          document analysis. Resvary reserves the quote and charges measured usage.
+          Try three runs free. Then add USDC from your wallet on Arc Mainnet and pay with Resvary
+          credits. The agent analyzes your document; Resvary charges measured usage.
         </p>
       </section>
       <div className="notice">
@@ -191,7 +219,7 @@ export default function Demo() {
           : status.testMode
             ? 'LOCAL TEST MODE · Deterministic analysis and simulated settlement. No real AI or USDC payment.'
             : status?.arcEnvironment === 'mainnet'
-              ? 'MAINNET · The agent spends real USDC within a server-enforced per-run limit.'
+              ? 'MAINNET · Three sponsored runs per IP, then prepaid credits from your wallet.'
               : 'Testnet USDC is supplied by the project. Document analysis uses a paid AI provider.'}
       </div>
       <div className="workspace">
@@ -204,7 +232,7 @@ export default function Demo() {
             {examples.map((example) => (
               <button
                 key={example.name}
-                disabled={active}
+                disabled={active || job?.phase === 'awaiting_credits'}
                 aria-pressed={document === example.text}
                 onClick={() => replaceDocument(example.text)}
               >
@@ -217,33 +245,52 @@ export default function Demo() {
             id="document"
             value={document}
             onChange={(e) => replaceDocument(e.target.value)}
-            disabled={active}
+            disabled={active || job?.phase === 'awaiting_credits'}
             spellCheck={false}
           />
           <div className="run-row">
             <button
               className="primary"
               onClick={submit}
-              disabled={active || !status?.accepting || bytes > 12288 || !document.trim()}
+              disabled={
+                active || !status?.accepting || !canPay || bytes > 12288 || !document.trim()
+              }
             >
               {!status
                 ? 'Starting secure session…'
                 : active
                   ? 'Agent is working…'
-                  : 'Run paid analysis'}
+                  : job?.phase === 'awaiting_credits'
+                    ? 'Continue pending analysis'
+                    : paid
+                      ? 'Run with my credits'
+                      : 'Run free analysis'}
               <svg aria-hidden="true" viewBox="0 0 16 16" width="16" height="16">
                 <path d="M4 12 12 4M6 4h6v6" />
               </svg>
             </button>
             <div>
-              <small>Available credits</small>
+              <small>{status?.wallet ? 'Your available credits' : 'Sponsored demo credits'}</small>
               <strong data-testid="balance">{money(status?.balance ?? '0')}</strong>
             </div>
           </div>
           <p className="fine">
-            Three new jobs per session. Text and results expire after 24 hours. Do not submit
-            sensitive information. Reusing the same completed request does not charge again.
+            {status
+              ? `${status.freeRunsRemaining} of 3 free runs left for this IP. The free allowance does not reset. `
+              : ''}
+            Text and results expire after 24 hours. Do not submit sensitive information. Reusing the
+            same completed request does not charge again.
           </p>
+          {status && (paid || status.wallet) ? (
+            <WalletPanel
+              address={status.wallet}
+              balance={status.balance}
+              maxAmount={status.maxPaidAmount}
+              amounts={status.topUpAmounts}
+              accepting={status.accepting}
+              refresh={refresh}
+            />
+          ) : null}
           {status && !status.accepting ? (
             <p role="status" className="message">
               New runs paused. {status.message}

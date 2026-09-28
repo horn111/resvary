@@ -49,21 +49,35 @@ export class JobEngine {
   ) {}
   async quote(id: string) {
     const job = await this.rt.jobs.get(id);
+    const customer = job.billing_customer ?? job.customer;
     await this.rt.ledger.ensureAccount({
-      customerId: job.customer,
-      idempotencyKey: `account:${job.customer}`,
+      customerId: customer,
+      idempotencyKey: `account:${customer}`,
     });
-    const balance = await this.rt.ledger.getBalance(job.customer);
+    const balance = await this.rt.ledger.getBalance(customer);
     const required =
       BigInt(job.estimated.input_tokens) * 2n + BigInt(job.estimated.output_tokens) * 8n;
     return {
       availableUnits: balance.availableUnits,
       requiredUnits: required.toString(),
-      needsTopUp: BigInt(balance.availableUnits) < required,
+      needsTopUp: !job.reservation_id && BigInt(balance.availableUnits) < required,
     };
   }
   async prepare(id: string) {
     const job = await this.rt.jobs.get(id);
+    if (job.billing_mode === 'paid') {
+      if (!job.reservation_id || job.phase === 'awaiting_credits')
+        throw new Error('Visitor credits must be reserved before execution');
+      const reservation = await this.rt.ledger.getReservation(job.reservation_id);
+      if (
+        !reservation ||
+        reservation.status !== 'open' ||
+        reservation.customerId !== job.billing_customer
+      )
+        throw new Error('Invalid visitor reservation');
+      await this.rt.jobs.transition(id, ['queued', 'running'], 'reserved');
+      return { status: 'reserved' };
+    }
     if (job.reservation_id) return { status: 'reserved' };
     if (job.challenge && job.phase !== 'funded') return { status: 'payment_required' };
     const pricing = await price(this.rt.ledger);
@@ -94,6 +108,8 @@ export class JobEngine {
   }
   async topup(id: string) {
     let job = await this.rt.jobs.get(id);
+    if (job.billing_mode === 'paid')
+      throw new Error('Visitor-funded jobs cannot spend the sponsor wallet');
     if (job.reservation_id || job.phase === 'completed') return { status: 'not_needed' };
     if (!job.challenge) await this.prepare(id);
     job = await this.rt.jobs.get(id);
@@ -136,6 +152,7 @@ export class JobEngine {
       return { status: 'completed', replayed: true };
     }
     if (job.phase === 'result_saved') {
+      if (job.billing_mode === 'paid' && !job.agent_usage) return { status: 'result_saved' };
       await this.commit(job);
       await this.settleCompletedBudget(await this.rt.jobs.get(id));
       return { status: 'completed' };
@@ -182,17 +199,33 @@ export class JobEngine {
           }
         : {}),
     });
-    await this.commit(await this.rt.jobs.get(id));
-    await this.settleCompletedBudget(await this.rt.jobs.get(id));
+    if (job.billing_mode !== 'paid') {
+      await this.commit(await this.rt.jobs.get(id));
+      await this.settleCompletedBudget(await this.rt.jobs.get(id));
+    }
     return { status: 'completed' };
   }
   async commit(job: Job) {
     if (!job.reservation_id || !job.usage || !job.result)
       throw new Error('No saved provider result');
+    if (job.billing_mode === 'paid' && !job.agent_usage)
+      throw new Error('Agent usage must be persisted before charging visitor credits');
+    const actualUsage = { ...job.usage };
+    if (job.billing_mode === 'paid' && job.agent_usage) {
+      for (const count of [job.agent_usage.inputTokens, job.agent_usage.outputTokens]) {
+        if (!Number.isSafeInteger(count) || count < 0) throw new Error('Invalid saved agent usage');
+      }
+      actualUsage.input_tokens = String(
+        BigInt(job.usage.input_tokens) + BigInt(job.agent_usage.inputTokens),
+      );
+      actualUsage.output_tokens = String(
+        BigInt(job.usage.output_tokens) + BigInt(job.agent_usage.outputTokens),
+      );
+    }
     for (const dimension of ['input_tokens', 'output_tokens']) {
       if (
-        !/^\d+$/.test(job.usage[dimension]) ||
-        BigInt(job.usage[dimension]) > BigInt(job.estimated[dimension])
+        !/^\d+$/.test(actualUsage[dimension]) ||
+        BigInt(actualUsage[dimension]) > BigInt(job.estimated[dimension])
       ) {
         await this.rt.jobs.patch(job.id, {
           phase: 'review_required',
@@ -204,7 +237,7 @@ export class JobEngine {
     const charged = await this.rt.ledger.commitUsage({
       reservationId: job.reservation_id,
       usageEventId: `analysis:${job.id}`,
-      actualUsage: job.usage,
+      actualUsage,
       idempotencyKey: `commit:${job.id}`,
     });
     await this.rt.jobs.patch(job.id, {
@@ -229,12 +262,17 @@ export class JobEngine {
         return;
       }
       if (existing.phase === 'failed' || existing.phase === 'review_required') return;
+      if (existing.phase === 'awaiting_credits') return;
       if (existing.phase === 'result_saved') {
         await this.commit(existing);
         await this.settleCompletedBudget(await this.rt.jobs.get(id));
         return;
       }
       if (this.rt.cfg.testMode) {
+        if (existing.billing_mode === 'paid')
+          await this.rt.jobs.patch(id, {
+            agent_usage: { inputTokens: 0, outputTokens: 0, requests: 0 },
+          });
         await this.quote(id);
         const result = await this.prepare(id);
         if (result.status === 'payment_required') await this.topup(id);
@@ -297,15 +335,28 @@ export class JobEngine {
             description:
               'Get the completion status; the visitor receives the saved result through the authenticated web app.',
             parameters: z.object({}),
-            execute: guarded(async () => ({ status: (await this.rt.jobs.get(id)).phase })),
+            execute: guarded(async () => {
+              const state = await this.rt.jobs.get(id);
+              return {
+                status:
+                  state.billing_mode === 'paid' && state.phase === 'result_saved'
+                    ? 'completed'
+                    : state.phase,
+              };
+            }),
           }),
         ];
         const agent = new Agent({
           name: 'Resvary document buyer',
           model: snapshot.agent.model,
           instructions:
-            'Fulfil one document analysis request. First check the balance and quote. If funds are insufficient, top up once. Then analyze the document. Check the result. Stop after completion or any uncertain payment/provider error. Never repeat a payment or an uncertain analysis. You cannot change amounts, addresses or document contents.',
-          tools,
+            existing.billing_mode === 'paid'
+              ? 'Fulfil one document analysis request. Visitor credits are already reserved. Check the quote, analyze the document once, then check the result and stop. Never repeat an uncertain analysis. You cannot make payments or change amounts, addresses or document contents.'
+              : 'Fulfil one document analysis request. First check the balance and quote. If funds are insufficient, top up once. Then analyze the document. Check the result. Stop after completion or any uncertain payment/provider error. Never repeat a payment or an uncertain analysis. You cannot change amounts, addresses or document contents.',
+          tools:
+            existing.billing_mode === 'paid'
+              ? tools.filter((entry) => entry.name !== 'top_up')
+              : tools,
           modelSettings: {
             maxTokens: 512,
             parallelToolCalls: false,
@@ -331,12 +382,19 @@ export class JobEngine {
           },
         });
       }
-      const final = await this.rt.jobs.get(id);
+      let final = await this.rt.jobs.get(id);
+      if (final.billing_mode === 'paid' && final.phase === 'result_saved') {
+        await this.commit(final);
+        final = await this.rt.jobs.get(id);
+      }
       if (final.phase !== 'completed') throw new Error('Agent stopped before completing the job');
       await this.settleCompletedBudget(final);
     } catch {
       const job = await this.rt.jobs.get(id);
-      if (!['completed', 'failed', 'result_saved'].includes(job.phase)) {
+      if (
+        !['completed', 'failed', 'result_saved'].includes(job.phase) ||
+        (job.billing_mode === 'paid' && job.phase === 'result_saved' && !job.agent_usage)
+      ) {
         await this.rt.jobs.patch(id, {
           phase: 'review_required',
           failure: 'Run paused for operator review. No automatic repayment or provider retry.',

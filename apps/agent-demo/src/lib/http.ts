@@ -8,6 +8,17 @@ import { RUN_BUDGET_UNITS } from './config';
 import { demoReadiness } from './readiness';
 import { dispatchJob, drainDispatches } from './workflow-dispatch';
 import { recoverWorkflowJob } from './workflow-execution';
+import {
+  connectedWallet,
+  walletActionLimit,
+  walletChallenge,
+  verifyWallet,
+  disconnectWallet,
+  createWalletFunding,
+  confirmWalletFunding,
+  reservePaidJob,
+} from './wallet';
+import { FREE_RUNS_PER_IP, PAID_MAX_AMOUNT, TOP_UP_AMOUNTS, walletCustomer } from './billing';
 
 const json = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
   Response.json(body, { status, headers: { 'Cache-Control': 'private, no-store', ...headers } });
@@ -16,6 +27,8 @@ async function payment(request: Request, id: string) {
   const rt = runtime();
   authorizePayment(request, id, rt.cfg.secret);
   const job = await rt.jobs.get(id);
+  if (job.billing_mode === 'paid')
+    throw new DemoError(403, 'Visitor-funded jobs cannot spend the sponsor wallet');
   if (
     !job.challenge ||
     !['payment_pending', 'funded', 'review_required', 'completed'].includes(job.phase)
@@ -108,6 +121,10 @@ async function maintenance(request: Request) {
     throw new DemoError(401, 'Unauthorized maintenance request');
   const rt = runtime();
   await rt.jobs.cleanup();
+  await rt.ledger.releaseExpiredReservations({
+    idempotencyKey: `expired:${Date.now()}`,
+    limit: 100,
+  });
   if (rt.cfg.executionMode !== 'workflow') return json({ ok: true });
   await rt.jobs.reconcileWorkflows();
   const saved = await rt.pool.query<{ id: string }>(
@@ -139,11 +156,45 @@ export async function handle(request: Request) {
       });
     }
     const owner = customer(request, rt.cfg.secret);
+    const ip = ipKey(request, rt.cfg.secret, rt.cfg.trustedIpHeader);
+    if (path.startsWith('/api/wallet/') && request.method === 'POST') {
+      await walletActionLimit(rt, ip);
+      if (path === '/api/wallet/disconnect') {
+        await disconnectWallet(rt, owner);
+        return json({ ok: true });
+      }
+      const input = await boundedJson(request);
+      if (path === '/api/wallet/challenge')
+        return json(await walletChallenge(rt, owner, input.address));
+      if (path === '/api/wallet/verify')
+        return json(await verifyWallet(rt, owner, input.signature));
+      const wallet = await connectedWallet(rt, owner);
+      if (!wallet) throw new DemoError(401, 'Connect and sign in with your wallet');
+      if (path === '/api/wallet/funding') {
+        const status = await demoReadiness(rt, true);
+        if (!rt.cfg.accepting || !status.workerReady || status.remainingUnits < RUN_BUDGET_UNITS)
+          throw new DemoError(503, 'Top-ups are paused while new runs are unavailable');
+        return json(await createWalletFunding(rt, wallet, input.amount, input.key));
+      }
+      const confirmation = /^\/api\/wallet\/funding\/(fund_[0-9a-f]{24})\/confirm$/.exec(path);
+      if (confirmation)
+        return json(await confirmWalletFunding(rt, wallet, confirmation[1], input.txHash));
+      throw new DemoError(404, 'Not found');
+    }
     if (path === '/api/status' && request.method === 'GET') {
       await rt.ledger.ensureAccount({ customerId: owner, idempotencyKey: `account:${owner}` });
+      const [freeRunsRemaining, wallet] = await Promise.all([
+        rt.jobs.freeRunsRemaining(ip),
+        connectedWallet(rt, owner),
+      ]);
+      if (wallet)
+        await rt.ledger.ensureAccount({
+          customerId: walletCustomer(wallet),
+          idempotencyKey: `account:${walletCustomer(wallet)}`,
+        });
       const [status, balance, jobs] = await Promise.all([
-        demoReadiness(rt),
-        rt.ledger.getBalance(owner),
+        demoReadiness(rt, freeRunsRemaining === 0),
+        rt.ledger.getBalance(wallet ? walletCustomer(wallet) : owner),
         rt.jobs.list(owner),
       ]);
       return json({
@@ -151,6 +202,11 @@ export async function handle(request: Request) {
         accepting:
           rt.cfg.accepting && status.workerReady && status.remainingUnits >= RUN_BUDGET_UNITS,
         balance: balance.availableAmount,
+        wallet,
+        freeRunsRemaining,
+        freeRunLimit: FREE_RUNS_PER_IP,
+        maxPaidAmount: PAID_MAX_AMOUNT,
+        topUpAmounts: TOP_UP_AMOUNTS,
         jobs,
         testMode: rt.cfg.testMode,
         arcEnvironment: rt.cfg.arcEnvironment,
@@ -160,24 +216,42 @@ export async function handle(request: Request) {
       const input = await boundedJson(request);
       if (typeof input.document !== 'string' || typeof input.key !== 'string')
         throw new DemoError(400, 'Document and request key are required');
-      const status = await demoReadiness(rt);
-      const job = await rt.jobs.create(
+      const [remaining, wallet] = await Promise.all([
+        rt.jobs.freeRunsRemaining(ip),
+        connectedWallet(rt, owner),
+      ]);
+      const status = await demoReadiness(rt, remaining === 0);
+      let job = await rt.jobs.create(
         owner,
         input.key,
         input.document,
-        ipKey(request, rt.cfg.secret, rt.cfg.trustedIpHeader),
+        ip,
+        rt.cfg.accepting && status.workerReady,
+        wallet ?? undefined,
+      );
+      job = await reservePaidJob(rt, job, wallet, rt.cfg.accepting && status.workerReady);
+      if (rt.cfg.executionMode === 'workflow') await dispatchJob(rt, job.id);
+      return json({ id: job.id, phase: job.phase }, 202);
+    }
+    const match = /^\/api\/jobs\/([0-9a-f-]+)$/i.exec(path);
+    if (match && request.method === 'POST') {
+      const status = await demoReadiness(rt, true);
+      const job = await reservePaidJob(
+        rt,
+        await rt.jobs.get(match[1], owner),
+        await connectedWallet(rt, owner),
         rt.cfg.accepting && status.workerReady,
       );
       if (rt.cfg.executionMode === 'workflow') await dispatchJob(rt, job.id);
       return json({ id: job.id, phase: job.phase }, 202);
     }
-    const match = /^\/api\/jobs\/([0-9a-f-]+)$/i.exec(path);
     if (match && request.method === 'GET') {
       const job = await rt.jobs.get(match[1], owner);
       return json({
         id: job.id,
         phase: job.phase,
-        result: job.result,
+        document: job.phase === 'awaiting_credits' ? job.document : undefined,
+        result: job.phase === 'completed' ? job.result : null,
         receipt: job.receipt,
         usage: job.usage,
         failure: job.failure,

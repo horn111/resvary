@@ -1,6 +1,15 @@
 # Resvary agent demo
 
-Resvary shows an AI agent buying a paid document-analysis service with product credits. If the visitor account lacks credits, the server uses a Circle Agent Wallet to fund the shortfall through Circle Gateway on the configured Arc network. The Vercel production configuration explicitly selects Mainnet; an omitted network remains on Testnet. Resvary reserves the quoted product credits, saves the provider result, charges measured usage, and returns the saved result with its receipt.
+Resvary shows an AI agent buying document analysis with product credits. Each IP receives three sponsored runs for all time. After that, the visitor signs in with an EOA browser wallet and tops up Resvary Core credits with USDC through Arc Mainnet. The server verifies the onchain memo payment before crediting the wallet's ledger account. It reserves the maximum charge, saves measured agent and analysis usage, then commits the actual charge and releases the unused reserve. Paid runs cannot call the project's Circle wallet.
+
+## Visitor credits
+
+- Wallet sign-in uses a server-generated SIWE message, a five-minute nonce, and a 24-hour signed visitor session. It does not authorize a payment. The balance belongs to the verified wallet address and survives browser sessions.
+- Top-ups offer `0.50`, `1.00`, or `5.00` USDC on Arc Mainnet, chain `5042`. Each deposit has a separate Core funding intent and memo invoice. Chain, successful receipt, sender, recipient, token, amount, and memo must match before credits are granted. Replaying a confirmation cannot grant credits again.
+- The browser sends the memo transaction from the visitor's wallet. No private key or token approval reaches the server. Smart-contract wallets are currently rejected because the Arc memo payment path requires an EOA.
+- The maximum paid reservation is `$0.347392`. Billing combines agent and analysis tokens at `$2` per million input tokens and `$8` per million output tokens. Network fees are separate. Unspent prepaid credits remain in Core; there is no automated withdrawal feature.
+- A pending transaction stays in browser storage. After a lost wallet response, enter its transaction hash and retry verification; do not submit a second payment. Confirmations remain available while new runs are paused.
+- Paid jobs wait in `awaiting_credits` until Core reserves credits. They do not allocate the provider budget or enter the execution queue beforehand. A pending job can resume through `POST /api/jobs/:id`. Reservations expire with the job and maintenance releases expired holds. Operator review is required if agent usage disappears after analysis; the app does not repeat the model call or invent a charge.
 
 The Vercel deployment keeps the OpenAI Agents SDK for the agent loop. The selected Nous configuration uses `qwen/qwen3.8-flash` for the buying agent and `openai/gpt-4.1-mini` for the document-analysis service.
 
@@ -20,7 +29,7 @@ The Vercel deployment keeps the OpenAI Agents SDK for the agent loop. The select
 | Vercel build            | Linux production build passed. Runtime CLI resolution and `@vercel/nft` tracing package Circle CLI dependencies.                                 |
 | Public readiness        | Two real analyses completed. Saved-result replay and a second analysis from remaining credits passed; a separate live isolation test passed.     |
 
-This is a working prototype with a verified live payment-and-analysis path, not a production-maturity claim. See the [sanitized evidence](public/proofs/2026-09-10.json) and [verification qualifications](../../docs/ethonline-continuity.md#evidence-status). No user documents, model results, signatures, session cookies, or credentials appear in the evidence.
+This is a working prototype with a verified live payment-and-analysis path, not a production-maturity claim. See the [sanitized evidence](../../docs/archive/agent-demo/2026-09-10-testnet.json) and [verification qualifications](../../docs/ethonline-continuity.md#evidence-status). No user documents, model results, signatures, session cookies, or credentials appear in the evidence.
 
 ## Request lifecycle
 
@@ -114,12 +123,12 @@ The current exported session expires on October 7, 2026. Treat that date as the 
 ## Limits and cost controls
 
 - The API accepts plain text from 1 through 12,288 UTF-8 bytes. The service output cap is 1,024 tokens. The agent gets at most eight turns, 512 output tokens per turn, serialized tool calls, and a 16,000-byte provider request cap.
-- Each signed session can create three jobs. Each IP hash can create ten jobs per UTC day. Replaying a known request key does not consume another allowance.
+- Each IP hash receives three free jobs for all time, across sessions and dates. PostgreSQL serializes admission; migration carries forward historical daily counters. Failed accepted runs still consume the free allowance. Paid runs and idempotent replays do not consume it. Shared networks share the allowance; changing IPs can bypass any IP-only policy. Preserve the HMAC secret and lifetime quota table across deployments.
 - The demo budget ceiling is `$10.00`, represented as `10,000,000` micro-USD. Provider probes created `19,390` micro-USD (`$0.019390`) of conservative pre-call holds. The provider reported `$0.00083109` in total probe spend. Record the holds, not the reported bill, in `AGENT_DEMO_INITIAL_SPEND_UNITS` before the first migration of a fresh database.
-- Each accepted job allocates `400,000` micro-USD (`$0.40`) and the application never returns that allocation. With the recorded probe holds, a fresh budget can admit at most 24 jobs. This limit controls exposure; it does not report a provider invoice total.
+- Each queued job holds `400,000` micro-USD (`$0.40`). Completed jobs replace that hold with saved provider costs; uncertain or failed runs keep a conservative hold. This separate demo-wide `$10` ceiling still controls admission for free and paid runs. Top-ups pause when the provider budget cannot admit another job.
 - Product credits use `$2` per million input tokens and `$8` per million output tokens. The receipt reports this product charge, not the Nous invoice.
 - The Circle payment policy rejects a request above `50,000` Gateway units and passes the stored funding amount again as the CLI `--max-amount` value.
-- Readiness requires a valid session for the configured network, the Agent Wallet SCA, the expected backing EOA, and at least `0.05` Gateway USDC.
+- Sponsored readiness requires a valid Circle session, the expected Agent Wallet SCA and backing EOA, and at least `0.05` Gateway USDC. Paid Workflow runs require AI readiness and provider budget, and do not depend on sponsor-wallet funds or its Circle session.
 
 ## Recovery rules
 

@@ -63,23 +63,11 @@ a {
   letter-spacing: 0;
   color: var(--muted);
 }
-.tag,
-.proof-link {
+.tag {
   font-family: var(--font-mono), monospace;
   font-size: 11px;
   letter-spacing: 1px;
   text-transform: uppercase;
-}
-.proof-link {
-  min-height: 44px;
-  display: inline-flex;
-  align-items: center;
-  color: var(--muted);
-  text-decoration: underline;
-  text-underline-offset: 4px;
-}
-.proof-link:hover {
-  color: var(--ink);
 }
 .tag {
   border: 1px solid var(--line);
@@ -321,6 +309,47 @@ footer {
   color: var(--muted);
   font-size: 12px;
 }
+.wallet-panel {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+.wallet-panel h3 {
+  font-size: 15px;
+  margin: 0 0 12px;
+}
+.wallet-panel p {
+  line-height: 1.6;
+}
+.wallet-panel code {
+  overflow-wrap: anywhere;
+}
+.wallet-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+}
+.wallet-panel label {
+  display: grid;
+  gap: 8px;
+}
+.wallet-panel select,
+.wallet-panel input {
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 10px;
+  font: inherit;
+  max-width: 100%;
+}
+.pending-payment {
+  display: grid;
+  gap: 12px;
+  margin: 16px 0;
+}
 @keyframes record-in {
   from {
     opacity: 0.55;
@@ -358,9 +387,6 @@ footer {
   }
   header nav {
     gap: 10px;
-  }
-  .proof-link {
-    font-size: 10px;
   }
   .intro {
     padding-top: 38px;
