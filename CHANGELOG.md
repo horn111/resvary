@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- Override Anchor `0.31.1` to use TOML `4.3.0` in Circle CLI, fixing the recursion and prototype-pollution advisories. Remove both temporary dependency exceptions and add parser and CLI compatibility checks.
+
 ## [1.3.0] - 2026-09-27
 
 ### Added
