@@ -252,15 +252,21 @@
   }
 
   .claudeDesign :global(#top > div:nth-child(2)) {
-    min-height: clamp(18.5rem, 50svh, 23rem);
+    flex: none !important;
+    flex-direction: column;
     align-items: flex-start !important;
     padding: 2.75rem 1.125rem 0 !important;
   }
 
   .claudeDesign :global(#top > div:nth-child(2) > div:first-child) {
-    top: 54% !important;
+    position: relative !important;
+    inset: auto !important;
+    order: 1;
+    flex: none;
+    margin: 0.75rem auto 0.5rem;
+    transform: none !important;
     width: min(68vw, 20rem) !important;
-    height: min(68vw, 20rem) !important;
+    height: clamp(8rem, 30vw, 10rem) !important;
     opacity: 0.62;
   }
 
@@ -270,14 +276,15 @@
     align-items: flex-start !important;
     justify-content: flex-start !important;
     gap: 0 !important;
-    font-size: clamp(2.45rem, 12vw, 4.2rem) !important;
-    line-height: 0.96 !important;
+    font-size: clamp(2.15rem, 10.5vw, 4.2rem) !important;
+    line-height: 1.03 !important;
   }
 
   .claudeDesign :global(#top h1 > span:last-child) {
-    align-self: flex-end;
-    margin-top: 0.12em;
-    text-align: right !important;
+    flex-direction: row !important;
+    flex-wrap: wrap;
+    column-gap: 0.25em;
+    text-align: left !important;
   }
 
   .claudeDesign :global(#top > div:last-child) {
@@ -330,12 +337,7 @@
 
 @media (max-width: 22.99rem) {
   .claudeDesign :global(#top > div:nth-child(2)) {
-    min-height: 16.5rem;
     padding-top: 2.25rem !important;
-  }
-
-  .claudeDesign :global(#top h1) {
-    font-size: clamp(2.15rem, 11vw, 3.6rem) !important;
   }
 
   .claudeDesign :global(footer nav) {
