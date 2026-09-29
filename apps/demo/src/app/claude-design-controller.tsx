@@ -335,7 +335,7 @@ export function ClaudeDesignController() {
         )
       : () => {};
     const footerCleanup = footerCanvas
-      ? buildFooterCanvas(footerCanvas, footerPointer, reducedMotion, (render) => {
+      ? buildFooterCanvas(footerCanvas, footerPointer, (render) => {
           footerRender = render;
           render();
         })
@@ -729,7 +729,6 @@ function buildHeroCanvas(
 function buildFooterCanvas(
   canvas: HTMLCanvasElement,
   pointer: PointerState,
-  reducedMotion: boolean,
   ready: (render: () => boolean) => void,
 ) {
   const context = canvas.getContext('2d');
@@ -748,7 +747,9 @@ function buildFooterCanvas(
     canvas.width = Math.round(width * pixelRatio);
     canvas.height = Math.round(height * pixelRatio);
     context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-    gap = Math.max(7, Math.min(13, width / 105));
+    const scaledGap = Math.min(13, width / 105);
+    // Keep enough samples per glyph on phones; a 7px floor loses thin strokes.
+    gap = window.matchMedia('(max-width: 47.99rem)').matches ? scaledGap : Math.max(7, scaledGap);
     const fontFamily = getComputedStyle(canvas).fontFamily;
     particles = wordDots('Resvary', width, height, gap, fontFamily).map((dot) => ({
       bx: dot.x,
@@ -819,12 +820,12 @@ function buildFooterCanvas(
     .then(() => {
       if (!active) return;
       rebuild();
-      if (reducedMotion) render();
+      render();
     })
     .catch(() => {});
   const observer = new ResizeObserver(() => {
     rebuild();
-    if (reducedMotion) render();
+    render();
   });
   observer.observe(canvas);
   return () => {
