@@ -1,0 +1,323 @@
+.network {
+  --hub-column: clamp(11rem, 20vw, 17rem);
+  --network-gap: 1.75rem;
+  --node-size: 4.5rem;
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--hub-column) minmax(0, 1fr);
+  grid-template-rows: repeat(2, minmax(13rem, 1fr));
+  gap: 3.25rem var(--network-gap);
+}
+
+.capabilities {
+  display: contents;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.node {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--node-size);
+  align-items: center;
+  gap: 1.5rem;
+  min-width: 0;
+}
+
+.reserve {
+  grid-area: 1 / 1;
+}
+
+.retry {
+  grid-area: 1 / 3;
+}
+
+.receipt {
+  grid-area: 2 / 1;
+}
+
+.funding {
+  grid-area: 2 / 3;
+}
+
+.nodeMarker {
+  position: relative;
+  grid-area: 1 / 2;
+  width: var(--node-size);
+  height: var(--node-size);
+  color: var(--color-ink);
+}
+
+.nodeMarker svg,
+.hub svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.orbit,
+.innerOrbit {
+  stroke: currentColor;
+  stroke-width: 1;
+  stroke-opacity: 0.2;
+  vector-effect: non-scaling-stroke;
+  transition: stroke-opacity 180ms ease-out;
+}
+
+.orbit {
+  stroke-dasharray: 1 4;
+}
+
+.innerOrbit {
+  stroke-opacity: 0.09;
+}
+
+.point {
+  fill: var(--color-ink);
+}
+
+.nodeTag {
+  position: absolute;
+  top: calc(100% + 0.625rem);
+  left: 50%;
+  translate: -50% 0;
+  color: var(--color-ink-muted);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.6875rem;
+  line-height: 1.5;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition: color 180ms ease-out;
+}
+
+.nodeBody {
+  grid-area: 1 / 1;
+}
+
+.nodeBody h3 {
+  max-width: 20ch;
+  margin: 0;
+  color: var(--color-ink-strong);
+  font-size: 1.375rem;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: -0.022em;
+  text-wrap: balance;
+}
+
+.nodeBody p {
+  margin: 0.875rem 0 0;
+  color: var(--color-ink-body);
+  font-size: 0.96875rem;
+  line-height: 1.6;
+  text-wrap: pretty;
+}
+
+.retry,
+.funding {
+  grid-template-columns: var(--node-size) minmax(0, 1fr);
+}
+
+.retry .nodeMarker,
+.funding .nodeMarker {
+  grid-column: 1;
+}
+
+.retry .nodeBody,
+.funding .nodeBody {
+  grid-column: 2;
+}
+
+.hubColumn {
+  position: relative;
+  grid-area: 1 / 2 / 3 / 3;
+  display: grid;
+  place-items: center;
+}
+
+.connections {
+  position: absolute;
+  top: 0;
+  left: calc(-1 * (var(--network-gap) + var(--node-size) / 2));
+  width: calc(100% + var(--network-gap) * 2 + var(--node-size));
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.connections path {
+  stroke: var(--color-ink-body);
+  stroke-width: 1;
+  stroke-opacity: 0.65;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  transition:
+    stroke 180ms ease-out,
+    stroke-opacity 180ms ease-out;
+}
+
+.hub {
+  position: relative;
+  width: 9.5rem;
+  height: 9.5rem;
+  color: var(--color-ink);
+}
+
+.hubLabel {
+  position: absolute;
+  top: calc(50% + 6rem);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--color-ink-muted);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.6875rem;
+  line-height: 1.5;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition: color 180ms ease-out;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .network[data-diagram-active='reserve'] .reserveWire,
+  .network[data-diagram-active='retry'] .retryWire,
+  .network[data-diagram-active='receipt'] .receiptWire,
+  .network[data-diagram-active='funding'] .fundingWire,
+  .network[data-diagram-active='ledger'] .connections path {
+    stroke: var(--color-ink);
+    stroke-opacity: 0.9;
+  }
+
+  .network[data-diagram-active='reserve'] .reserve .orbit,
+  .network[data-diagram-active='retry'] .retry .orbit,
+  .network[data-diagram-active='receipt'] .receipt .orbit,
+  .network[data-diagram-active='funding'] .funding .orbit {
+    stroke-opacity: 0.5;
+  }
+
+  .network[data-diagram-active='reserve'] .reserve .nodeTag,
+  .network[data-diagram-active='retry'] .retry .nodeTag,
+  .network[data-diagram-active='receipt'] .receipt .nodeTag,
+  .network[data-diagram-active='funding'] .funding .nodeTag,
+  .network[data-diagram-active] .hubLabel {
+    color: var(--color-ink-strong);
+  }
+
+  .network[data-diagram-active] .hub .orbit {
+    stroke-opacity: 0.35;
+  }
+
+  .network[data-diagram-active] .hub .innerOrbit {
+    stroke-opacity: 0.16;
+  }
+
+  .network[data-diagram-active='ledger'] .hub .orbit {
+    stroke-opacity: 0.5;
+  }
+}
+
+@media (max-width: 67.99rem) {
+  .network {
+    --node-size: 4rem;
+    --diagram-height: 19rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: var(--diagram-height) auto auto;
+    gap: 2.25rem 2rem;
+  }
+
+  .hubColumn {
+    grid-area: 1 / 1 / 2 / 3;
+  }
+
+  .connections {
+    left: 18%;
+    width: 64%;
+  }
+
+  .node {
+    display: block;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--color-line);
+  }
+
+  .node .nodeMarker {
+    position: absolute;
+    grid-area: auto;
+    top: calc(var(--diagram-height) * 0.22 - var(--node-size) / 2);
+    left: calc(18% - var(--node-size) / 2);
+  }
+
+  .retry .nodeMarker,
+  .funding .nodeMarker {
+    left: calc(82% - var(--node-size) / 2);
+  }
+
+  .receipt .nodeMarker,
+  .funding .nodeMarker {
+    top: calc(var(--diagram-height) * 0.78 - var(--node-size) / 2);
+  }
+
+  .reserve {
+    grid-area: 2 / 1;
+  }
+
+  .retry {
+    grid-area: 2 / 2;
+  }
+
+  .receipt {
+    grid-area: 3 / 1;
+  }
+
+  .funding {
+    grid-area: 3 / 2;
+  }
+}
+
+@media (max-width: 35.99rem) {
+  .network {
+    --node-size: 3.5rem;
+    --diagram-height: 16rem;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: var(--diagram-height) repeat(4, auto);
+    gap: 1.75rem;
+  }
+
+  .hubColumn {
+    grid-column: 1;
+  }
+
+  .hub {
+    width: 6.5rem;
+    height: 6.5rem;
+  }
+
+  .hubLabel {
+    top: calc(50% + 4.25rem);
+  }
+
+  .node {
+    grid-area: auto / 1;
+    padding-top: 1.25rem;
+  }
+
+  .nodeBody h3 {
+    max-width: 25ch;
+    font-size: 1.25rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .connections path,
+  .orbit,
+  .innerOrbit,
+  .nodeTag,
+  .hubLabel {
+    transition: none;
+  }
+}

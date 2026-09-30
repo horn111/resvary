@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { InteractiveCreditDemo } from './interactive-credit-demo';
+import { attachDiagramFeedback } from './diagram-feedback';
 
 type PointerState = { x: number; y: number; on: boolean };
 type Dot = { x: number; y: number; u: number; r?: number };
@@ -48,6 +49,7 @@ export function ClaudeDesignController() {
     const doneMark = byRef<HTMLElement>('setDoneMark');
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const cleanup: Array<() => void> = [];
+    cleanup.push(attachDiagramFeedback(root));
     const timers: number[] = [];
     const heroPointer: PointerState = { x: -9999, y: -9999, on: false };
     const footerPointer: PointerState = { x: -9999, y: -9999, on: false };

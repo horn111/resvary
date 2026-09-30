@@ -161,15 +161,21 @@ Only the Overview ledger transforms into stacked label/value records on phones. 
 
 ## Elevation & Depth
 
-The system is flat by default. Depth comes from tonal black surfaces, clipped paper, bounded canvas glow, and the sticky header backdrop. Conventional card shadows are not part of the visual language.
+The system is flat by default. Depth comes from tonal black surfaces, clipped paper, bounded canvas glow, and the sticky header backdrop. Both the Problem and Why Resvary diagrams use flat geometry on the continuous black field. Conventional card shadows are not part of the visual language.
 
 **The Flat Ledger Rule.** A border defines structure; a shadow appears only when it expresses light emitted by an animated particle or focused settlement node.
 
 ## Shapes
 
-Controls and data containers are square or nearly square. Thin corner brackets identify primary navigation actions. In the console, status marks, evidence steps, and the synthetic/live dataset badge are also square. Circles belong only to particles, progress indicators, and the central settlement node.
+Controls and data containers are square or nearly square. Thin corner brackets identify primary navigation actions. In the console, status marks, evidence steps, and the synthetic/live dataset badge are also square. Circles belong to particles, progress indicators, the central settlement node, the four capability nodes in the credit boundary diagram, and routing nodes in the request timing diagram.
+
+The Why Resvary diagram shares the approved Problem diagram's flat routing language: four point nodes connect to a central ledger point through thin straight and diagonal lines. Faint dotted circles mark each capability, and two concentric outlines mark the ledger. Fixed-size mono labels identify the nodes. At desktop widths, the full capability explanations flank the diagram; at tablet and phone widths, the diagram sits above those same explanations. A fine pointer brightens the nearest node's outline, label, and connection. Hovering an explanation selects its associated branch; the central ledger selects all four connections. Feedback changes ink over 180ms without moving the geometry, and leaving the diagram restores its resting state. Touch pointers retain the static diagram; reduced motion retains immediate color feedback. There are no shaded icon tiles, beveled surfaces, or diagram shadows. This geometry belongs to the diagrams rather than to general controls or containers.
 
 ## Components
+
+### Request Timing Diagram
+
+The Problem section places a compact routing diagram below its heading. Parallel request lines converge on a credit reservation, then branch toward commit, release, and receipt after provider execution. Thin lines, point nodes, and faint dotted orbit outlines follow the supplied reference on the continuous black field. The reservation's hold symbol is part of the static geometry. A fine pointer selects the closest request stage or output node, brightening its outline, mono label, and the path back to the reservation. The response uses the same bounded 180ms ink transition as Why Resvary, resets on pointer leave, stays static for touch, and becomes immediate under reduced motion. The figure scales with the heading column and appears above the explanatory text on phones; its labels remain HTML text at the existing mono label size, and a caption exposes the full sequence to assistive technology.
 
 ### Buttons
 

@@ -1,5 +1,7 @@
 import { ClaudeDesignController } from './claude-design-controller';
 import { CLAUDE_DESIGN_HTML } from './claude-design.generated';
+import { CREDIT_BOUNDARY_HTML } from './credit-boundary';
+import { REQUEST_FLOW_HTML } from './request-flow';
 import styles from './claude-design.module.css';
 import { version as RELEASE_VERSION } from '../../../../package.json';
 
@@ -40,8 +42,8 @@ const OPERATOR_CONSOLE_SECTION = `<section id="operator-console" data-operator-c
           <h2 style="margin:0;font-size:clamp(30px,3.6vw,54px);line-height:1.02;letter-spacing:-0.032em;font-weight:500;max-width:17ch;text-wrap:balance">Explain every balance. Recover known ledger incidents safely.</h2>
           <p style="margin:26px 0 0;max-width:48ch;font-size:16.5px;line-height:1.6;color:var(--color-ink-body)">A self-hosted command ledger for one Resvary project. Search customers, trace a charge through its receipt and price version, and run only the recovery actions the ledger can prove are safe. The panel uses synthetic data to illustrate the interface.</p>
           <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:30px">
-            <a href="https://github.com/horn111/resvary/blob/main/docs/operator-console.md" style="display:inline-flex;align-items:center;padding:14px 22px;background:var(--color-ink);color:var(--color-canvas);font-family:var(--font-mono),'JetBrains Mono',monospace;font-size:12px;letter-spacing:0.12em;text-transform:uppercase">Deploy the console</a>
-            <a href="https://github.com/horn111/resvary/blob/main/docs/migration-1.0.md" style="display:inline-flex;align-items:center;padding:14px 22px;border:1px solid var(--color-line-strong);font-family:var(--font-mono),'JetBrains Mono',monospace;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-ink-strong)">Upgrade to 1.0</a>
+            <a href="https://github.com/horn111/resvary/blob/main/docs/operator-console.md" style="display:inline-flex;align-items:center;padding:14px 22px;background:var(--color-ink);color:var(--color-canvas);font-family:var(--font-mono),'JetBrains Mono',monospace;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;transition:opacity .2s" data-hover-style="opacity:0.82;color:var(--color-canvas)">Deploy the console</a>
+            <a href="https://github.com/horn111/resvary/blob/main/docs/migration-1.0.md" style="display:inline-flex;align-items:center;padding:14px 22px;border:1px solid var(--color-line-strong);font-family:var(--font-mono),'JetBrains Mono',monospace;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-ink-strong);transition:border-color .2s,color .2s" data-hover-style="border-color:var(--color-ink-subtle);color:var(--color-white)">Upgrade to 1.0</a>
           </div>
         </div>
         <div style="border:1px solid var(--color-line-strong);font-family:var(--font-mono),'JetBrains Mono',monospace">
@@ -75,8 +77,8 @@ const ACCESS_SECTION = `<section id="pricing" data-reveal="1" style="border-top:
           <span style="padding:18px 0;color:var(--color-ink-body)">Hosted cloud, enterprise SLA, tax invoices, custody, and transferable or redeemable balances.</span>
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:12px">
-          <a href="https://github.com/horn111/resvary" style="display:inline-flex;align-items:center;padding:14px 22px;background:var(--color-ink);color:var(--color-canvas);font-family:var(--font-mono),'JetBrains Mono',monospace;font-size:12px;letter-spacing:0.12em;text-transform:uppercase">Open the repository</a>
-          <a href="https://github.com/horn111/resvary/blob/main/docs/getting-started.md" style="display:inline-flex;align-items:center;padding:14px 22px;border:1px solid var(--color-line-strong);font-family:var(--font-mono),'JetBrains Mono',monospace;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-ink-strong)">Getting started</a>
+          <a href="https://github.com/horn111/resvary" style="display:inline-flex;align-items:center;padding:14px 22px;background:var(--color-ink);color:var(--color-canvas);font-family:var(--font-mono),'JetBrains Mono',monospace;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;transition:opacity .2s" data-hover-style="opacity:0.82;color:var(--color-canvas)">Open the repository</a>
+          <a href="https://github.com/horn111/resvary/blob/main/docs/getting-started.md" style="display:inline-flex;align-items:center;padding:14px 22px;border:1px solid var(--color-line-strong);font-family:var(--font-mono),'JetBrains Mono',monospace;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-ink-strong);transition:border-color .2s,color .2s" data-hover-style="border-color:var(--color-ink-subtle);color:var(--color-white)">Getting started</a>
         </div>
       </div>
     </div>
@@ -90,6 +92,30 @@ function replaceSectionByLabel(html: string, label: string, replacement = '') {
     throw new Error(`Unable to find generated section: ${label}`);
   }
   return `${html.slice(0, sectionStart)}${replacement}${html.slice(sectionEnd + 10)}`;
+}
+
+function replaceCreditBoundaryGrid(html: string) {
+  const gridStart = html.indexOf('<div data-benefit-grid="true"');
+  const receiptStart = html.indexOf('<div id="receipt-printer"', gridStart);
+  const sectionStart = html.lastIndexOf('<section ', gridStart);
+  if (gridStart < 0 || receiptStart < 0 || sectionStart < 0) {
+    throw new Error('Unable to find the credit boundary and its receipt printer');
+  }
+  const sectionHeading = html
+    .slice(sectionStart, gridStart)
+    .replace('<section ', '<section id="credit-boundary" ');
+  return `${html.slice(0, sectionStart)}${sectionHeading}${CREDIT_BOUNDARY_HTML}\n\n      ${html.slice(receiptStart)}`;
+}
+
+function insertRequestFlow(html: string) {
+  const sectionStart = html.indexOf('<section id="product"');
+  const sectionEnd = html.indexOf('</section>', sectionStart);
+  const headingEnd = html.indexOf('</h2>', sectionStart);
+  if (sectionStart < 0 || headingEnd < 0 || headingEnd > sectionEnd) {
+    throw new Error('Unable to find the problem section heading');
+  }
+  const insertAt = headingEnd + '</h2>'.length;
+  return `${html.slice(0, insertAt)}\n        ${REQUEST_FLOW_HTML}${html.slice(insertAt)}`;
 }
 
 let SITE_HTML = CLAUDE_DESIGN_HTML.replaceAll(
@@ -162,6 +188,8 @@ let SITE_HTML = CLAUDE_DESIGN_HTML.replaceAll(
     `${FOOTER_ISSUES_LINK}\n        ${FOOTER_X_LINK}\n        ${FOOTER_PRICING_LINK}`,
   );
 
+SITE_HTML = insertRequestFlow(SITE_HTML);
+SITE_HTML = replaceCreditBoundaryGrid(SITE_HTML);
 SITE_HTML = replaceSectionByLabel(SITE_HTML, '04 / Included in 0.5');
 SITE_HTML = replaceSectionByLabel(SITE_HTML, '10 / Credit model');
 SITE_HTML = replaceSectionByLabel(SITE_HTML, '11 / Self-hosted boundary');
