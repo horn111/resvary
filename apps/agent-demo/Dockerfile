@@ -1,4 +1,16 @@
 # syntax=docker/dockerfile:1.7
+# Apply Debian's OpenSSL security updates while the distroless image catches up.
+FROM debian:trixie-slim AS openssl-security
+WORKDIR /tmp/openssl-security
+RUN apt-get update \
+    && apt-get download libssl3t64 \
+    && dpkg --compare-versions "$(dpkg-deb --field libssl3t64_*.deb Version)" ge '3.5.7-1~deb13u3' \
+    && dpkg-deb --extract libssl3t64_*.deb /patched \
+    && dpkg-deb --control libssl3t64_*.deb /control \
+    && mkdir -p /patched/var/lib/dpkg/status.d \
+    && cp /control/control /patched/var/lib/dpkg/status.d/libssl3t64 \
+    && cp /control/md5sums /patched/var/lib/dpkg/status.d/libssl3t64.md5sums
+
 FROM node:24-bookworm-slim AS build
 WORKDIR /workspace
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -27,6 +39,7 @@ RUN mkdir -p /home/nonroot/.circle-cli \
     && chmod 700 /home/nonroot/.circle-cli
 
 FROM gcr.io/distroless/nodejs24-debian13:nonroot AS runtime
+COPY --from=openssl-security /patched/ /
 WORKDIR /workspace
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 HOME=/home/nonroot
 COPY --from=build --chown=65532:65532 /workspace/node_modules ./node_modules

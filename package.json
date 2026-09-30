@@ -37,8 +37,12 @@
     "@coral-xyz/anchor@0.31.1": {
       "toml": "4.3.0"
     },
-    "undici@^7.0.0": "7.29.1",
-    "undici@7.28.0": "7.29.1",
+    "@workflow/world-local@4.4.1": {
+      "undici": "7.29.1"
+    },
+    "@workflow/world-vercel@4.7.4": {
+      "undici": "7.29.1"
+    },
     "brace-expansion@^5.0.0": "5.0.12",
     "@workflow/core": {
       "nanoid": "5.1.16"
