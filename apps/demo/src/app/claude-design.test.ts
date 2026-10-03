@@ -16,7 +16,7 @@ describe('landing page content', () => {
     expect(SITE_HTML).toContain('keeps the execution claim when the callback throws');
     expect(SITE_HTML).toContain('npm install @resvary/sdk @resvary/sqlite');
     expect(SITE_HTML).toContain('The published ledger is a read-only preview');
-    expect(SITE_HTML).toContain('optional Mainnet or Testnet funding adapters');
+    expect(SITE_HTML).toContain('How does Resvary use Arc and Circle?');
     expect(SITE_HTML).toContain('Arc adapters support explicit Mainnet and Testnet configuration');
     expect(SITE_HTML).toContain('Synthetic example data');
     expect(SITE_HTML).toContain('09 / Operator Console');

@@ -166,9 +166,10 @@ let SITE_HTML = CLAUDE_DESIGN_HTML.replaceAll(
     'Run the interactive demo <span style="opacity:0.5">→</span></a>',
     'Explore the ledger <span style="opacity:0.5">→</span></a>\n        <a href="https://github.com/horn111/resvary/blob/main/docs/ethonline-continuity.md#evidence-status" style="align-self:flex-start;display:inline-flex;align-items:center;gap:10px;padding:14px 22px;border:1px solid var(--color-line-strong);font-family:var(--font-mono),\'JetBrains Mono\',monospace;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-ink-strong)">Review the archived Testnet proof <span style="opacity:0.5">→</span></a>',
   )
+  .replace('Do I need crypto or Arc to use Resvary?', 'How does Resvary use Arc and Circle?')
   .replace(
     'No. Manual grants work without a blockchain. Direct Arc USDC and Gateway Nanopayments are Testnet funding options; neither changes the usage ledger.',
-    'No. Manual grants work without a blockchain. Direct Arc USDC and Gateway Nanopayments are optional Mainnet or Testnet funding adapters; neither changes the usage ledger.',
+    "Arc is Resvary's reference network for USDC funding. Direct Arc transfers and Circle Gateway Nanopayments turn verified USDC payments into prepaid credits for AI products. Your application reserves those credits before each AI request, charges actual usage, and returns an auditable receipt.",
   )
   .replace(
     'Run the deterministic demo without an AI key, or open the repository and follow the getting-started guide.',

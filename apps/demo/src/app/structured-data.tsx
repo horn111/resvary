@@ -37,9 +37,9 @@ const FAQ_ITEMS = [
       'Yes. The core ledger does not depend on a model vendor. Your application passes estimated and actual usage into the SDK.',
   },
   {
-    question: 'Do I need crypto or Arc to use Resvary?',
+    question: 'How does Resvary use Arc and Circle?',
     answer:
-      'No. Manual grants work without a blockchain. Direct Arc USDC and Gateway Nanopayments are optional Mainnet or Testnet funding adapters; neither changes the usage ledger.',
+      "Arc is Resvary's reference network for USDC funding. Direct Arc transfers and Circle Gateway Nanopayments turn verified USDC payments into prepaid credits for AI products. Your application reserves those credits before each AI request, charges actual usage, and returns an auditable receipt.",
   },
   {
     question: 'Is SQLite production-ready?',
