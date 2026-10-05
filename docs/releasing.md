@@ -1,5 +1,7 @@
 # Release Publication
 
+For application deployments after a package release, follow [production operations](production-operations.md). Both Vercel projects require **Production CI gate** for their commit before promotion. `/api/version` identifies the deployed source independently of the published npm version.
+
 Resvary uses npm trusted publishing with direct OIDC publication. GitHub Actions never receives a long-lived npm token, and one protected GitHub environment approval gates the entire synchronized release.
 
 For each of `@resvary/sdk`, `@resvary/sqlite`, `@resvary/postgres`, `@resvary/circle`, `@resvary/worker`, and `create-resvary`, configure npm with:

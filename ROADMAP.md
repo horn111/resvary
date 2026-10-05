@@ -107,13 +107,26 @@ Published Testnet evidence does not establish production Mainnet verification.
 - [x] Record ordered state transitions and expose operation backlog health.
 - [x] Publish SQLite v8 and PostgreSQL v6 migrations and release archive checks.
 
-## 1.3.1 candidate: concurrent recovery and dependency maintenance
+## 1.3.1 released: concurrent recovery and dependency maintenance
 
 - [x] Reproduce and fix stale reads during concurrent reconciliation, including the interval between credit commit and the final operation update.
 - [x] Verify one receipt and no remaining hold with deterministic in-memory and PostgreSQL tests.
 - [x] Update patched production dependencies and document the remaining unfixed advisory with an expiring exception.
-- [ ] Pass CI, including PostgreSQL 16–18 and the Agent Demo runtime image scan, for the release SHA.
-- [ ] Publish checked package artifacts and update Agent Demo from a verified source commit.
+- [x] Pass CI, including PostgreSQL 16–18 and the Agent Demo runtime image scan, for the release SHA.
+- [x] Publish checked package artifacts and update Agent Demo from a verified source commit.
+
+Released October 5, 2026: [v1.3.1](https://github.com/horn111/resvary/releases/tag/v1.3.1), source `c413bac6dd0b666b9b1c7e1adb2b1d0801145ebc`.
+
+## Before 1.4: production operations
+
+- [x] Register authenticated daily maintenance, exclude overlapping runs, and record successful and failed runs.
+- [x] Record content-expiry events without document or result content; expose aggregate operational health and deployment identity.
+- [x] Configure both Vercel projects to require the full CI gate before production promotion.
+- [x] Add scheduled production-health and dependency-exception checks.
+- [x] Verify an existing Mainnet deposit against Arc RPC and its credit grant, usage receipt, balance, and retention state. Publish [scoped evidence](docs/evidence/mainnet/2026-10-05.md).
+- [x] Update release, Mainnet, Console recovery, and operator documentation.
+
+The reviewed `node-forge@1.4.0` exception remains open upstream and expires October 19, 2026. Daily dependency maintenance checks flag an upstream release or the approaching deadline; this checklist does not claim the vulnerability is fixed.
 
 ## 1.4 proposed: first external integration
 

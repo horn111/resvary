@@ -4,6 +4,7 @@
   "buildCommand": "cd ../.. && npm run build:core && npm run build --workspace=@resvary/agent-demo",
   "installCommand": "cd ../.. && npm ci",
   "regions": ["fra1"],
+  "crons": [{ "path": "/api/internal/maintenance", "schedule": "17 3 * * *" }],
   "functions": {
     "src/app/.well-known/workflow/v1/step/route.*": { "maxDuration": 300 },
     "src/app/api/[...path]/route.ts": { "maxDuration": 300 }

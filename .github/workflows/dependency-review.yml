@@ -1,0 +1,27 @@
+name: Dependency maintenance
+
+on:
+  schedule:
+    - cron: '29 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Audit production dependencies and exception deadlines
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: npm run audit:production
+      - run: node scripts/security/review-exceptions.mjs
+      - name: Exception review instructions
+        if: failure()
+        run: echo 'Review docs/dependency-security.md and security/dependency-exceptions.json. Do not extend an exception without reviewing the affected caller.' >> "$GITHUB_STEP_SUMMARY"
