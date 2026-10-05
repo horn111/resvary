@@ -1,13 +1,21 @@
 # Resvary agent demo Vercel runbook
 
-This runbook covers the dedicated `resvary-agent-demo` Vercel project, its managed Neon PostgreSQL database, Vercel Workflow `4.8.8`, and the Circle Mainnet Agent Wallet session. Mainnet verification moves real USDC; keep admission closed except during an explicitly authorized, low-value verification window.
+This runbook covers the dedicated `resvary-agent-demo` Vercel project, its managed Neon PostgreSQL database, Vercel Workflow `4.8.9`, and the Circle Mainnet Agent Wallet session. The production app accepts three free runs per IP, then requires wallet-funded credits. Mainnet payment verification moves real USDC; use an explicitly authorized, low-value verification window for payment-path changes.
+
+## October 5 operational snapshot
+
+The owner reported a successful 0.5 USDC credit deposit and paid run. The October 5 read-only check found the public Mainnet app accepting jobs with a ready worker. This is an observed demo state, not a published end-to-end Mainnet proof or evidence of external customer usage. The Testnet proof remains archived.
+
+At that check, Agent Demo still ran the September 28 deployment, while `main` contained later dependency fixes. After CI passes for the next release commit, deploy that exact source to `resvary-agent-demo` and recheck the canonical domain. The repository-root `.vercel` link targets Agent Demo; `apps/demo/.vercel` targets the marketing site. Verify the target project before deployment.
+
+The maintenance endpoint exists, but `vercel.json` has no cron registration. Confirm an external scheduler separately; a successful Workflow run does not prove abandoned dispatches receive periodic maintenance. Each started Workflow also schedules its own expiry. The application still serializes jobs through a global execution claim, and paid jobs remain subject to the provider budget ceiling.
 
 ## Production topology
 
 ```mermaid
 flowchart LR
     User[Browser visitor] -->|HTTPS| Vercel[Next.js project\nresvary-agent-demo\nfra1]
-    Vercel -->|job ID| Workflow[Vercel Workflow 4.8.8]
+    Vercel -->|job ID| Workflow[Vercel Workflow 4.8.9]
     Vercel -->|pooled SQL| Neon[(Managed Neon PostgreSQL\nfree plan, fra1)]
     Workflow -->|atomic global claim| Neon
     Workflow --> Agent[OpenAI Agents SDK\nNous Qwen agent]
@@ -18,7 +26,9 @@ flowchart LR
     Ledger --> Neon
 ```
 
-## Current release gates
+## Historical migration checks
+
+The following table records the earlier Testnet-to-Mainnet preparation. Use the dated snapshot above for the observed deployment state; rerun readiness after changes to sessions, funding, or configuration.
 
 | Gate                                                        | Status                                                                                     |
 | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
@@ -63,9 +73,9 @@ Run PostgreSQL integration tests only against a disposable database whose name e
 
 Confirm these pinned runtime dependencies in `apps/agent-demo/package.json`:
 
-- `workflow` `4.8.8`
-- `@openai/agents` `0.17.1`
-- `openai` `7.10.0`
+- `workflow` `4.8.9`
+- `@openai/agents` `0.18.0`
+- `openai` `7.23.0`
 - `@circle-fin/cli` `1.1.4`
 
 ## 2. Check the Vercel and Neon boundary

@@ -7,9 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-10-05
+
+### Fixed
+
+- Keep the canonical committed reservation when concurrent workers reconcile saved usage before the operation reaches `settled`. Read the operation and its usage event in one transaction to avoid a false foreign-charge conflict. Regression tests cover both interleavings with in-memory and PostgreSQL stores, one receipt, and no remaining hold.
+- Release expired Agent Demo wallet holds when reading balances, so unused reservations do not keep visitor credits unavailable.
+
+### Changed
+
+- Limit Agent Demo to three free runs per IP, then fund prepaid credits through an Arc Mainnet wallet. Reserve the maximum run cost and charge measured usage.
+- Improve the marketing site's mobile hero and footer wordmark, and add interactive request and credit lifecycle diagrams.
+
 ### Security
 
 - Override Anchor `0.31.1` to use TOML `4.3.0` in Circle CLI, fixing the recursion and prototype-pollution advisories. Remove both temporary dependency exceptions and add parser and CLI compatibility checks.
+- Pin Workflow's `devalue` to `5.9.4` and `http-cache-semantics` 4.2.0 to `4.3.0`. Add a reviewed, version-scoped exception for the unfixed `node-forge@1.4.0` PKCS#1 signature-verification advisory, expiring October 19, 2026; the installed Circle CLI caller does not use that verification path.
+- Patch Workflow's Undici 7.x and brace-expansion 5.x installations. Exclude optional compiler and browser-test dependencies from the Agent Demo runtime image and apply Debian's OpenSSL security updates.
+
+### Compatibility
+
+- The recovery fix does not change public API signatures, database schema versions, or provider retry behavior.
 
 ## [1.3.0] - 2026-09-27
 

@@ -1,4 +1,15 @@
 {
   "schemaVersion": 1,
-  "exceptions": []
+  "exceptions": [
+    {
+      "advisory": "GHSA-86w9-cpqp-85rv",
+      "cve": "CVE-2026-85393",
+      "package": "node-forge",
+      "version": "1.4.0",
+      "path": "node_modules/node-forge",
+      "owner": "horn111",
+      "expires": "2026-10-19",
+      "reason": "Only installed caller is @circle-fin/cli@1.1.4. Reviewed CLI uses forge for SHA-256, ASN.1 parsing and RSA-OAEP encryption, not the affected PKCS#1 v1.5 signature verification. No patched release on 2026-10-05. See docs/dependency-security.md; remove on upstream fix and re-review on CLI or call-path changes."
+    }
+  ]
 }

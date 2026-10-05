@@ -1,5 +1,21 @@
 # Production dependency review
 
+## October 5 review for the 1.3.1 candidate
+
+Workflow `4.8.9` now resolves `devalue@5.9.4` through its Core override. The version-scoped `http-cache-semantics@4.2.0` override resolves to `4.3.0`. Both changes stay within the installed major versions. Use npm `11.19.1`, matching release CI, when regenerating this lockfile; the local npm `11.9.0` did not apply these overrides correctly.
+
+After these updates, the production audit reports **7 low, 6 moderate, 2 high, and 0 critical** affected-package entries. The two high entries are `node-forge` and its caller, Circle CLI, from one underlying advisory. The production gate passes with the single exception below. This is not a zero-vulnerability result, and the container scan remains a separate release gate.
+
+### Temporary node-forge exception
+
+[GHSA-86w9-cpqp-85rv / CVE-2026-85393](https://github.com/advisories/GHSA-86w9-cpqp-85rv) affects RSA PKCS#1 v1.5 signature verification through `node-forge@1.4.0`. No patched npm release was available on October 5. The exception in `security/dependency-exceptions.json` applies only to that advisory, version, and `node_modules/node-forge` path. Owner: `horn111`. It expires at **2026-10-19 00:00 UTC**.
+
+The installed production graph has one caller: `@circle-fin/cli@1.1.4`. Inspection of its distributed `dist/index.js` found SHA-256 hashing, base64 helpers, ASN.1 envelope parsing, public-key parsing, and RSA-OAEP encryption. Envelope decryption uses Node's RSA-OAEP implementation. The CLI does not call Forge's affected PKCS#1 v1.5 signature verifier. Resvary invokes fixed CLI wallet, Gateway, and payment commands through `apps/agent-demo/src/lib/circle-cli.ts`; request input cannot select arbitrary CLI code. This reviewed call path is the basis for the temporary exception, not a claim that the package is fixed.
+
+Remove the exception as soon as a compatible fixed package or caller release is available. Re-review it before changing Circle CLI, adding a Forge caller, or expanding CLI dispatch. New advisories, another installed path/version, and expiry still block the gate. The same policy generates the version-scoped Trivy exception.
+
+## Earlier reviews
+
 Reviewed on September 21, 2026 for the 1.1.1 candidate. Run `npm run audit:production` from the repository root after `npm ci`. It checks every workspace's production dependency graph, saves the raw report to `.resvary/npm-audit.json`, and rejects unapproved high or critical advisories. Registry failures and expired exceptions fail the gate too.
 
 Rechecked on September 27, 2026 for version 1.3.0 with Circle CLI 1.1.4. The all-workspace audit still reports 7 low, 5 moderate, and 3 high affected-package entries, with the same two scoped `toml` exceptions. The separate release audit of the six public packages and Operator Console reports no vulnerabilities. npm verified registry signatures for 741 installed packages and attestations for 155. These checks do not replace the container scans.
@@ -44,7 +60,7 @@ The installed chain is `@circle-fin/cli@1.1.4` â†’ `@coral-xyz/anchor@0.31.1` â†
 
 TOML `4.3.0` fixes both advisories and retains the CommonJS entry point and Buffer input support used by Anchor. [`scripts/security/toml-compat.test.mjs`](../scripts/security/toml-compat.test.mjs), included in `npm run test:release`, resolves the parser through the installed Circle CLI and Anchor packages. It checks Anchor's actual workspace loader with a temporary `Anchor.toml` and IDL, rejects deeply nested arrays and inline tables without a stack overflow, and rejects scalar-to-prototype traversal without modifying `Object.prototype`. It also starts Circle CLI's version command and help for the wallet, Gateway, and payment commands used by the application, with a temporary home directory and telemetry disabled.
 
-The previous two exceptions, which had an October 21 deadline, have been removed from [`security/dependency-exceptions.json`](../security/dependency-exceptions.json). The policy is empty, so the npm gate and generated Trivy ignore file no longer exempt either advisory. The generic exception mechanism remains available for future reviewed cases and retains its expiry and exact-version checks.
+The previous two TOML exceptions, which had an October 21 deadline, have been removed from [`security/dependency-exceptions.json`](../security/dependency-exceptions.json). The policy no longer exempts either TOML advisory. The generic exception mechanism retains its expiry and exact-version checks.
 
 The application still runs fixed Arc wallet and Gateway commands through [`circle-cli.ts`](../apps/agent-demo/src/lib/circle-cli.ts). The compatibility checks do not perform live payments or establish compatibility with every Solana workspace feature. Re-review the override when changing CLI dispatch, enabling Solana workspace features, or updating Anchor. Remove it once the upstream caller selects a fixed parser without an override. Replacing the CLI with maintained APIs remains an option for the remaining transitive findings, but is no longer required to meet the former TOML exception deadline.
 

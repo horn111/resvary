@@ -42,6 +42,81 @@ async function fixture() {
 }
 
 describe('DurableMeteredOperations', () => {
+  it.each(['operation', 'reservation'] as const)(
+    'reuses a concurrent charge after a stale %s read without leaving another hold',
+    async (pauseAt) => {
+      const { ledger, store, operations, input, setNow } = await fixture();
+      await operations.create(input);
+      const claim = await operations.claim({ operationKey: input.idempotencyKey, workerId: 'one' });
+      await operations.saveResult({
+        operationKey: input.idempotencyKey,
+        claimToken: claim!.claimToken!,
+        result: { value: 'answer', actualUsage: { jobs: '2' }, usageEventId: 'concurrent' },
+      });
+      setNow(1_200);
+      await operations.settle(input.idempotencyKey);
+      const secondLedger = new CreditLedger({
+        projectId: ledger.projectId,
+        store,
+        now: () => 1_200,
+      });
+      const second = new DurableMeteredOperations(secondLedger, { now: () => 1_200 });
+      const paused = Promise.withResolvers<void>();
+      const resume = Promise.withResolvers<void>();
+      const charged = Promise.withResolvers<void>();
+      const finish = Promise.withResolvers<void>();
+      const pauseAfterRead = async <T>(value: T): Promise<T> => {
+        paused.resolve();
+        await resume.promise;
+        return value;
+      };
+      if (pauseAt === 'operation') {
+        const read = second.get.bind(second);
+        vi.spyOn(second, 'get').mockImplementationOnce(async (key) =>
+          pauseAfterRead(await read(key)),
+        );
+      } else {
+        const read = secondLedger.getReservation.bind(secondLedger);
+        vi.spyOn(secondLedger, 'getReservation').mockImplementationOnce(async (id) =>
+          pauseAfterRead(await read(id)),
+        );
+      }
+      const commit = ledger.commitUsage.bind(ledger);
+      vi.spyOn(ledger, 'commitUsage').mockImplementationOnce(async (commitInput) => {
+        const result = await commit(commitInput);
+        charged.resolve();
+        await finish.promise;
+        return result;
+      });
+      const follower = Promise.allSettled([second.reconcile(input.idempotencyKey)]);
+      await paused.promise;
+      const leader = Promise.allSettled([operations.reconcile(input.idempotencyKey)]);
+      try {
+        await charged.promise;
+        resume.resolve();
+        const [outcome] = await follower;
+        expect(outcome.status).toBe('fulfilled');
+        if (outcome.status === 'fulfilled') expect(outcome.value.operation.status).toBe('settled');
+      } finally {
+        resume.resolve();
+        finish.resolve();
+        await leader;
+      }
+      const [outcome] = await leader;
+      expect(outcome.status).toBe('fulfilled');
+      expect(await ledger.listUsageReceipts('customer')).toHaveLength(1);
+      expect(await ledger.getBalance('customer')).toMatchObject({
+        postedAmount: '8',
+        reservedAmount: '0',
+        availableAmount: '8',
+      });
+      expect(
+        await store.listReservations({ projectId: ledger.projectId, status: 'open' }),
+      ).toHaveLength(0);
+      expect((await operations.get(input.idempotencyKey))?.reconciliationAttempt).toBe(1);
+    },
+  );
+
   it('atomically records ordered transitions and rolls back a claim when its outbox write fails', async () => {
     const { store, operations, input } = await fixture();
     await operations.create(input);
@@ -206,6 +281,34 @@ describe('DurableMeteredOperations', () => {
     expect((await operations.reconcile(input.idempotencyKey)).receipt?.usageEventId).toBe(
       'usage-unfunded',
     );
+  });
+
+  it('rejects reconciliation when another reservation charged the saved usage event', async () => {
+    const { ledger, store, operations, input, setNow } = await fixture();
+    await operations.create(input);
+    const claim = await operations.claim({ operationKey: input.idempotencyKey, workerId: 'one' });
+    await operations.saveResult({
+      operationKey: input.idempotencyKey,
+      claimToken: claim!.claimToken!,
+      result: { value: 'answer', actualUsage: { jobs: '1' }, usageEventId: 'foreign-charge' },
+    });
+    setNow(1_200);
+    await operations.settle(input.idempotencyKey);
+    const unrelated = await ledger.reserveCredits({ ...input, idempotencyKey: 'unrelated' });
+    await ledger.commitUsage({
+      reservationId: unrelated.id,
+      actualUsage: { jobs: '1' },
+      usageEventId: 'foreign-charge',
+      idempotencyKey: 'unrelated-charge',
+    });
+    await expect(operations.reconcile(input.idempotencyKey)).rejects.toThrow(
+      'charged by another reservation',
+    );
+    expect((await operations.get(input.idempotencyKey))?.status).toBe('needs_reconciliation');
+    expect(
+      await store.listReservations({ projectId: ledger.projectId, status: 'open' }),
+    ).toHaveLength(0);
+    expect(await ledger.listUsageReceipts('customer')).toHaveLength(1);
   });
 
   it('requires external evidence for unknown outcomes and never reclaims a running call', async () => {
