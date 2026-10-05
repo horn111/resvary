@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Operations
+
+- Register daily authenticated Agent Demo maintenance with a database lease, run history, and content-expiry evidence. Add aggregate health and build-identity endpoints.
+- Require the full CI gate before either Vercel project promotes a production deployment. Check production health every 15 minutes and dependency exceptions daily through GitHub Actions.
+- Document the published 1.3.1 release and verify an existing 0.5 USDC Mainnet deposit, its credit grant, paid usage receipt, and cleared document content without another payment or AI call.
+
+These application and operations changes do not change the published 1.3.1 npm artifacts or ledger schema.
+
 ## [1.3.1] - 2026-10-05
 
 ### Fixed

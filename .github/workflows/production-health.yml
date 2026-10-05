@@ -1,0 +1,30 @@
+name: Production health
+
+on:
+  schedule:
+    - cron: '7,22,37,52 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-health
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Check production health and deployment identity
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: node scripts/ops/check-production.mjs
+      - name: Operator recovery instructions
+        if: failure()
+        run: echo 'Check docs/agent-demo-vercel-runbook.md. Inspect maintenance, budget, and unknown provider outcomes before retrying a job.' >> "$GITHUB_STEP_SUMMARY"

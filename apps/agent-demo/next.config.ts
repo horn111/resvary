@@ -5,6 +5,9 @@ import { createRequire } from 'node:module';
 import { nodeFileTrace } from '@vercel/nft';
 const config: NextConfig = {
   agentRules: false,
+  env: {
+    RESVARY_BUILD_SHA: process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.RESVARY_BUILD_SHA ?? '',
+  },
   outputFileTracingRoot: resolve(process.cwd(), '../..'),
   serverExternalPackages: ['pg', '@resvary/postgres', '@resvary/circle', '@resvary/sdk'],
   async headers() {

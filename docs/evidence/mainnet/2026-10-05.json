@@ -1,0 +1,48 @@
+{
+  "verifiedAt": "2026-10-05T12:33:54.444Z",
+  "method": "Read-only Arc RPC verification and a repeatable-read production ledger snapshot",
+  "verifier": {
+    "sdkVersion": "1.3.1",
+    "sourceCommit": "c413bac6dd0b666b9b1c7e1adb2b1d0801145ebc"
+  },
+  "network": {
+    "name": "Arc Mainnet",
+    "chainId": 5042
+  },
+  "payment": {
+    "txHash": "0x9fda01a57d6db888057c387ee68ed187eb2c5d5c538acac6de833d3758b8c6b8",
+    "amount": "0.5",
+    "currency": "USDC",
+    "recordedAt": "2026-09-28T17:51:44.333Z",
+    "memoProofVerified": true,
+    "payerBindingVerified": true,
+    "fundingTransactions": 1,
+    "creditGrants": 1
+  },
+  "usage": {
+    "createdAt": "2026-09-28T17:52:20.523Z",
+    "phase": "completed",
+    "receiptCount": 1,
+    "reservedAmount": "0.347392",
+    "chargedAmount": "0.008164",
+    "releasedAmount": "0.339228",
+    "budgetSettled": true
+  },
+  "balance": {
+    "postedUnits": "491836",
+    "reservedUnits": "0"
+  },
+  "retention": {
+    "expiresAt": "2026-09-29T17:52:20.523Z",
+    "checkedAt": "2026-10-05T12:33:54.445Z",
+    "documentCleared": true,
+    "resultCleared": true,
+    "receiptRetained": true
+  },
+  "limitations": [
+    "The original job did not record its deployment commit.",
+    "Historical cleanup time was not recorded; this snapshot confirms deletion after the 24-hour deadline, not the exact deletion time.",
+    "No new payment, AI call, or production replay was performed. Concurrent and replay behavior is covered by automated tests, not established by this read-only snapshot.",
+    "This maintainer run is not external customer adoption or an independent security audit."
+  ]
+}

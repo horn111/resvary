@@ -66,6 +66,10 @@ The application still runs fixed Arc wallet and Gateway commands through [`circl
 
 ## Maintenance
 
+The `Dependency maintenance` GitHub Actions workflow runs daily at 05:29 UTC, including when no PR is open. It runs the production advisory gate and `scripts/security/review-exceptions.mjs`. The review check fails when an exception is within three days of expiry or a different upstream `latest` version becomes available. The advisory gate rejects expired exceptions. Workflow failure notifications follow the repository owner's GitHub Actions settings.
+
+On October 5, 2026, npm still reported `node-forge@1.4.0` and Circle CLI `1.1.4` as latest. The October 19 exception remains unchanged; daily checks provide a review trigger, not a vulnerability fix or permission to extend its deadline.
+
 1. Let the weekly npm Dependabot check propose updates, then review the lockfile and run workspace tests, Agent Demo build, and PostgreSQL/browser CI. Group production and development minor/patch updates separately; review each major dependency update in its own PR. Keep Node type majors aligned with supported runtimes through a deliberate migration rather than an automatic upgrade to the latest Node release.
 2. Remove each override once all callers resolve to a fixed compatible version without it. Keep overrides version-scoped.
 3. Inspect both the raw audit report and image findings. Never add a blanket package, severity, or `ignore-unfixed` exemption to make the Agent Demo scan pass.

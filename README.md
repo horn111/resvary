@@ -23,7 +23,7 @@ grant or top up credits
 
 Resvary keeps credit accounting separate from settlement. Arc is the reference network for external USDC funding: direct Arc transfers and Circle Gateway Nanopayments fund the same ledger. The Operator Console explains balances and supports guarded recovery without manual SQL. Version 1.3 adds [durable-operation recovery](docs/migration-1.3.md) with saved usage evidence, transition history, and replayable commands.
 
-The [agent demo](https://agent.resvary.xyz) shows an OpenAI Agents SDK buyer funding credits through Circle Agent Wallet and Gateway on Arc before it buys document analysis. Its archived public proof was recorded on Testnet; the current source supports an explicit Mainnet configuration.
+The [agent demo](https://agent.resvary.xyz) runs on Arc Mainnet. Each IP receives three lifetime sponsored runs; later runs require a signed-in wallet and prepaid credits funded through a verified Arc USDC transfer. Read the [Mainnet payment and usage evidence](docs/evidence/mainnet/2026-10-05.md) for a maintainer's completed run and the limits of that verification.
 
 ## Why Resvary
 
@@ -136,17 +136,17 @@ export RESVARY_CONSOLE_ADMIN_SECRET='replace-with-at-least-32-random-characters'
 docker compose -f docker-compose.console.yml up -d
 ```
 
-The console shows balances, customer timelines, usage evidence, overdue reservations, outbox failures, funding reconciliation, and the append-only operator action log. It permits only positive grants, reasoned adjustments, overdue sweeps, and dead-letter requeue. One instance serves one project.
+The console shows balances, customer timelines, usage evidence, overdue reservations, outbox failures, funding reconciliation, and the append-only operator action log. Operators can reconcile saved operation results, record evidence for unknown outcomes, grant credits, make reasoned adjustments, sweep overdue reservations, and requeue dead letters. Recovery commands bind to reviewed evidence and stable action IDs. One instance serves one project.
 
 ![Resvary Operator Console showing balances, ledger events, and a usage-receipt evidence chain with synthetic demo data](docs/images/operator-console-dashboard.png)
 
 _Operator Console with synthetic demo data._
 
-See the [Operator Console guide](docs/operator-console.md) and [1.0 migration guide](docs/migration-1.0.md).
+See the [Operator Console guide](docs/operator-console.md), [operation recovery guide](docs/operation-recovery.md), and [1.3 migration guide](docs/migration-1.3.md).
 
 ## ETHOnline 2026 agent demo
 
-The Continuity implementation adds an OpenAI Agents SDK buyer that purchases document analysis with Resvary credits. The agent checks the balance and quote. When the account lacks credits, server-side controls use Circle Agent Wallet and Gateway to fund the account on the configured Arc network. Resvary reserves the quoted cost, charges measured usage, releases the unused amount, and returns a receipt.
+The Agent Demo supports sponsored and visitor-funded document analysis. Three lifetime runs per IP use the sponsored Circle Agent Wallet and Gateway path. Later runs require wallet sign-in and a direct Arc Mainnet USDC credit deposit. Resvary reserves up to 0.347392 credits, charges measured agent and analysis usage, releases the unused amount, and returns a receipt. Paid runs cannot spend the sponsor wallet.
 
 - [Live agent demo](https://agent.resvary.xyz)
 - [Agent demo source and setup](apps/agent-demo/README.md)
@@ -154,7 +154,7 @@ The Continuity implementation adds an OpenAI Agents SDK buyer that purchases doc
 - [Continuity disclosure](docs/ethonline-continuity.md)
 - [Archived Testnet proof](docs/archive/agent-demo/2026-09-10-testnet.json)
 
-The archived proof verifies the former Circle Testnet payment-and-analysis path. Circle later reported the recorded Gateway transfer as completed, and the Testnet explorer reports its batch transaction as successful. It does not prove the new Mainnet path; Mainnet activation requires a separate wallet session, funded Gateway balance, deployment check, and low-value live verification.
+The archived proof covers the former Circle Testnet path. The separate [Mainnet evidence](docs/evidence/mainnet/2026-10-05.md) covers an existing direct wallet deposit and paid run, verified against Arc RPC and the production ledger. It does not establish Mainnet Gateway replay behavior or external customer adoption. The [production operations guide](docs/production-operations.md) describes deployment gates, monitoring, and retention checks.
 
 ## Arc settlement for external USDC funding
 

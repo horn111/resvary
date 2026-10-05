@@ -1,4 +1,4 @@
-import { createHash, timingSafeEqual } from 'node:crypto';
+import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import type { GatewayPaymentPayload } from '@resvary/circle';
 import { runtime } from './runtime';
 import { authorizePayment, boundedJson, customer, ipKey, newSession, sameOrigin } from './auth';
@@ -8,6 +8,8 @@ import { RUN_BUDGET_UNITS } from './config';
 import { demoReadiness } from './readiness';
 import { dispatchJob, drainDispatches } from './workflow-dispatch';
 import { recoverWorkflowJob } from './workflow-execution';
+import { buildInfo } from './build-info';
+import { operationsHealth } from './operations-health';
 import {
   connectedWallet,
   releaseExpiredWalletHolds,
@@ -121,24 +123,68 @@ async function maintenance(request: Request) {
   )
     throw new DemoError(401, 'Unauthorized maintenance request');
   const rt = runtime();
-  await rt.jobs.cleanup();
-  await rt.ledger.releaseExpiredReservations({
-    idempotencyKey: `expired:${Date.now()}`,
-    limit: 100,
-  });
-  if (rt.cfg.executionMode !== 'workflow') return json({ ok: true });
-  await rt.jobs.reconcileWorkflows();
-  const saved = await rt.pool.query<{ id: string }>(
-    "SELECT id FROM agent_demo.jobs WHERE phase='result_saved' AND expires_at>now() LIMIT 25",
+  const token = randomUUID();
+  const claim = await rt.pool.query(
+    `UPDATE agent_demo.maintenance SET lease_token=$1,lease_expires_at=now()+interval '6 minutes',
+      last_started_at=now() WHERE id=1 AND (lease_expires_at IS NULL OR lease_expires_at<now()) RETURNING id`,
+    [token],
   );
-  for (const job of saved.rows) await recoverWorkflowJob(rt, job.id);
-  const dispatched = await drainDispatches(rt);
-  return json({ ok: true, dispatched, reconciled: saved.rowCount });
+  if (!claim.rowCount) return json({ ok: true, skipped: 'maintenance_in_progress' });
+  try {
+    const cleaned = await rt.jobs.cleanup();
+    await rt.ledger.releaseExpiredReservations({
+      idempotencyKey: `expired:${Date.now()}`,
+      limit: 100,
+    });
+    let dispatched = 0;
+    let reconciled = 0;
+    if (rt.cfg.executionMode === 'workflow') {
+      await rt.jobs.reconcileWorkflows();
+      const saved = await rt.pool.query<{ id: string }>(
+        "SELECT id FROM agent_demo.jobs WHERE phase='result_saved' AND expires_at>now() LIMIT 25",
+      );
+      for (const job of saved.rows) await recoverWorkflowJob(rt, job.id);
+      dispatched = await drainDispatches(rt);
+      reconciled = saved.rowCount ?? 0;
+    }
+    await rt.pool.query(
+      `UPDATE agent_demo.maintenance SET last_succeeded_at=now(),cleaned_jobs=$2,
+      lease_token=NULL,lease_expires_at=NULL WHERE id=1 AND lease_token=$1`,
+      [token, cleaned],
+    );
+    console.info(
+      JSON.stringify({
+        event: 'maintenance.completed',
+        cleaned,
+        dispatched,
+        reconciled,
+        build: buildInfo(),
+      }),
+    );
+    return json({ ok: true, cleaned, dispatched, reconciled, build: buildInfo() });
+  } catch (error) {
+    await rt.pool.query(
+      `UPDATE agent_demo.maintenance SET last_failed_at=now(),lease_token=NULL,lease_expires_at=NULL
+        WHERE id=1 AND lease_token=$1`,
+      [token],
+    );
+    console.error(JSON.stringify({ event: 'maintenance.failed', build: buildInfo() }));
+    throw error;
+  }
 }
 
 export async function handle(request: Request) {
   try {
     const path = new URL(request.url).pathname;
+    if (path === '/api/version' && request.method === 'GET') return json(buildInfo());
+    if (path === '/api/health' && request.method === 'GET') {
+      try {
+        const health = await operationsHealth(runtime());
+        return json(health, health.ok ? 200 : 503);
+      } catch {
+        return json({ ok: false, build: buildInfo(), issues: ['operations_unavailable'] }, 503);
+      }
+    }
     if (path === '/api/internal/maintenance' && request.method === 'GET')
       return await maintenance(request);
     const internal = /^\/api\/internal\/topup\/([0-9a-f-]+)$/i.exec(path);
@@ -202,6 +248,7 @@ export async function handle(request: Request) {
       ]);
       return json({
         ...status,
+        build: buildInfo(),
         accepting:
           rt.cfg.accepting && status.workerReady && status.remainingUnits >= RUN_BUDGET_UNITS,
         balance: balance.availableAmount,

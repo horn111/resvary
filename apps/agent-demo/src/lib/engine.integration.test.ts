@@ -24,6 +24,7 @@ import { handle } from './http';
 import { paymentToken } from './auth';
 import { executeWorkflowJob, recoverWorkflowJob } from './workflow-execution';
 import { closeQueuedJobStep } from './workflow-steps';
+import { operationsHealth } from './operations-health';
 
 const database = process.env.TEST_DATABASE_URL;
 describe.skipIf(!database)('durable document jobs on PostgreSQL', () => {
@@ -58,10 +59,16 @@ describe.skipIf(!database)('durable document jobs on PostgreSQL', () => {
     );
     await rt.pool.query('UPDATE agent_demo.budget SET allocated=0 WHERE id=1');
     await rt.pool.query(
+      'UPDATE agent_demo.maintenance SET last_started_at=NULL,last_succeeded_at=NULL,last_failed_at=NULL,lease_token=NULL,lease_expires_at=NULL,cleaned_jobs=0 WHERE id=1',
+    );
+    await rt.pool.query(
       'UPDATE agent_demo.executor SET job_id=NULL,token=NULL,started_at=NULL WHERE id=1',
     );
   });
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
   afterAll(async () => {
     await rt?.pool.end();
   });
@@ -426,6 +433,15 @@ describe.skipIf(!database)('durable document jobs on PostgreSQL', () => {
       (await rt.pool.query('SELECT document,result FROM agent_demo.jobs WHERE id=$1', [job.id]))
         .rows[0],
     ).toEqual({ document: null, result: null });
+    expect(await rt.jobs.cleanup()).toBe(0);
+    const evidence = await rt.pool.query(
+      "SELECT detail FROM agent_demo.events WHERE job_id=$1 AND kind='content.expired'",
+      [job.id],
+    );
+    expect(evidence.rows).toHaveLength(1);
+    expect(Date.parse(evidence.rows[0].detail.clearedAt)).toBeGreaterThanOrEqual(
+      Date.parse(evidence.rows[0].detail.expiresAt),
+    );
   });
   it('atomically claims the provider call even with concurrent execute attempts', async () => {
     const job = await make(),
@@ -637,5 +653,41 @@ describe.skipIf(!database)('durable document jobs on PostgreSQL', () => {
     );
     expect(await rt.jobs.pendingDispatches()).toEqual([{ id: job.id }]);
     expect(await rt.jobs.claimDispatch(job.id)).toBeTruthy();
+  });
+  it('authenticates maintenance and does not enter an existing maintenance lease', async () => {
+    vi.stubEnv('CRON_SECRET', 'test-maintenance-secret-at-least-32-characters');
+    expect(
+      (await handle(new Request('http://127.0.0.1:3100/api/internal/maintenance'))).status,
+    ).toBe(401);
+    await rt.pool.query(
+      "UPDATE agent_demo.maintenance SET lease_token=$1,lease_expires_at=now()+interval '6 minutes' WHERE id=1",
+      [randomUUID()],
+    );
+    const response = await handle(
+      new Request('http://127.0.0.1:3100/api/internal/maintenance', {
+        headers: { authorization: `Bearer ${process.env.CRON_SECRET}` },
+      }),
+    );
+    expect(await response.json()).toEqual({ ok: true, skipped: 'maintenance_in_progress' });
+    expect((await operationsHealth(rt)).issues).toContain('maintenance_overdue');
+  });
+  it('records maintenance failures and only marks a completed retry healthy', async () => {
+    vi.stubEnv('CRON_SECRET', 'test-maintenance-secret-at-least-32-characters');
+    const request = () =>
+      new Request('http://127.0.0.1:3100/api/internal/maintenance', {
+        headers: { authorization: `Bearer ${process.env.CRON_SECRET}` },
+      });
+    vi.spyOn(rt.ledger, 'releaseExpiredReservations').mockRejectedValueOnce(
+      new Error('private database detail'),
+    );
+    const failed = await handle(request());
+    expect(failed.status).toBe(503);
+    expect(await failed.text()).not.toContain('private database detail');
+    expect((await operationsHealth(rt)).issues).toContain('maintenance_failed');
+    expect((await handle(request())).status).toBe(200);
+    expect((await operationsHealth(rt)).issues).toEqual([]);
+    const health = await handle(new Request('http://127.0.0.1:3100/api/health'));
+    expect(health.status).toBe(200);
+    expect(Object.keys(await health.json()).sort()).toEqual(['build', 'issues', 'ok']);
   });
 });

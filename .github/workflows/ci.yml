@@ -10,6 +10,18 @@ permissions:
   contents: read
 
 jobs:
+  production-gate:
+    name: Production CI gate
+    runs-on: ubuntu-latest
+    if: ${{ always() }}
+    needs: [typecheck, build, test, agent-demo, console-e2e, console-image-smoke, sqlite, postgres]
+    steps:
+      - name: Require every CI job to pass
+        env:
+          JOB_RESULTS: ${{ toJSON(needs) }}
+        run: |
+          node -e 'const jobs=JSON.parse(process.env.JOB_RESULTS); const failed=Object.entries(jobs).filter(([,job])=>job.result!=="success"); if(failed.length){console.error(failed);process.exit(1)} console.log("All CI jobs passed for this commit.")'
+
   typecheck:
     name: SDK Type Check
     runs-on: ubuntu-latest

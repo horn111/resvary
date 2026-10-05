@@ -4,11 +4,11 @@ This runbook covers the dedicated `resvary-agent-demo` Vercel project, its manag
 
 ## October 5 operational snapshot
 
-The owner reported a successful 0.5 USDC credit deposit and paid run. The October 5 read-only check found the public Mainnet app accepting jobs with a ready worker. This is an observed demo state, not a published end-to-end Mainnet proof or evidence of external customer usage. The Testnet proof remains archived.
+The October 5 read-only verification checked the owner's existing 0.5 USDC deposit against Arc Mainnet RPC and the production ledger: one grant, one paid usage receipt for 0.008164 credits, and zero reserved balance. Documents and results were cleared for all ten jobs older than 24 hours. See the [Mainnet evidence and its limits](evidence/mainnet/2026-10-05.md). This maintainer run does not establish external adoption or Mainnet Gateway replay behavior. The Testnet proof remains archived.
 
-At that check, Agent Demo still ran the September 28 deployment, while `main` contained later dependency fixes. After CI passes for the next release commit, deploy that exact source to `resvary-agent-demo` and recheck the canonical domain. The repository-root `.vercel` link targets Agent Demo; `apps/demo/.vercel` targets the marketing site. Verify the target project before deployment.
+The 1.3.1 release updated Agent Demo from verified source `c413bac6dd0b666b9b1c7e1adb2b1d0801145ebc`. Subsequent deployments report their own commit at `/api/version`. Both Vercel projects now require **Production CI gate** before production promotion. The repository-root `.vercel` link targets Agent Demo; `apps/demo/.vercel` targets the marketing site. Verify the target project and deployed commit after each change.
 
-The maintenance endpoint exists, but `vercel.json` has no cron registration. Confirm an external scheduler separately; a successful Workflow run does not prove abandoned dispatches receive periodic maintenance. Each started Workflow also schedules its own expiry. The application still serializes jobs through a global execution claim, and paid jobs remain subject to the provider budget ceiling.
+The application registers daily Vercel maintenance at 03:17 UTC, using the existing `CRON_SECRET`, and records successful and failed attempts. Each started Workflow also schedules its own expiry. The **Production health** GitHub workflow checks budget, overdue jobs, retention, maintenance heartbeat, and deployment identity on a 15-minute schedule. See [production operations](production-operations.md) for thresholds, notification behavior, and Hobby scheduling limits. Jobs still share one execution claim, and paid jobs remain subject to the provider budget ceiling.
 
 ## Production topology
 
@@ -45,7 +45,7 @@ The following table records the earlier Testnet-to-Mainnet preparation. Use the 
 | Session isolation                                           | Separate read-only production browser test passed                                          |
 | Gateway batch finality and real 24-hour cleanup             | Not yet observed                                                                           |
 
-Keep `AGENT_DEMO_ACCEPTING=false` throughout the Mainnet migration. Enable it only after Mainnet session, wallet identity, Gateway balance, deployment, and readiness checks pass. See the [historical Testnet evidence and qualifications](ethonline-continuity.md#evidence-status).
+For a new Mainnet installation or a network migration, keep `AGENT_DEMO_ACCEPTING=false` until session, wallet identity, Gateway balance, deployment, and readiness checks pass. The existing production deployment has completed this transition. See the [historical Testnet evidence and qualifications](ethonline-continuity.md#evidence-status).
 
 An earlier Vercel build reached `@circle-fin/cli`, then `@open-wallet-standard/core`, and failed on a native/non-ECMAScript asset. The implemented boundary resolves the CLI from the Node runtime and uses `@vercel/nft` to trace its dependency files for the target operating system. Local and Linux Vercel builds pass. This build result proves packaging, not the paid path.
 
@@ -240,7 +240,7 @@ Do not clear an execution token, authorization fingerprint, reservation ID, or f
 | `failed` after confirmed provider rejection                    | Confirm reservation release and stop                                                   | Turn the failure into an automatic retry  |
 | `completed`                                                    | Verify receipt conservation and replay                                                 | Start a second paid call                  |
 
-The maintenance endpoint accepts `GET /api/internal/maintenance` with `Authorization: Bearer <CRON_SECRET>`. It performs database-only cleanup, stale-claim reconciliation, saved-result commits, and dispatch draining. Never call it without an approved operator context because it mutates production state.
+The maintenance endpoint accepts `GET /api/internal/maintenance` with `Authorization: Bearer <CRON_SECRET>`. It performs cleanup, stale-claim reconciliation, saved-result commits, and dispatch draining for existing accepted jobs. It uses a six-minute database lease to exclude overlapping invocations, records completion only after all work succeeds, and records failures without storing error details. An authorized operator can invoke it manually after deployment; Vercel invokes the same handler daily.
 
 Circle CLI `1.1.4` rewrites `maxTimeoutSeconds` to 30 days. The demo configures `authorizationValiditySeconds` accordingly; strict requirements matching and the funding-intent expiry stay unchanged. Never generalize a known pre-verification Testnet failure to an unknown Mainnet payment outcome.
 
@@ -248,9 +248,9 @@ For a Mainnet payment, query `https://gateway-api.circle.com/v1/x402/transfers/T
 
 ## 9. Verify 24-hour cleanup
 
-Each started Workflow sleeps until the job's `expires_at` timestamp and calls cleanup. Cleanup sets the submitted document and saved result to `NULL`; it retains hashes, events, usage, receipts, quota counters, and budget data.
+Each started Workflow sleeps until the job's `expires_at` timestamp and calls cleanup. Cleanup sets the submitted document and saved result to `NULL`; it retains hashes, events, usage, receipts, quota counters, and budget data. New cleanups atomically record `content.expired` with the expiry and deletion timestamps. Repeating cleanup does not add another expiry event.
 
-Schedule the authenticated maintenance route outside the application because `vercel.json` contains no cron registration. This covers jobs whose Workflow start never completed and supplies another cleanup path after platform incidents.
+The daily Vercel cron covers jobs whose Workflow start never completed and supplies another cleanup path after platform incidents. Hobby scheduling can run anywhere within the scheduled hour; the daily fallback does not guarantee deletion exactly at 24 hours. Health returns `content_cleanup_overdue` when content remains five minutes after expiry and `maintenance_overdue` after 26 hours without a successful maintenance run.
 
 Verify cleanup with a non-sensitive test record:
 
@@ -273,9 +273,9 @@ After rotation:
 ## Known production limitations
 
 - Two archived Testnet jobs prove the recorded flow, not Mainnet correctness, sustained-load reliability, or production maturity.
-- No Mainnet paid proof has been recorded. A real 24-hour cleanup cycle has not yet been observed.
+- The direct-wallet Mainnet evidence verifies an existing maintainer deposit and paid run. Historical jobs have cleared content, but their exact deletion timestamps were not retained. Mainnet Gateway replay and sustained load remain outside that evidence.
 - Vercel platform limits and Neon free-plan limits can interrupt or throttle execution.
 - External services cannot supply exactly-once guarantees to this application. Unknown outcomes stop for review.
 - Circle session snapshots expire and require operator rotation. Vercel cannot refresh the current snapshot.
-- The fixed `$0.40` demo-budget allocation does not return unused capacity. Probe calls already hold `$0.019390` of the ceiling, while the provider reported `$0.00083109` in billed probe cost.
+- Each accepted run holds `$0.40` of the internal provider allowance. Completed runs settle measured cost and return unused capacity; unknown outcomes retain their hold for review. User deposits do not replenish the external AI provider account.
 - Keep Circle CLI commands fixed, the session private, and dependency audits in the release gate.

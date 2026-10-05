@@ -111,6 +111,11 @@ CREATE TABLE IF NOT EXISTS agent_demo.worker (
 CREATE TABLE IF NOT EXISTS agent_demo.executor (
  id integer PRIMARY KEY CHECK(id=1), job_id uuid, token uuid, started_at timestamptz);
 INSERT INTO agent_demo.executor(id) VALUES(1) ON CONFLICT DO NOTHING;
+CREATE TABLE IF NOT EXISTS agent_demo.maintenance (
+ id integer PRIMARY KEY CHECK(id=1), last_started_at timestamptz,
+ last_succeeded_at timestamptz, last_failed_at timestamptz,
+ lease_token uuid, lease_expires_at timestamptz, cleaned_jobs integer NOT NULL DEFAULT 0);
+INSERT INTO agent_demo.maintenance(id) VALUES(1) ON CONFLICT DO NOTHING;
 `;
 
 export class JobStore {
@@ -503,9 +508,18 @@ export class JobStore {
   }
   async cleanup() {
     // Retain opaque ledger references and quota/budget accounting; erase submitted content.
-    await this.pool.query(
-      'UPDATE agent_demo.jobs SET document=NULL,result=NULL WHERE expires_at<=now() AND (document IS NOT NULL OR result IS NOT NULL)',
+    const result = await this.pool.query<{ count: number }>(
+      `WITH cleared AS (
+        UPDATE agent_demo.jobs SET document=NULL,result=NULL
+        WHERE expires_at<=now() AND (document IS NOT NULL OR result IS NOT NULL)
+        RETURNING id,expires_at
+      ), recorded AS (
+        INSERT INTO agent_demo.events(job_id,kind,detail)
+        SELECT id,'content.expired',jsonb_build_object('expiresAt',expires_at,'clearedAt',now())
+        FROM cleared RETURNING job_id
+      ) SELECT count(*)::int AS count FROM recorded`,
     );
+    return result.rows[0].count;
   }
   async recoverInterrupted() {
     await this.pool.query(
