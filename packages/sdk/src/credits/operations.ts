@@ -345,18 +345,26 @@ export class DurableMeteredOperations {
     if (operation.status !== 'needs_reconciliation' || !operation.savedResult) {
       throw new InvalidCreditStateError(`Operation does not need reconciliation: ${operation.id}`);
     }
-    const alreadyCharged = await this.ledger.store.getUsageEvent(
-      operation.savedResult.usageEventId,
-    );
-    if (
-      alreadyCharged &&
-      alreadyCharged.reservationId !==
-        (operation.settlementReservationId ?? operation.reservationId)
-    ) {
-      throw new InvalidCreditStateError(
-        `Saved usage event was charged by another reservation: ${operation.savedResult.usageEventId}`,
-      );
-    }
+    // Read the operation and its charge from one snapshot. Another worker may have
+    // committed a replacement reservation since the initial operation read.
+    operation = await this.transaction(async (tx) => {
+      const current = await requireOperation(tx, this.ledger.projectId, operationKey);
+      if (current.status === 'settled') return current;
+      if (current.status !== 'needs_reconciliation' || !current.savedResult) {
+        throw new InvalidCreditStateError(`Operation does not need reconciliation: ${current.id}`);
+      }
+      const alreadyCharged = await tx.getUsageEvent(current.savedResult.usageEventId);
+      if (
+        alreadyCharged &&
+        alreadyCharged.reservationId !== (current.settlementReservationId ?? current.reservationId)
+      ) {
+        throw new InvalidCreditStateError(
+          `Saved usage event was charged by another reservation: ${current.savedResult.usageEventId}`,
+        );
+      }
+      return current;
+    });
+    if (operation.status === 'settled') return this.settle(operationKey);
     const initial = await this.ledger.getReservation(operation.reservationId);
     if (initial?.status === 'open') {
       await this.ledger.releaseReservation({
@@ -380,7 +388,12 @@ export class DurableMeteredOperations {
         const currentReservation = current.settlementReservationId
           ? await tx.getReservation(current.settlementReservationId)
           : undefined;
-        if (currentReservation?.status === 'open' && currentReservation.expiresAt > this.now()) {
+        // Credit commit and the final operation update are separate transactions.
+        // Preserve a committed hold so a concurrent worker can finish settlement.
+        if (
+          currentReservation?.status === 'committed' ||
+          (currentReservation?.status === 'open' && currentReservation.expiresAt > this.now())
+        ) {
           return current;
         }
         const next: MeteredOperation = {

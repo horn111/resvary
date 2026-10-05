@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { Pool } from 'pg';
 import { CreditLedger, DurableMeteredOperations } from '@resvary/sdk/credits';
 import { OperatorService } from '@resvary/sdk/admin';
@@ -57,6 +57,101 @@ suite('Postgres stores', () => {
     const status = await migratePostgres({ pool: pool!, schema });
     expect(status).toMatchObject({ currentVersion: 6, latestVersion: 6, pendingVersions: [] });
   });
+
+  it.each(['operation', 'reservation'] as const)(
+    'finishes a concurrent recovery after a stale %s read without another hold',
+    async (pauseAt) => {
+      const projectId = `commit_window_${randomUUID().replaceAll('-', '')}`;
+      let now = 1_000;
+      const stores = [0, 1].map(() => createPostgresCreditStore({ pool: pool!, schema }));
+      const ledgers = stores.map(
+        (store) => new CreditLedger({ projectId, store, now: () => now, reservationTtlMs: 100 }),
+      );
+      const [first, second] = ledgers.map(
+        (ledger) => new DurableMeteredOperations(ledger, { now: () => now }),
+      );
+      await ledgers[0].registerMeter({
+        key: 'jobs',
+        dimensions: ['jobs'],
+        idempotencyKey: 'meter',
+      });
+      const price = await ledgers[0].createPriceVersion({
+        meterKey: 'jobs',
+        rates: [{ dimension: 'jobs', unitSize: '1', amount: '1' }],
+        idempotencyKey: 'price',
+      });
+      await ledgers[0].grantCredits({
+        customerId: 'customer',
+        amount: '10',
+        idempotencyKey: 'grant',
+      });
+      await first.create({
+        customerId: 'customer',
+        priceId: price.id,
+        estimatedUsage: { jobs: '1' },
+        idempotencyKey: 'job',
+      });
+      const claim = await first.claim({ operationKey: 'job', workerId: 'one' });
+      await first.saveResult({
+        operationKey: 'job',
+        claimToken: claim!.claimToken!,
+        result: { value: 'answer', actualUsage: { jobs: '2' }, usageEventId: `usage-${projectId}` },
+      });
+      now = 1_200;
+      await first.settle('job');
+      const paused = Promise.withResolvers<void>();
+      const resume = Promise.withResolvers<void>();
+      const charged = Promise.withResolvers<void>();
+      const finish = Promise.withResolvers<void>();
+      const pauseAfterRead = async <T>(value: T): Promise<T> => {
+        paused.resolve();
+        await resume.promise;
+        return value;
+      };
+      if (pauseAt === 'operation') {
+        const read = second.get.bind(second);
+        vi.spyOn(second, 'get').mockImplementationOnce(async (key) =>
+          pauseAfterRead(await read(key)),
+        );
+      } else {
+        const read = ledgers[1].getReservation.bind(ledgers[1]);
+        vi.spyOn(ledgers[1], 'getReservation').mockImplementationOnce(async (id) =>
+          pauseAfterRead(await read(id)),
+        );
+      }
+      const commit = ledgers[0].commitUsage.bind(ledgers[0]);
+      vi.spyOn(ledgers[0], 'commitUsage').mockImplementationOnce(async (input) => {
+        const result = await commit(input);
+        charged.resolve();
+        await finish.promise;
+        return result;
+      });
+      const follower = Promise.allSettled([second.reconcile('job')]);
+      await paused.promise;
+      const leader = Promise.allSettled([first.reconcile('job')]);
+      try {
+        await charged.promise;
+        resume.resolve();
+        const [outcome] = await follower;
+        expect(outcome.status).toBe('fulfilled');
+        if (outcome.status === 'fulfilled') expect(outcome.value.operation.status).toBe('settled');
+      } finally {
+        resume.resolve();
+        finish.resolve();
+        await leader;
+      }
+      const [outcome] = await leader;
+      expect(outcome.status).toBe('fulfilled');
+      expect(await ledgers[0].listUsageReceipts('customer')).toHaveLength(1);
+      expect(await ledgers[0].getBalance('customer')).toMatchObject({
+        postedAmount: '8',
+        reservedAmount: '0',
+        availableAmount: '8',
+      });
+      expect(await stores[0].listReservations({ projectId, status: 'open' })).toHaveLength(0);
+      expect((await first.get('job'))?.reconciliationAttempt).toBe(1);
+    },
+  );
 
   it('claims a metered operation once across PostgreSQL workers and settles after restart', async () => {
     const projectId = `operation_${randomUUID().replaceAll('-', '')}`;

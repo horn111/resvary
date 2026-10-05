@@ -1,6 +1,6 @@
 # Roadmap
 
-> Last updated: September 2026
+> Last updated: October 2026
 
 Resvary is an embedded, open-source prepaid credit ledger and usage billing SDK for AI products. Arc is the reference settlement network for external USDC funding. The ledger keeps settlement separate from usage accounting so manual grants and future payment sources can fund the same credit lifecycle.
 
@@ -93,12 +93,35 @@ Published Testnet evidence does not establish production Mainnet verification.
 - [x] Complete PostgreSQL, browser, and container CI for the release commit
 - [x] Publish checked 1.1.1 artifacts through the release workflow
 
-## 1.2 candidate: durable operation recovery
+## 1.2 released: durable operation recovery
 
 - [x] Define separate operation and reservation lifecycles for queued or long-running provider calls.
 - [x] Persist provider results and usage before credit settlement; expose reconciliation for expired holds and unknown provider outcomes.
 - [x] Verify restart recovery and concurrent workers on PostgreSQL in CI without repeating external side effects.
 - [x] Keep the 1.x ledger API compatible and specify SQLite v7 and PostgreSQL v5 migrations.
+
+## 1.3 released: operator recovery
+
+- [x] Expose saved-result recovery through the project-scoped Operator Console.
+- [x] Bind recovery commands to reviewed result hashes and replay-safe action IDs.
+- [x] Record ordered state transitions and expose operation backlog health.
+- [x] Publish SQLite v8 and PostgreSQL v6 migrations and release archive checks.
+
+## 1.3.1 candidate: concurrent recovery and dependency maintenance
+
+- [x] Reproduce and fix stale reads during concurrent reconciliation, including the interval between credit commit and the final operation update.
+- [x] Verify one receipt and no remaining hold with deterministic in-memory and PostgreSQL tests.
+- [x] Update patched production dependencies and document the remaining unfixed advisory with an expiring exception.
+- [ ] Pass CI, including PostgreSQL 16–18 and the Agent Demo runtime image scan, for the release SHA.
+- [ ] Publish checked package artifacts and update Agent Demo from a verified source commit.
+
+## 1.4 proposed: first external integration
+
+Current usage consists of maintainer tests and demos. The next feature milestone should help an external team complete an integration and expose gaps in that process.
+
+- [ ] Ship one Next.js/PostgreSQL example with a real AI provider, measured usage, prepaid credits, an outbox worker, and Operator Console setup.
+- [ ] Document the path from a fresh install to the first usage receipt, including failure recovery.
+- [ ] Measure time to the first receipt and validate the example with two or three external pilot teams.
 
 ## Later
 
