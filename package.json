@@ -52,7 +52,7 @@
     "ws@8.18.2": "8.21.0"
   },
   "devDependencies": {
-    "@types/node": "^22.20.1",
+    "@types/node": "^22.20.5",
     "prettier": "^3.9.9",
     "typescript": "^7.0.2"
   },
