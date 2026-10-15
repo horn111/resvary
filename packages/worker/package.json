@@ -39,7 +39,7 @@
   "dependencies": {
     "@resvary/postgres": "1.3.1",
     "@resvary/sdk": "1.3.1",
-    "pg": "^8.16.3"
+    "pg": "^8.23.1"
   },
   "devDependencies": {
     "@types/node": "^22.20.1",
