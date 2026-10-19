@@ -8,8 +8,8 @@
       "version": "1.4.0",
       "path": "node_modules/node-forge",
       "owner": "horn111",
-      "expires": "2026-10-19",
-      "reason": "Only installed caller is @circle-fin/cli@1.1.4. Reviewed CLI uses forge for SHA-256, ASN.1 parsing and RSA-OAEP encryption, not the affected PKCS#1 v1.5 signature verification. No patched release on 2026-10-05. See docs/dependency-security.md; remove on upstream fix and re-review on CLI or call-path changes."
+      "expires": "2026-10-26",
+      "reason": "Only installed caller is @circle-fin/cli@1.2.1. Static review of the published bundle found SHA-256, ASN.1 envelope parsing, and RSA-OAEP operations, but no call to the affected RSA PKCS#1 v1.5 signature verifier. Resvary invokes only fixed wallet status/list, Gateway balance, and services pay commands through apps/agent-demo/src/lib/circle-cli.ts. node-forge@1.4.0 remains the latest npm release with no patched version as of 2026-10-19. This is a seven-day, exact-version exception, not a fix; remove it when a patched compatible release is available and re-review on CLI or call-path changes. See docs/dependency-security.md."
     }
   ]
 }

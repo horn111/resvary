@@ -37,7 +37,7 @@ export function packageTemplate(config: ProjectConfig): string {
     ${
       isExpress
         ? `"express": "^4.21.2"`
-        : `"next": "16.3.5",\n    "react": "19.3.0",\n    "react-dom": "19.3.0"`
+        : `"next": "16.4.0",\n    "react": "19.3.0",\n    "react-dom": "19.3.0"`
     }
   },
   "devDependencies": {

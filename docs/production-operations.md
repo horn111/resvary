@@ -55,7 +55,7 @@ The public response contains issue codes and build identity only. Inspect privat
 
 The **Dependency maintenance** workflow runs daily at 05:29 UTC. It runs the production advisory gate and checks every exception for an upstream package release and its deadline. It fails within three days of expiry to prompt review. The normal audit gate still rejects expired exceptions.
 
-As of October 5, `node-forge@1.4.0` has no newer npm release. The reviewed exception expires October 19 and belongs to `horn111`; see [dependency security](dependency-security.md). A newer version triggers review rather than an automatic override. No deadline is extended automatically.
+As of October 19, `node-forge@1.4.0` remains the latest npm release. The exact-version exception expires October 26 and belongs to `horn111`; see [dependency security](dependency-security.md). A newer version triggers review rather than an automatic override. No deadline is extended automatically.
 
 ## Evidence
 
