@@ -1,16 +1,18 @@
 # Production dependency review
 
-## October 5 review for the 1.3.1 candidate
+## October 19 review for the 1.3.1 candidate
 
 Workflow `4.8.9` now resolves `devalue@5.9.4` through its Core override. The version-scoped `http-cache-semantics@4.2.0` override resolves to `4.3.0`. Both changes stay within the installed major versions. Use npm `11.19.1`, matching release CI, when regenerating this lockfile; the local npm `11.9.0` did not apply these overrides correctly.
 
-After these updates, the production audit reports **7 low, 6 moderate, 2 high, and 0 critical** affected-package entries. The two high entries are `node-forge` and its caller, Circle CLI, from one underlying advisory. The production gate passes with the single exception below. This is not a zero-vulnerability result, and the container scan remains a separate release gate.
+The reviewed Dependabot candidate updates Circle CLI to `1.2.1`. Its lockfile was refreshed with npm `11.19.1`, matching release CI. The all-workspace production audit reports **7 low, 6 moderate, 2 high, and 0 critical** affected-package entries. The two high entries are `node-forge` and its caller, Circle CLI, from one underlying advisory. The production gate accepts only the exact `node-forge@1.4.0` exception below. This is not a zero-vulnerability result, and the container scan remains a separate release gate.
 
 ### Temporary node-forge exception
 
-[GHSA-86w9-cpqp-85rv / CVE-2026-85393](https://github.com/advisories/GHSA-86w9-cpqp-85rv) affects RSA PKCS#1 v1.5 signature verification through `node-forge@1.4.0`. No patched npm release was available on October 5. The exception in `security/dependency-exceptions.json` applies only to that advisory, version, and `node_modules/node-forge` path. Owner: `horn111`. It expires at **2026-10-19 00:00 UTC**.
+[GHSA-86w9-cpqp-85rv / CVE-2026-85393](https://github.com/advisories/GHSA-86w9-cpqp-85rv) affects RSA PKCS#1 v1.5 signature verification through `node-forge@1.4.0`. npm still lists `1.4.0` as the latest release, and the advisory lists no patched version as of October 19. The exception in `security/dependency-exceptions.json` applies only to this advisory, this version, and the `node_modules/node-forge` path. Owner: `horn111`. It expires at **2026-10-26 00:00 UTC**.
 
-The installed production graph has one caller: `@circle-fin/cli@1.1.4`. Inspection of its distributed `dist/index.js` found SHA-256 hashing, base64 helpers, ASN.1 envelope parsing, public-key parsing, and RSA-OAEP encryption. Envelope decryption uses Node's RSA-OAEP implementation. The CLI does not call Forge's affected PKCS#1 v1.5 signature verifier. Resvary invokes fixed CLI wallet, Gateway, and payment commands through `apps/agent-demo/src/lib/circle-cli.ts`; request input cannot select arbitrary CLI code. This reviewed call path is the basis for the temporary exception, not a claim that the package is fixed.
+The installed production graph has one caller: `@circle-fin/cli@1.2.1`. Static inspection of the published source map found SHA-256 hashing, ASN.1 envelope parsing, public-key parsing, and RSA-OAEP encryption in its Forge helper; envelope decryption uses Node's RSA-OAEP implementation. The reviewed command paths do not call Forge's affected PKCS#1 v1.5 signature verifier. Resvary invokes only fixed wallet status/list, Gateway balance, and payment commands through `apps/agent-demo/src/lib/circle-cli.ts`; request input cannot select arbitrary CLI code. This manual reachability review supports the temporary exception, but does not fix the vulnerable package.
+
+Circle CLI `1.2.2` is now published and still declares `node-forge: ^1.3.1`; its bundled Forge helper matches `1.2.1`. It also changes `services pay` payment validation and preflight behavior. Keep that payment-flow update out of this dependency PR and review it separately with the Arc funding path before upgrading.
 
 Remove the exception as soon as a compatible fixed package or caller release is available. Re-review it before changing Circle CLI, adding a Forge caller, or expanding CLI dispatch. New advisories, another installed path/version, and expiry still block the gate. The same policy generates the version-scoped Trivy exception.
 
@@ -68,7 +70,7 @@ The application still runs fixed Arc wallet and Gateway commands through [`circl
 
 The `Dependency maintenance` GitHub Actions workflow runs daily at 05:29 UTC, including when no PR is open. It runs the production advisory gate and `scripts/security/review-exceptions.mjs`. The review check fails when an exception is within three days of expiry or a different upstream `latest` version becomes available. The advisory gate rejects expired exceptions. Workflow failure notifications follow the repository owner's GitHub Actions settings.
 
-On October 5, 2026, npm still reported `node-forge@1.4.0` and Circle CLI `1.1.4` as latest. The October 19 exception remains unchanged; daily checks provide a review trigger, not a vulnerability fix or permission to extend its deadline.
+On October 19, 2026, npm reported `node-forge@1.4.0` as latest. The seven-day exception is specific to the reviewed Circle CLI `1.2.1` graph; daily checks provide a review trigger, not a vulnerability fix or permission to extend its deadline.
 
 1. Let the weekly npm Dependabot check propose updates, then review the lockfile and run workspace tests, Agent Demo build, and PostgreSQL/browser CI. Group production and development minor/patch updates separately; review each major dependency update in its own PR. Keep Node type majors aligned with supported runtimes through a deliberate migration rather than an automatic upgrade to the latest Node release.
 2. Remove each override once all callers resolve to a fixed compatible version without it. Keep overrides version-scoped.
