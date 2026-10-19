@@ -1,6 +1,6 @@
 import type { NextConfig } from 'next';
 import { withWorkflow } from 'workflow/next';
-import { resolve } from 'node:path';
+import { posix, resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import { nodeFileTrace } from '@vercel/nft';
 const config: NextConfig = {
@@ -31,11 +31,37 @@ export default async function nextConfig(phase: string, context: { defaultConfig
     base: resolve(process.cwd(), '../..'),
     processCwd: process.cwd(),
   });
-  const files = [...traced.fileList].map((file) => `../../${file.replaceAll('\\', '/')}`);
+  // Keep Turbopack's globs small without including untraced source maps.
+  const includeFiles: string[] = [];
+  const includeGroups = new Map<
+    string,
+    { directory: string; extension: string; files: string[] }
+  >();
+  for (const tracedFile of traced.fileList) {
+    const file = tracedFile.replaceAll('\\', '/');
+    const extension = posix.extname(file);
+    if (!file.startsWith('node_modules/') || !extension) {
+      includeFiles.push(`../../${file}`);
+      continue;
+    }
+
+    const directory = posix.dirname(file);
+    const key = `${directory}\0${extension}`;
+    const group = includeGroups.get(key) ?? { directory, extension, files: [] };
+    group.files.push(file);
+    includeGroups.set(key, group);
+  }
+  for (const group of includeGroups.values()) {
+    includeFiles.push(
+      group.files.length > 1
+        ? `../../${group.directory}/*${group.extension}`
+        : `../../${group.files[0]}`,
+    );
+  }
   const wrapped = withWorkflow(
     {
       ...config,
-      outputFileTracingIncludes: { '/*': files },
+      outputFileTracingIncludes: { '/*': includeFiles },
     },
     { workflows: { local: { port: 3100 } } },
   );
