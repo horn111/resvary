@@ -19,22 +19,22 @@
     "node": "24.x"
   },
   "dependencies": {
-    "@circle-fin/cli": "1.2.1",
+    "@circle-fin/cli": "1.2.2",
     "@openai/agents": "0.20.0",
     "@resvary/circle": "1.3.1",
     "@resvary/postgres": "1.3.1",
     "@resvary/sdk": "1.3.1",
     "@vercel/nft": "1.11.0",
-    "next": "^16.4.0",
-    "openai": "7.32.0",
+    "next": "^16.4.2",
+    "openai": "7.39.0",
     "pg": "^8.23.1",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "tsx": "4.23.15",
-    "undici": "8.11.2",
-    "viem": "^2.57.4",
+    "undici": "8.12.2",
+    "viem": "^2.57.7",
     "workflow": "5.2.2",
-    "zod": "^4.6.6"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.0",

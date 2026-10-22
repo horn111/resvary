@@ -100,11 +100,11 @@
     "url": "https://github.com/horn111/resvary/issues"
   },
   "dependencies": {
-    "viem": "^2.57.4"
+    "viem": "^2.57.7"
   },
   "peerDependencies": {
     "express": ">=4.0.0",
-    "next": "^16.4.0"
+    "next": "^16.4.2"
   },
   "peerDependenciesMeta": {
     "express": {
